@@ -249,6 +249,7 @@ using .CoreModule:
     AbstractOptions,
     Options,
     ComplexityMapping,
+    SparseRegressionOptions,
     WarmStartIncompatibleError,
     AbstractMutationWeights,
     MutationWeights,
