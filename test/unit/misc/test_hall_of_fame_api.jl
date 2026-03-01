@@ -1,7 +1,9 @@
 @testitem "HallOfFame API accessors" tags = [:part3] begin
     using SymbolicRegression
     using DynamicExpressions: Node, Expression
-    using SymbolicRegression.HallOfFameModule: defined_members, dominating_members, update_hall_of_fame!
+    using SymbolicRegression.HallOfFameModule:
+        defined_members, dominates, dominating_members, update_hall_of_fame!
+    using SymbolicRegression.SearchUtilsModule: check_for_loss_threshold
 
     options = Options(; binary_operators=[+], unary_operators=[], maxsize=10)
 
@@ -13,10 +15,7 @@
 
     ex1 = to_hof_expression(
         @parse_expression(
-            x,
-            operators=options.operators,
-            variable_names=[:x],
-            node_type=Node{Float64},
+            x, operators=options.operators, variable_names=[:x], node_type=Node{Float64},
         ),
     )
     ex3 = to_hof_expression(
@@ -45,6 +44,7 @@
 
     members = collect(defined_members(hof))
     @test length(members) == 3
+    @test length(defined_members(hof)) == 3
 
     dom = dominating_members(hof)
     dom2 = calculate_pareto_frontier(hof)
@@ -56,6 +56,24 @@
     @test length(dom) == 2
     @test dom[1].loss == 5.0
     @test dom[2].loss == 4.0
+
+    @test dominates(1, 5.0, 3, 5.0)
+    @test !dominates(3, 5.0, 1, 5.0)
+
+    options_stop = Options(;
+        binary_operators=[+],
+        unary_operators=[],
+        maxsize=10,
+        early_stop_condition=((loss, complexity) -> loss < 4.5),
+    )
+    options_no_stop = Options(;
+        binary_operators=[+],
+        unary_operators=[],
+        maxsize=10,
+        early_stop_condition=((loss, complexity) -> loss < 3.5),
+    )
+    @test check_for_loss_threshold([hof], options_stop)
+    @test !check_for_loss_threshold([hof], options_no_stop)
 
     # Ensure update supports iterables (not just vectors)
     hof2 = HallOfFame(options, dataset)

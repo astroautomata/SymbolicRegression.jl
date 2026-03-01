@@ -141,7 +141,8 @@ defined_members(hall_of_fame::HallOfFame) = DefinedMembers(hall_of_fame)
 
 """Pareto dominance for minimization objectives (complexity, loss)."""
 @inline function dominates(a_complexity::Int, a_loss, b_complexity::Int, b_loss)
-    return (a_complexity <= b_complexity) && (a_loss <= b_loss) &&
+    return (a_complexity <= b_complexity) &&
+           (a_loss <= b_loss) &&
            ((a_complexity < b_complexity) || (a_loss < b_loss))
 end
 
