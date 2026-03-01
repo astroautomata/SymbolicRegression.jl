@@ -61,8 +61,8 @@ on-the-fly from whether each bucket `cells[complexity]` is empty.
 
 Actual archive cells are stored in `cells` keyed by tuple keys produced by criteria.
 """
-struct HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}}
-    criteria::AbstractHallOfFameCriteria
+struct HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N},C<:AbstractHallOfFameCriteria}
+    criteria::C
     cells::Vector{Dict{Tuple,PM}}
     members::Array{PM,1}
 end
@@ -82,8 +82,8 @@ function Base.propertynames(::HallOfFame, private::Bool=false)
 end
 
 function Base.show(
-    io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM}
-) where {T,L,N,PM}
+    io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM,C}
+) where {T,L,N,PM,C}
     println(io, "HallOfFame{...}:")
     for i in eachindex(hof.members)
         slot_exists = !isempty(hof.cells[i])
@@ -105,7 +105,7 @@ function Base.show(
     return nothing
 end
 
-function Base.eltype(::Union{HOF,Type{HOF}}) where {T,L,N,PM,HOF<:HallOfFame{T,L,N,PM}}
+function Base.eltype(::Union{HOF,Type{HOF}}) where {T,L,N,PM,C,HOF<:HallOfFame{T,L,N,PM,C}}
     return PM
 end
 
@@ -130,8 +130,8 @@ function HallOfFame(
 end
 
 function HallOfFame(
-    options::AbstractOptions, dataset::Dataset{T,L}, criteria::AbstractHallOfFameCriteria
-) where {T<:DATA_TYPE,L<:LOSS_TYPE}
+    options::AbstractOptions, dataset::Dataset{T,L}, criteria::C
+) where {T<:DATA_TYPE,L<:LOSS_TYPE,C<:AbstractHallOfFameCriteria}
     base_tree = create_expression(init_value(T), options, dataset)
     PM = options.popmember_type
 
@@ -153,12 +153,12 @@ function HallOfFame(
     cells = [Dict{Tuple,PMtype}() for _ in 1:(options.maxsize)]
     empty_members = [copy(prototype) for _ in 1:(options.maxsize)]
 
-    return HallOfFame{T,L,typeof(base_tree),PMtype}(criteria, cells, empty_members)
+    return HallOfFame(criteria, cells, empty_members)
 end
 
-function Base.copy(hof::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
-    cells = [Dict(k => copy(member) for (k, member) in d) for d in hof.cells]
-    return HallOfFame{T,L,N,PM}(
+function Base.copy(hof::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
+    cells = [Dict{Tuple,PM}(k => copy(member) for (k, member) in d) for d in hof.cells]
+    return HallOfFame(
         hof.criteria,
         cells,
         [copy(member) for member in hof.members],
@@ -193,7 +193,7 @@ function Base.iterate(dc::DefinedCells, state=(1, nothing))
 end
 
 Base.IteratorEltype(::Type{<:DefinedCells}) = Base.HasEltype()
-Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,H<:HallOfFame{T,L,N,PM}} = Tuple{Tuple,PM}
+Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}} = Tuple{Tuple,PM}
 Base.IteratorSize(::Type{<:DefinedCells}) = Base.SizeUnknown()
 Base.length(dc::DefinedCells) = sum(length, dc.hall_of_fame.cells)
 
@@ -214,7 +214,7 @@ function Base.iterate(dm::DefinedMembers, state::Int=1)
 end
 
 Base.IteratorEltype(::Type{<:DefinedMembers}) = Base.HasEltype()
-Base.eltype(::Type{DefinedMembers{H}}) where {T,L,N,PM,H<:HallOfFame{T,L,N,PM}} = PM
+Base.eltype(::Type{DefinedMembers{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}} = PM
 Base.IteratorSize(::Type{<:DefinedMembers}) = Base.SizeUnknown()
 Base.length(dm::DefinedMembers) = count(_ -> true, dm)
 
@@ -231,7 +231,7 @@ end
 
 This corresponds to the Pareto frontier in objectives `(complexity, loss)`.
 """
-function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
+function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
     dominating = PM[]
     best_loss = typemax(L)
     for complexity in eachindex(hall_of_fame.members)
@@ -252,7 +252,7 @@ This preserves the historical behavior (dominance based on
 """
 calculate_pareto_frontier(hallOfFame::HallOfFame) = dominating_members(hallOfFame)
 
-function _sync_best_member!(hof::HallOfFame{T,L,N,PM}, complexity) where {T,L,N,PM}
+function _sync_best_member!(hof::HallOfFame{T,L,N,PM,C}, complexity) where {T,L,N,PM,C}
     bucket = hof.cells[complexity]
     isempty(bucket) && return nothing
 

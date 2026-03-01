@@ -641,7 +641,7 @@ end
     PMType = infer_popmember_type(T, L, D, options)
     NT = expression_type(PMType)
     PopType = Population{T,L,NT,PMType}
-    HallOfFameType = HallOfFame{T,L,NT,PMType}
+    HallOfFameType = typeof(HallOfFame(options, example_dataset))
     WorkerOutputType = get_worker_output_type(
         Val(ropt.parallelism), PopType, HallOfFameType
     )
@@ -701,7 +701,7 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType}(;
+    return SearchState{T,L,NT,PMType,HallOfFameType,WorkerOutputType,ChannelType}(;
         procs=procs,
         we_created_procs=we_created_procs,
         worker_output=worker_output,
@@ -821,7 +821,7 @@ function _preserve_loaded_state!(
     prototype_pop = state.last_pops[1][1]
     PopType = typeof(prototype_pop)
     PM = popmember_type(PopType)
-    HallType = HallOfFame{T,L,N,PM}
+    HallType = typeof(state.halls_of_fame[1])
 
     for j in 1:nout, i in 1:(options.populations)
         (pop, _, _, _) = extract_from_worker(state.worker_output[j][i], PopType, HallType)
@@ -859,7 +859,7 @@ function _warmup_search!(
         prototype_pop = state.last_pops[j][i]
         PopType = typeof(prototype_pop)
         PM = popmember_type(PopType)
-        HallType = HallOfFame{T,L,N,PM}
+        HallType = typeof(state.halls_of_fame[j])
 
         updated_pop = @sr_spawner(
             begin
@@ -874,7 +874,7 @@ function _warmup_search!(
                     ropt.verbosity,
                     cur_maxsize,
                     running_search_statistics=c_rss,
-                )::DefaultWorkerOutputType{Population{T,L,N,PM},HallOfFame{T,L,N,PM}}
+                )::DefaultWorkerOutputType{Population{T,L,N,PM},HallType}
             end,
             parallelism = ropt.parallelism,
             worker_idx = worker_idx

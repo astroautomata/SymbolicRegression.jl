@@ -589,14 +589,20 @@ Look through the source of `equation_search` to see how this is used.
 abstract type AbstractSearchState{T,L,N<:AbstractExpression{T}} end
 
 """
-    SearchState{T,L,N,WorkerOutputType,ChannelType} <: AbstractSearchState{T,L,N}
+    SearchState{T,L,N,PM,HOF,WorkerOutputType,ChannelType} <: AbstractSearchState{T,L,N}
 
 The state of the search, including the populations, worker outputs, tasks, and
 channels. This is used to manage the search and keep track of runtime variables
 in a single struct.
 """
 Base.@kwdef struct SearchState{
-    T,L,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N},WorkerOutputType,ChannelType
+    T,
+    L,
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    HOF<:HallOfFame{T,L,N,PM},
+    WorkerOutputType,
+    ChannelType,
 } <: AbstractSearchState{T,L,N}
     procs::Vector{Int}
     we_created_procs::Bool
@@ -605,7 +611,7 @@ Base.@kwdef struct SearchState{
     channels::Vector{Vector{ChannelType}}
     worker_assignment::WorkerAssignments
     task_order::Vector{Tuple{Int,Int}}
-    halls_of_fame::Vector{HallOfFame{T,L,N,PM}}
+    halls_of_fame::Vector{HOF}
     last_pops::Vector{Vector{Population{T,L,N,PM}}}
     best_sub_pops::Vector{Vector{Population{T,L,N,PM}}}
     all_running_search_statistics::Vector{RunningSearchStatistics}
