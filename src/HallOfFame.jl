@@ -31,14 +31,15 @@ function HallOfFameCriteria(axes::Vararg{Symbol,N}) where {N}
 end
 
 @inline function _criterion_value(axis::Symbol, member, options)::Int
+    if axis !== :complexity && axis !== :depth && axis !== :nconsts
+        @noinline throw(ArgumentError("Unsupported HallOfFameCriteria axis: $(axis)"))
+    end
     if axis === :complexity
         return compute_complexity(member, options)
     elseif axis === :depth
         return count_depth(get_tree(member.tree))
-    elseif axis === :nconsts
-        return count_scalar_constants(member.tree)
     else
-        throw(ArgumentError("Unsupported HallOfFameCriteria axis: $(axis)"))
+        return count_scalar_constants(member.tree)
     end
 end
 
