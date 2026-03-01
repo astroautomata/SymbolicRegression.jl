@@ -39,7 +39,11 @@ DEFAULT_HALL_OF_FAME_CRITERIA[] = HallOfFameCriteria()
 
 @inline function _criterion_value(axis::Symbol, member, options)::Int
     if !(axis in (:complexity, :depth, :nconsts))
-        @noinline throw(ArgumentError("Unsupported HallOfFameCriteria axis: $(axis)"))
+        @noinline throw(
+            ArgumentError(
+                "Unsupported HallOfFameCriteria axis: $(axis). Supported axes are: :complexity, :depth, :nconsts"
+            ),
+        )
     end
     if axis === :complexity
         return compute_complexity(member, options)
