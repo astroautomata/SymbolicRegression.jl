@@ -71,7 +71,7 @@ end
 # - `hof.exists[i]` indicates whether complexity-slot `i` has any archived members.
 function Base.getproperty(hof::HallOfFame, name::Symbol)
     if name === :exists
-        return map(d -> !isempty(d), getfield(hof, :cells))
+        return map(!isempty, getfield(hof, :cells))
     end
     return getfield(hof, name)
 end
