@@ -137,7 +137,7 @@ end
             Dict{K,PM}(k => embed_metadata(member, options, dataset) for (k, member) in d)
             for d in hof.cells
         ]
-        return HallOfFame(hof.criteria, new_cells, new_members, copy(hof.exists))
+        return HallOfFame(hof.criteria, new_cells, new_members)
     end
     function embed_metadata(
         vec::Vector{H}, options::AbstractOptions, dataset::Dataset{T,L}
@@ -186,7 +186,7 @@ function strip_metadata(
         Dict{K,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d) for
         d in hof.cells
     ]
-    return HallOfFame(hof.criteria, new_cells, new_members, copy(hof.exists))
+    return HallOfFame(hof.criteria, new_cells, new_members)
 end
 
 @unstable function get_operators(ex::AbstractExpression, options::AbstractOptions)

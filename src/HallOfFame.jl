@@ -51,27 +51,41 @@ end
 
 List of the best members seen all time.
 
-For compatibility this preserves legacy fields:
+For compatibility this preserves a legacy-like field:
 - `members::Array{PM,1}`: best member per complexity (for convenience/backward compatibility)
-- `exists::Array{Bool,1}`: whether each complexity slot has at least one member
+
+The legacy `exists` field is no longer stored; instead, `hof.exists` is computed
+on-the-fly from whether each bucket `cells[complexity]` is empty.
 
 Actual archive cells are stored in `cells` keyed by tuple keys produced by criteria.
 """
-struct HallOfFame{
-    T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}
-}
+struct HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}}
     criteria::AbstractHallOfFameCriteria
     cells::Vector{Dict{Tuple,PM}}
     members::Array{PM,1}
-    exists::Array{Bool,1}
+end
+
+# Legacy compatibility:
+# - `hof.exists[i]` indicates whether complexity-slot `i` has any archived members.
+function Base.getproperty(hof::HallOfFame, name::Symbol)
+    if name === :exists
+        return map(d -> !isempty(d), getfield(hof, :cells))
+    end
+    return getfield(hof, name)
+end
+
+function Base.propertynames(::HallOfFame, private::Bool=false)
+    names = (:criteria, :cells, :members, :exists)
+    return private ? names : names
 end
 
 function Base.show(
     io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM}
 ) where {T,L,N,PM}
     println(io, "HallOfFame{...}:")
-    for i in eachindex(hof.members, hof.exists)
-        s_member, s_exists = if hof.exists[i]
+    for i in eachindex(hof.members)
+        slot_exists = !isempty(hof.cells[i])
+        s_member, s_exists = if slot_exists
             sprint((io, m) -> show(io, mime, m), hof.members[i]), "true"
         else
             "undef", "false"
@@ -137,9 +151,7 @@ function HallOfFame(
     cells = [Dict{Tuple,PMtype}() for _ in 1:(options.maxsize)]
     empty_members = [copy(prototype) for _ in 1:(options.maxsize)]
 
-    return HallOfFame{T,L,typeof(base_tree),PMtype}(
-        criteria, cells, empty_members, [false for _ in 1:(options.maxsize)]
-    )
+    return HallOfFame{T,L,typeof(base_tree),PMtype}(criteria, cells, empty_members)
 end
 
 function Base.copy(hof::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
@@ -148,7 +160,6 @@ function Base.copy(hof::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
         hof.criteria,
         cells,
         [copy(member) for member in hof.members],
-        [exists for exists in hof.exists],
     )
 end
 
@@ -194,7 +205,7 @@ end
 function Base.iterate(dm::DefinedMembers, state::Int=1)
     hof = dm.hall_of_fame
     for i in state:lastindex(hof.members)
-        hof.exists[i] && return (hof.members[i], i + 1)
+        !isempty(hof.cells[i]) && return (hof.members[i], i + 1)
     end
     return nothing
 end
@@ -221,7 +232,7 @@ function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
     dominating = PM[]
     best_loss = typemax(L)
     for complexity in eachindex(hall_of_fame.members)
-        hall_of_fame.exists[complexity] || continue
+        isempty(hall_of_fame.cells[complexity]) && continue
         member = hall_of_fame.members[complexity]
         if member.loss < best_loss
             push!(dominating, copy(member))
@@ -240,10 +251,8 @@ calculate_pareto_frontier(hallOfFame::HallOfFame) = dominating_members(hallOfFam
 
 function _sync_best_member!(hof::HallOfFame{T,L,N,PM}, complexity) where {T,L,N,PM}
     bucket = hof.cells[complexity]
-    if isempty(bucket)
-        hof.exists[complexity] = false
-        return nothing
-    end
+    isempty(bucket) && return nothing
+
     best = nothing
     for member in values(bucket)
         best = if best === nothing || member.cost < best.cost
@@ -253,7 +262,6 @@ function _sync_best_member!(hof::HallOfFame{T,L,N,PM}, complexity) where {T,L,N,
         end
     end
     hof.members[complexity] = copy(best)
-    hof.exists[complexity] = true
     return nothing
 end
 

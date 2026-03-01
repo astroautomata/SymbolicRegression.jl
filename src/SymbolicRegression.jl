@@ -1204,7 +1204,6 @@ end
         for complexity in 1:(options.maxsize)
             bucket = best_seen.cells[complexity]
             if isempty(bucket)
-                best_seen.exists[complexity] = false
                 continue
             end
             best_member = nothing
@@ -1218,7 +1217,6 @@ end
                 num_evals += 1
             end
             best_seen.members[complexity] = copy(best_member)
-            best_seen.exists[complexity] = true
         end
     end
     return (out_pop, best_seen, record, num_evals)
