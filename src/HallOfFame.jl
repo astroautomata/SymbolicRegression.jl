@@ -76,10 +76,7 @@ function Base.getproperty(hof::HallOfFame, name::Symbol)
     return getfield(hof, name)
 end
 
-function Base.propertynames(::HallOfFame, private::Bool=false)
-    names = (:criteria, :cells, :members, :exists)
-    return private ? names : names
-end
+Base.propertynames(::HallOfFame, private::Bool=false) = (:criteria, :cells, :members, :exists)
 
 function Base.show(
     io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM,C}
