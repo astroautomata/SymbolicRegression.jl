@@ -7,6 +7,7 @@ using ..CoreModule:
     AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, relu, create_expression, init_value
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember, PopMember
+using ..CheckConstraintsModule: check_constraints
 using ..InterfaceDynamicExpressionsModule: format_dimensions, WILDCARD_UNIT_STRING
 using Printf: @sprintf
 
@@ -113,36 +114,87 @@ function Base.copy(hof::HallOfFame)
     )
 end
 
+"""Iterate over members which have been set in the hall of fame.
+
+This is the supported way to traverse the hall of fame without relying on the
+internal `.exists` bookkeeping.
 """
-    calculate_pareto_frontier(hallOfFame::HallOfFame{T,L,P}) where {T<:DATA_TYPE,L<:LOSS_TYPE}
+struct DefinedMembers{H}
+    hall_of_fame::H
+end
+
+function Base.iterate(dm::DefinedMembers, state::Int=1)
+    hof = dm.hall_of_fame
+    for i in state:lastindex(hof.members)
+        hof.exists[i] && return (hof.members[i], i + 1)
+    end
+    return nothing
+end
+
+Base.IteratorEltype(::Type{<:DefinedMembers}) = Base.HasEltype()
+Base.eltype(::Type{DefinedMembers{H}}) where {H} = eltype(fieldtype(H, :members))
+Base.IteratorSize(::Type{<:DefinedMembers}) = Base.SizeUnknown()
+Base.length(dm::DefinedMembers) = count(_ -> true, dm)
+
+"""Return an iterator over members which have been set in the hall of fame."""
+defined_members(hall_of_fame::HallOfFame) = DefinedMembers(hall_of_fame)
+
+"""Pareto dominance for minimization objectives (complexity, loss)."""
+@inline function dominates(a_complexity::Int, a_loss, b_complexity::Int, b_loss)
+    return (a_complexity <= b_complexity) && (a_loss <= b_loss) &&
+           ((a_complexity < b_complexity) || (a_loss < b_loss))
+end
+
+"""Return the dominating (non-dominated) set from the hall of fame.
+
+This corresponds to the Pareto frontier in objectives `(complexity, loss)`.
 """
-function calculate_pareto_frontier(hallOfFame::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
-    # TODO - remove dataset from args.
-    # Dominating pareto curve - must be better than all simpler equations
+function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
     dominating = PM[]
-    for size in eachindex(hallOfFame.members)
-        if !hallOfFame.exists[size]
-            continue
-        end
-        member = hallOfFame.members[size]
-        # We check if this member is better than all members which are smaller than it and
-        # also exist.
-        betterThanAllSmaller = true
-        for i in 1:(size - 1)
-            if !hallOfFame.exists[i]
-                continue
-            end
-            simpler_member = hallOfFame.members[i]
-            if member.loss >= simpler_member.loss
-                betterThanAllSmaller = false
-                break
-            end
-        end
-        if betterThanAllSmaller
+    best_loss = typemax(L)
+    for complexity in eachindex(hall_of_fame.members)
+        hall_of_fame.exists[complexity] || continue
+        member = hall_of_fame.members[complexity]
+        if member.loss < best_loss
             push!(dominating, copy(member))
+            best_loss = member.loss
         end
     end
     return dominating
+end
+
+"""Backward-compatible API: compute the Pareto frontier of a HallOfFame.
+
+This preserves the historical behavior (dominance based on
+`(complexity, loss)`), and does not require passing a `Dataset`.
+"""
+calculate_pareto_frontier(hallOfFame::HallOfFame) = dominating_members(hallOfFame)
+
+"""Update a hall of fame with a single population member."""
+function update_hall_of_fame!(
+    hall_of_fame::HallOfFame, member::AbstractPopMember, options::AbstractOptions
+)
+    size = compute_complexity(member, options)
+    valid_size = 0 < size <= options.maxsize
+    valid_size || return nothing
+
+    check_constraints(member.tree, options, options.maxsize, size) || return nothing
+
+    not_filled = !hall_of_fame.exists[size]
+    better_than_current = !not_filled && member.cost < hall_of_fame.members[size].cost
+    if not_filled || better_than_current
+        hall_of_fame.members[size] = copy(member)
+        hall_of_fame.exists[size] = true
+    end
+    return nothing
+end
+
+"""Update a hall of fame with a collection of population members."""
+function update_hall_of_fame!(hall_of_fame::HallOfFame, members, options::AbstractOptions)
+    for member in members
+        update_hall_of_fame!(hall_of_fame, member, options)
+    end
+    return nothing
 end
 
 let header_parts = (
