@@ -80,7 +80,7 @@
     @test check_for_loss_threshold([hof], options_stop)
     @test !check_for_loss_threshold([hof], options_no_stop)
 
-    hof3 = HallOfFame(options, dataset, HallOfFameCriteria(:complexity, :nconsts))
+    hof3 = HallOfFame(options, dataset, HallOfFameCriteria(:nconsts))
     # (complexity, nconsts) keys should be tuples and first element is complexity.
     update_hall_of_fame!(hof3, [m1, m3, m5], options)
     cells = collect(defined_cells(hof3))

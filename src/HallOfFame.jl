@@ -17,17 +17,19 @@ abstract type AbstractHallOfFameCriteria end
 
 """Built-in hall-of-fame criteria defined by axis symbols.
 
-The first axis must be `:complexity`.
+Complexity is always included as the first axis (it defines the outer bucket).
+The `extra_axes` define additional archive dimensions within each complexity bucket.
 """
 struct HallOfFameCriteria{N} <: AbstractHallOfFameCriteria
-    axes::NTuple{N,Symbol}
+    extra_axes::NTuple{N,Symbol}
 end
 
-function HallOfFameCriteria(axes::Vararg{Symbol,N}) where {N}
-    isempty(axes) && throw(ArgumentError("HallOfFameCriteria requires at least one axis"))
-    first(axes) == :complexity ||
-        throw(ArgumentError("HallOfFameCriteria must start with :complexity as first axis"))
-    return HallOfFameCriteria{N}(axes)
+function HallOfFameCriteria(extra_axes::Vararg{Symbol,N}) where {N}
+    any(==(:complexity), extra_axes) &&
+        throw(ArgumentError("Do not include :complexity in HallOfFameCriteria; it is implicit."))
+    length(extra_axes) == length(unique(extra_axes)) ||
+        throw(ArgumentError("HallOfFameCriteria extra_axes must be unique"))
+    return HallOfFameCriteria{N}(extra_axes)
 end
 
 @inline function _criterion_value(axis::Symbol, member, options)::Int
@@ -43,8 +45,8 @@ end
     end
 end
 
-function hof_key(criteria::HallOfFameCriteria{N}, member, options)::NTuple{N,Int} where {N}
-    return ntuple(i -> _criterion_value(criteria.axes[i], member, options), Val(N))
+function hof_key(criteria::HallOfFameCriteria{N}, member, options)::NTuple{N + 1,Int} where {N}
+    return ntuple(i -> _criterion_value(i == 1 ? :complexity : criteria.extra_axes[i - 1], member, options), Val(N + 1))
 end
 """
     HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}}
@@ -113,16 +115,16 @@ end
 Construct an empty HallOfFame.
 
 If the passed options have `hall_of_fame_criteria`, that criteria is used;
-otherwise defaults to `( :complexity, )`.
+otherwise defaults to `( :complexity, )` (i.e., no extra axes).
 """
 function HallOfFame(
     options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T<:DATA_TYPE,L<:LOSS_TYPE}
     criteria = if hasproperty(options, :hall_of_fame_criteria)
         maybe = getproperty(options, :hall_of_fame_criteria)
-        maybe isa AbstractHallOfFameCriteria ? maybe : HallOfFameCriteria(:complexity)
+        maybe isa AbstractHallOfFameCriteria ? maybe : HallOfFameCriteria()
     else
-        HallOfFameCriteria(:complexity)
+        HallOfFameCriteria()
     end
     return HallOfFame(options, dataset, criteria)
 end
