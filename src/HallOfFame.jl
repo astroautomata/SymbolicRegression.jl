@@ -190,7 +190,8 @@ function Base.iterate(dc::DefinedCells, state=(1, nothing))
     return nothing
 end
 
-Base.IteratorEltype(::Type{<:DefinedCells}) = Base.EltypeUnknown()
+Base.IteratorEltype(::Type{<:DefinedCells}) = Base.HasEltype()
+Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,H<:HallOfFame{T,L,N,PM}} = Tuple{Tuple,PM}
 Base.IteratorSize(::Type{<:DefinedCells}) = Base.SizeUnknown()
 Base.length(dc::DefinedCells) = sum(length, dc.hall_of_fame.cells)
 
