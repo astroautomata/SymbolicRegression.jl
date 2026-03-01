@@ -31,7 +31,7 @@ function HallOfFameCriteria(axes::Vararg{Symbol,N}) where {N}
 end
 
 @inline function _criterion_value(axis::Symbol, member, options)::Int
-    if axis !== :complexity && axis !== :depth && axis !== :nconsts
+    if !(axis in (:complexity, :depth, :nconsts))
         @noinline throw(ArgumentError("Unsupported HallOfFameCriteria axis: $(axis)"))
     end
     if axis === :complexity
