@@ -10,6 +10,7 @@ using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember, PopMember
 using ..CheckConstraintsModule: check_constraints
 using ..InterfaceDynamicExpressionsModule: format_dimensions, WILDCARD_UNIT_STRING
+import ..CoreModule.OptionsModule: DEFAULT_HALL_OF_FAME_CRITERIA
 using Printf: @sprintf
 
 """Abstract strategy for hall-of-fame keying."""
@@ -31,6 +32,10 @@ function HallOfFameCriteria(extra_axes::Vararg{Symbol,N}) where {N}
         throw(ArgumentError("HallOfFameCriteria extra_axes must be unique"))
     return HallOfFameCriteria{N}(extra_axes)
 end
+
+# So Options() can default to a concrete criteria (Options is defined/loaded earlier).
+DEFAULT_HALL_OF_FAME_CRITERIA[] = HallOfFameCriteria()
+
 
 @inline function _criterion_value(axis::Symbol, member, options)::Int
     if !(axis in (:complexity, :depth, :nconsts))
@@ -117,13 +122,7 @@ otherwise defaults to `( :complexity, )` (i.e., no extra axes).
 function HallOfFame(
     options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T<:DATA_TYPE,L<:LOSS_TYPE}
-    criteria = if hasproperty(options, :hall_of_fame_criteria)
-        maybe = getproperty(options, :hall_of_fame_criteria)
-        maybe isa AbstractHallOfFameCriteria ? maybe : HallOfFameCriteria()
-    else
-        HallOfFameCriteria()
-    end
-    return HallOfFame(options, dataset, criteria)
+    return HallOfFame(options, dataset, getproperty(options, :hall_of_fame_criteria))
 end
 
 function HallOfFame(

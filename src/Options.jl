@@ -1,5 +1,9 @@
 module OptionsModule
 
+# Set by HallOfFameModule after it is loaded, so Options() can default to a
+# concrete criteria type without introducing a load-order dependency.
+const DEFAULT_HALL_OF_FAME_CRITERIA = Ref{Any}(nothing)
+
 using DispatchDoctor: @unstable
 using Optim: Optim
 using DynamicExpressions:
@@ -654,7 +658,7 @@ $(OPTION_DESCRIPTIONS)
     una_constraints=nothing,
     terminal_width::Union{Nothing,Integer}=nothing,
     use_recorder::Bool=false,
-    hall_of_fame_criteria::Any=nothing,
+    hall_of_fame_criteria::Any=DEFAULT_HALL_OF_FAME_CRITERIA[],
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
     ### Not search options; just construction options:
