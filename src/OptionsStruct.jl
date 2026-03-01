@@ -183,6 +183,7 @@ struct Options{
     E<:AbstractExpression,
     EO<:NamedTuple,
     MW<:AbstractMutationWeights,
+    HOFCRIT,
     PM,
     _turbo,
     _bumper,
@@ -257,6 +258,7 @@ struct Options{
     deterministic::Bool
     define_helper_functions::Bool
     use_recorder::Bool
+    hall_of_fame_criteria::HOFCRIT
     popmember_type::Type{PM}
 end
 
@@ -327,6 +329,7 @@ function check_warm_start_compatibility(old_options::Options, new_options::Optio
         :node_type,
         :expression_type,
         :expression_options,
+        :hall_of_fame_criteria,
     )
 
     changed = [

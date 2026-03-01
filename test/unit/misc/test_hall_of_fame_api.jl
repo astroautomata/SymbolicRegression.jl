@@ -2,7 +2,12 @@
     using SymbolicRegression
     using DynamicExpressions: Node, Expression
     using SymbolicRegression.HallOfFameModule:
-        defined_members, dominates, dominating_members, update_hall_of_fame!
+        defined_cells,
+        defined_members,
+        dominates,
+        dominating_members,
+        HallOfFameCriteria,
+        update_hall_of_fame!
     using SymbolicRegression.SearchUtilsModule: check_for_loss_threshold
 
     options = Options(; binary_operators=[+], unary_operators=[], maxsize=10)
@@ -74,6 +79,14 @@
     )
     @test check_for_loss_threshold([hof], options_stop)
     @test !check_for_loss_threshold([hof], options_no_stop)
+
+    hof3 = HallOfFame(options, dataset, HallOfFameCriteria(:complexity, :nconsts))
+    # (complexity, nconsts) keys should be tuples and first element is complexity.
+    update_hall_of_fame!(hof3, [m1, m3, m5], options)
+    cells = collect(defined_cells(hof3))
+    @test length(cells) == 3
+    @test all(length(k) == 2 for (k, _) in cells)
+    @test all(k[1] == compute_complexity(member, options) for (k, member) in cells)
 
     # Ensure update supports iterables (not just vectors)
     hof2 = HallOfFame(options, dataset)

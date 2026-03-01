@@ -130,9 +130,14 @@ end
     function embed_metadata(
         hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
     ) where {T,L}
-        return HallOfFame(
-            map(Fix{2}(Fix{3}(embed_metadata, dataset), options), hof.members), hof.exists
-        )
+        new_members = [embed_metadata(member, options, dataset) for member in hof.members]
+        PM = eltype(new_members)
+        K = keytype(eltype(hof.cells))
+        new_cells = [
+            Dict{K,PM}(k => embed_metadata(member, options, dataset) for (k, member) in d)
+            for d in hof.cells
+        ]
+        return HallOfFame(hof.criteria, new_cells, new_members, copy(hof.exists))
     end
     function embed_metadata(
         vec::Vector{H}, options::AbstractOptions, dataset::Dataset{T,L}
@@ -174,9 +179,14 @@ end
 function strip_metadata(
     hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T,L}
-    return HallOfFame(
-        map(member -> strip_metadata(member, options, dataset), hof.members), hof.exists
-    )
+    new_members = [strip_metadata(member, options, dataset) for member in hof.members]
+    PM = eltype(new_members)
+    K = keytype(eltype(hof.cells))
+    new_cells = [
+        Dict{K,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d) for
+        d in hof.cells
+    ]
+    return HallOfFame(hof.criteria, new_cells, new_members, copy(hof.exists))
 end
 
 @unstable function get_operators(ex::AbstractExpression, options::AbstractOptions)
