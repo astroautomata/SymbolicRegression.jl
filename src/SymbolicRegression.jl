@@ -304,7 +304,11 @@ using .PopMemberModule:
 using .CoreModule.UtilsModule: get_birth_order
 using .PopulationModule: Population, best_sub_pop, record_population, best_of_sample
 using .HallOfFameModule:
-    HallOfFame, calculate_pareto_frontier, string_dominating_pareto_curve
+    HallOfFame,
+    calculate_pareto_frontier,
+    defined_members,
+    string_dominating_pareto_curve,
+    update_hall_of_fame!
 using .MutateModule: mutate!, condition_mutation_weights!, MutationResult
 using .SingleIterationModule: s_r_cycle, optimize_and_simplify_population
 using .ProgressBarsModule: WrappedProgressBar
@@ -340,7 +344,6 @@ using .SearchUtilsModule:
     construct_datasets,
     save_to_file,
     get_cur_maxsize,
-    update_hall_of_fame!,
     parse_guesses,
     logging_callback!,
     infer_popmember_type
@@ -738,7 +741,7 @@ function _initialize_search!(
         # case the dataset changed:
         for j in eachindex(init_hall_of_fame, datasets, state.halls_of_fame)
             hof = strip_metadata(init_hall_of_fame[j], options, datasets[j])
-            for member in hof.members[hof.exists]
+            for member in defined_members(hof)
                 cost, result_loss = eval_cost(datasets[j], member, options)
                 member.cost = cost
                 member.loss = result_loss
@@ -973,7 +976,7 @@ function _main_search_loop!(
             end
             #! format: off
             update_hall_of_fame!(state.halls_of_fame[j], cur_pop.members, options)
-            update_hall_of_fame!(state.halls_of_fame[j], best_seen.members[best_seen.exists], options)
+            update_hall_of_fame!(state.halls_of_fame[j], defined_members(best_seen), options)
             #! format: on
 
             # Dominating pareto curve - must be better than all simpler equations
