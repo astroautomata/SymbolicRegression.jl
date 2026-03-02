@@ -54,8 +54,8 @@ DEFAULT_HALL_OF_FAME_CRITERIA[] = HallOfFameCriteria()
     end
 end
 
-function hof_key(criteria::HallOfFameCriteria{N}, member, options)::NTuple{N + 1,Int} where {N}
-    return ntuple(i -> _criterion_value(i == 1 ? :complexity : criteria.extra_axes[i - 1], member, options), Val(N + 1))
+function hof_key(criteria::HallOfFameCriteria{N}, member, options)::NTuple{N,Int} where {N}
+    return ntuple(i -> _criterion_value(criteria.extra_axes[i], member, options), Val(N))
 end
 """
     HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}}
@@ -186,7 +186,8 @@ function Base.iterate(dc::DefinedCells, state=(1, nothing))
             continue
         else
             kv, inner2 = step
-            return ((kv[1], kv[2]), (i, inner2))
+            # Reconstruct a full key (complexity, extra_axes...) for user-facing iteration.
+            return (((i, kv[1]...), kv[2]), (i, inner2))
         end
     end
     return nothing
@@ -283,9 +284,6 @@ function update_hall_of_fame!(
         @error("`hof_key` returned `nothing`; skipping update")
         return nothing
     end
-    key[1] == size ||
-        throw(ArgumentError("HallOfFame criteria must produce key[1] == complexity"))
-
     slot = hall_of_fame.cells[size]
     old = get(slot, key, nothing)
     if old === nothing || member.cost < old.cost

@@ -112,7 +112,7 @@ end
         Node{Float64}(; feature=1); operators=nothing, variable_names=nothing
     )
     hof.members[1].loss = -1.0
-    hof.cells[1][(1,)] = copy(hof.members[1])
+    hof.cells[1][()] = copy(hof.members[1])
 
     # With :log scale, should throw a DomainError with a helpful message
     err = try
@@ -154,7 +154,7 @@ end
         Node{Float64}(; feature=1); operators=nothing, variable_names=nothing
     )
     hof.members[1].loss = 0.5
-    hof.cells[1][(1,)] = copy(hof.members[1])
+    hof.cells[1][()] = copy(hof.members[1])
 
     # Test with log scale (should show Score column)
     output_log = string_dominating_pareto_curve(hof, dataset, options_log)
