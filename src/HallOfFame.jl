@@ -26,8 +26,9 @@ struct HallOfFameCriteria{N} <: AbstractHallOfFameCriteria
 end
 
 function HallOfFameCriteria(extra_axes::Vararg{Symbol,N}) where {N}
-    any(==(:complexity), extra_axes) &&
-        throw(ArgumentError("Do not include :complexity in HallOfFameCriteria; it is implicit."))
+    any(==(:complexity), extra_axes) && throw(
+        ArgumentError("Do not include :complexity in HallOfFameCriteria; it is implicit."),
+    )
     length(extra_axes) == length(unique(extra_axes)) ||
         throw(ArgumentError("HallOfFameCriteria extra_axes must be unique"))
     return HallOfFameCriteria{N}(extra_axes)
@@ -36,12 +37,11 @@ end
 # So Options() can default to a concrete criteria (Options is defined/loaded earlier).
 DEFAULT_HALL_OF_FAME_CRITERIA[] = HallOfFameCriteria()
 
-
 @inline function _criterion_value(axis::Symbol, member, options)::Int
     if !(axis in (:complexity, :depth, :nconsts))
         @noinline throw(
             ArgumentError(
-                "Unsupported HallOfFameCriteria axis: $(axis). Supported axes are: :complexity, :depth, :nconsts"
+                "Unsupported HallOfFameCriteria axis: $(axis). Supported axes are: :complexity, :depth, :nconsts",
             ),
         )
     end
@@ -70,7 +70,13 @@ on-the-fly from whether each bucket `cells[complexity]` is empty.
 
 Actual archive cells are stored in `cells` keyed by tuple keys produced by criteria.
 """
-struct HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N},C<:AbstractHallOfFameCriteria}
+struct HallOfFame{
+    T<:DATA_TYPE,
+    L<:LOSS_TYPE,
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    C<:AbstractHallOfFameCriteria,
+}
     criteria::C
     cells::Vector{Dict{Tuple,PM}}
     members::Array{PM,1}
@@ -85,7 +91,9 @@ function Base.getproperty(hof::HallOfFame, name::Symbol)
     return getfield(hof, name)
 end
 
-Base.propertynames(::HallOfFame, private::Bool=false) = (:criteria, :cells, :members, :exists)
+function Base.propertynames(::HallOfFame, private::Bool=false)
+    (:criteria, :cells, :members, :exists)
+end
 
 function Base.show(
     io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM,C}
@@ -158,11 +166,7 @@ end
 
 function Base.copy(hof::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
     cells = [Dict{Tuple,PM}(k => copy(member) for (k, member) in d) for d in hof.cells]
-    return HallOfFame(
-        hof.criteria,
-        cells,
-        [copy(member) for member in hof.members],
-    )
+    return HallOfFame(hof.criteria, cells, [copy(member) for member in hof.members])
 end
 
 """Iterate over all `(key, member)` pairs that are populated."""
@@ -194,7 +198,9 @@ function Base.iterate(dc::DefinedCells, state=(1, nothing))
 end
 
 Base.IteratorEltype(::Type{<:DefinedCells}) = Base.HasEltype()
-Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}} = Tuple{Tuple,PM}
+function Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}}
+    Tuple{Tuple,PM}
+end
 Base.IteratorSize(::Type{<:DefinedCells}) = Base.SizeUnknown()
 Base.length(dc::DefinedCells) = sum(length, dc.hall_of_fame.cells)
 
