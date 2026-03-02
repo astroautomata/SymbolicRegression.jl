@@ -62,13 +62,13 @@ end
 
 List of the best members seen all time.
 
-For compatibility this preserves a legacy-like field:
-- `members::Array{PM,1}`: best member per complexity (for convenience/backward compatibility)
+`cells` is the source-of-truth archive, bucketed by complexity.
 
-The legacy `exists` field is no longer stored; instead, `hof.exists` is computed
-on-the-fly from whether each bucket `cells[complexity]` is empty.
+For backward compatibility we still expose:
+- `hof.exists`: a derived boolean vector indicating which complexity buckets are non-empty.
+- `hof.members`: a derived vector-like view giving the best member per complexity.
 
-Actual archive cells are stored in `cells` keyed by tuple keys produced by criteria.
+Both are *derived*; mutate `hof.cells` (or call `update_hall_of_fame!`) instead.
 """
 struct HallOfFame{
     T<:DATA_TYPE,
@@ -79,14 +79,46 @@ struct HallOfFame{
 }
     criteria::C
     cells::Vector{Dict{Tuple,PM}}
-    members::Array{PM,1}
+end
+
+struct DerivedExists{H} <: AbstractVector{Bool}
+    hall_of_fame::H
+end
+Base.IndexStyle(::Type{<:DerivedExists}) = Base.IndexLinear()
+Base.size(de::DerivedExists) = (length(de.hall_of_fame.cells),)
+Base.length(de::DerivedExists) = length(de.hall_of_fame.cells)
+Base.getindex(de::DerivedExists, i::Int) = !isempty(de.hall_of_fame.cells[i])
+function Base.setindex!(::DerivedExists, ::Bool, ::Int)
+    throw(ArgumentError("`hof.exists` is derived; edit `hof.cells` instead."))
+end
+
+struct DerivedMembers{H,PM} <: AbstractVector{PM}
+    hall_of_fame::H
+end
+function DerivedMembers(hof::H) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}}
+    DerivedMembers{H,PM}(hof)
+end
+Base.IndexStyle(::Type{<:DerivedMembers}) = Base.IndexLinear()
+Base.size(dm::DerivedMembers) = (length(dm.hall_of_fame.cells),)
+Base.length(dm::DerivedMembers) = length(dm.hall_of_fame.cells)
+function Base.getindex(dm::DerivedMembers, i::Int)
+    hof = dm.hall_of_fame
+    bucket = hof.cells[i]
+    isempty(bucket) && throw(UndefRefError())
+    return copy(_best_member_in_nonempty_bucket(bucket))
+end
+function Base.setindex!(::DerivedMembers, _, ::Int)
+    throw(ArgumentError("`hof.members` is derived; edit `hof.cells` instead."))
 end
 
 # Legacy compatibility:
 # - `hof.exists[i]` indicates whether complexity-slot `i` has any archived members.
+# - `hof.members[i]` gives the best member per complexity-slot (derived from `cells`).
 function Base.getproperty(hof::HallOfFame, name::Symbol)
     if name === :exists
-        return map(!isempty, getfield(hof, :cells))
+        return DerivedExists(hof)
+    elseif name === :members
+        return DerivedMembers(hof)
     end
     return getfield(hof, name)
 end
@@ -155,18 +187,17 @@ function HallOfFame(
     )
 
     PMtype = typeof(prototype)
+    N = typeof(base_tree)
     key = hof_key(criteria, prototype, options)
     key isa Tuple || throw(ArgumentError("`hof_key` must return a tuple"))
 
     cells = [Dict{Tuple,PMtype}() for _ in 1:(options.maxsize)]
-    empty_members = [copy(prototype) for _ in 1:(options.maxsize)]
-
-    return HallOfFame(criteria, cells, empty_members)
+    return HallOfFame{T,L,N,PMtype,C}(criteria, cells)
 end
 
 function Base.copy(hof::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
     cells = [Dict{Tuple,PM}(k => copy(member) for (k, member) in d) for d in hof.cells]
-    return HallOfFame(hof.criteria, cells, [copy(member) for member in hof.members])
+    return HallOfFame(hof.criteria, cells)
 end
 
 """Iterate over all `(key, member)` pairs that are populated."""
@@ -214,8 +245,10 @@ end
 
 function Base.iterate(dm::DefinedMembers, state::Int=1)
     hof = dm.hall_of_fame
-    for i in state:lastindex(hof.members)
-        !isempty(hof.cells[i]) && return (hof.members[i], i + 1)
+    for i in state:lastindex(hof.cells)
+        bucket = hof.cells[i]
+        isempty(bucket) && continue
+        return (copy(_best_member_in_nonempty_bucket(bucket)), i + 1)
     end
     return nothing
 end
@@ -238,12 +271,27 @@ end
 
 This corresponds to the Pareto frontier in objectives `(complexity, loss)`.
 """
+@inline function _best_member_in_nonempty_bucket(bucket::Dict{K,PM}) where {K,PM}
+    it = iterate(values(bucket))
+    best, state = it::Tuple{PM,Any}
+    while true
+        it = iterate(values(bucket), state)
+        it === nothing && break
+        member, state = it
+        if member.cost < best.cost
+            best = member
+        end
+    end
+    return best
+end
+
 function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
     dominating = PM[]
     best_loss = typemax(L)
-    for complexity in eachindex(hall_of_fame.members)
-        isempty(hall_of_fame.cells[complexity]) && continue
-        member = hall_of_fame.members[complexity]
+    for complexity in eachindex(hall_of_fame.cells)
+        bucket = hall_of_fame.cells[complexity]
+        isempty(bucket) && continue
+        member = _best_member_in_nonempty_bucket(bucket)
         if member.loss < best_loss
             push!(dominating, copy(member))
             best_loss = member.loss
@@ -258,22 +306,6 @@ This preserves the historical behavior (dominance based on
 `(complexity, loss)`), and does not require passing a `Dataset`.
 """
 calculate_pareto_frontier(hallOfFame::HallOfFame) = dominating_members(hallOfFame)
-
-function _sync_best_member!(hof::HallOfFame{T,L,N,PM,C}, complexity) where {T,L,N,PM,C}
-    bucket = hof.cells[complexity]
-    isempty(bucket) && return nothing
-
-    best = nothing
-    for member in values(bucket)
-        best = if best === nothing || member.cost < best.cost
-            member
-        else
-            best
-        end
-    end
-    hof.members[complexity] = copy(best)
-    return nothing
-end
 
 """Update a hall of fame with a single population member."""
 function update_hall_of_fame!(
@@ -294,7 +326,6 @@ function update_hall_of_fame!(
     old = get(slot, key, nothing)
     if old === nothing || member.cost < old.cost
         slot[key] = copy(member)
-        _sync_best_member!(hall_of_fame, size)
     end
     return nothing
 end

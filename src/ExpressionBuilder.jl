@@ -15,7 +15,7 @@ using ..PopMemberModule: PopMember, AbstractPopMember, create_child
 using ..ComplexityModule: compute_complexity
 
 import DynamicExpressions: get_operators
-import ..CoreModule: create_expression
+import ..CoreModule: create_expression, init_value
 
 @unstable function create_expression(
     t::T, options::AbstractOptions, dataset::Dataset{T,L}, (::Val{embed})=Val(false)
@@ -127,17 +127,32 @@ end
             map(Fix{2}(Fix{3}(embed_metadata, dataset), options), pop.members)
         )
     end
+    @inline function _prototype_member(
+        options::AbstractOptions, dataset::Dataset{T,L}
+    ) where {T,L}
+        base_tree = create_expression(init_value(T), options, dataset)
+        PM = options.popmember_type
+        return PM(
+            copy(base_tree),
+            L(0),
+            L(Inf),
+            options,
+            1;
+            parent=-1,
+            deterministic=options.deterministic,
+        )
+    end
+
     function embed_metadata(
         hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
     ) where {T,L}
-        new_members = [embed_metadata(member, options, dataset) for member in hof.members]
-        PM = eltype(new_members)
         K = keytype(eltype(hof.cells))
+        PM = typeof(embed_metadata(_prototype_member(options, dataset), options, dataset))
         new_cells = [
             Dict{K,PM}(k => embed_metadata(member, options, dataset) for (k, member) in d)
             for d in hof.cells
         ]
-        return HallOfFame(hof.criteria, new_cells, new_members)
+        return HallOfFame(hof.criteria, new_cells)
     end
     function embed_metadata(
         vec::Vector{H}, options::AbstractOptions, dataset::Dataset{T,L}
@@ -179,14 +194,13 @@ end
 function strip_metadata(
     hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T,L}
-    new_members = [strip_metadata(member, options, dataset) for member in hof.members]
-    PM = eltype(new_members)
     K = keytype(eltype(hof.cells))
+    PM = typeof(_prototype_member(options, dataset))
     new_cells = [
         Dict{K,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d) for
         d in hof.cells
     ]
-    return HallOfFame(hof.criteria, new_cells, new_members)
+    return HallOfFame(hof.criteria, new_cells)
 end
 
 @unstable function get_operators(ex::AbstractExpression, options::AbstractOptions)

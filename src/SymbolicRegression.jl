@@ -1206,17 +1206,12 @@ end
             if isempty(bucket)
                 continue
             end
-            best_member = nothing
             for member in values(bucket)
                 cost, result_loss = eval_cost(dataset, member, options)
                 member.cost = cost
                 member.loss = result_loss
-                if best_member === nothing || member.cost < best_member.cost
-                    best_member = member
-                end
                 num_evals += 1
             end
-            best_seen.members[complexity] = copy(best_member)
         end
     end
     return (out_pop, best_seen, record, num_evals)
