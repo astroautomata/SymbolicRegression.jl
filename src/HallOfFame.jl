@@ -92,7 +92,7 @@ function Base.getproperty(hof::HallOfFame, name::Symbol)
 end
 
 function Base.propertynames(::HallOfFame, private::Bool=false)
-    (:criteria, :cells, :members, :exists)
+    private ? (:criteria, :cells, :members, :exists) : (:criteria, :cells)
 end
 
 function Base.show(
