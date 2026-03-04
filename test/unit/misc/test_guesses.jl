@@ -176,6 +176,39 @@ end
     @test parsed_members[1][1] isa PopMember{Float32,Float32}
 end
 
+@testitem "String guesses parse Julia imaginary unit `im`" begin
+    using SymbolicRegression
+    using SymbolicRegression: parse_guesses, Dataset, PopMember
+    using Test
+
+    X = ComplexF32[1 + 0im 2 + 0im 3 + 0im; 4 + 0im 5 + 0im 6 + 0im]
+    y = ComplexF32[7 + 0im, 8 + 0im, 9 + 0im]
+    dataset = Dataset(X, y; variable_names=["RC_vector", "time"])
+
+    options = Options(; binary_operators=[+, -, *, /], verbosity=0, progress=false)
+
+    guess_with_im = "(-0.2052275f0 - 0.016992446f0im) + RC_vector"
+    parsed_members = parse_guesses(
+        PopMember{ComplexF32,Float32}, [guess_with_im], [dataset], options
+    )
+
+    @test length(parsed_members) == 1
+    @test length(parsed_members[1]) == 1
+    @test parsed_members[1][1] isa PopMember{ComplexF32,Float32}
+
+    guess_with_time = "time + RC_vector"
+    parsed_time = parse_guesses(
+        PopMember{ComplexF32,Float32}, [guess_with_time], [dataset], options
+    )
+    @test parsed_time[1][1] isa PopMember{ComplexF32,Float32}
+
+    dataset_with_im_var = Dataset(X, y; variable_names=["im", "x2"])
+    parsed_im_var = parse_guesses(
+        PopMember{ComplexF32,Float32}, ["im + x2"], [dataset_with_im_var], options
+    )
+    @test parsed_im_var[1][1] isa PopMember{ComplexF32,Float32}
+end
+
 @testitem "Custom operators in string guesses" begin
     using SymbolicRegression
     using SymbolicRegression: parse_guesses, Dataset, PopMember, calculate_pareto_frontier

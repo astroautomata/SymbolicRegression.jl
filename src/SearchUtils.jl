@@ -757,6 +757,33 @@ function _parse_guess_expression(
     return copy(g)
 end
 
+@unstable @inline _replace_imaginary_unit_symbol(ex) = ex
+@unstable @inline _replace_imaginary_unit_symbol(ex::Symbol) = ex === :im ? im : ex
+@unstable @inline function _replace_imaginary_unit_symbol(ex::Expr)
+    return Expr(ex.head, map(_replace_imaginary_unit_symbol, ex.args)...)
+end
+
+@unstable @inline function _normalize_guess_for_parse(
+    g::AbstractString, variable_names::Union{AbstractVector,Nothing}
+)
+    parsed_expr = Meta.parse(g)
+    if variable_names !== nothing && "im" in variable_names
+        return parsed_expr
+    end
+    return _replace_imaginary_unit_symbol(parsed_expr)
+end
+
+@unstable @inline function _normalize_guess_for_parse(
+    g::Expr, variable_names::Union{AbstractVector,Nothing}
+)
+    if variable_names !== nothing && "im" in variable_names
+        return g
+    end
+    return _replace_imaginary_unit_symbol(g)
+end
+
+@unstable @inline _normalize_guess_for_parse(g, ::Union{AbstractVector,Nothing}) = g
+
 @unstable function _parse_guess_expression(
     ::Type{T}, g::NamedTuple, dataset::Dataset, options::AbstractOptions
 ) where {T}
@@ -791,8 +818,9 @@ end
 @unstable function _parse_guess_expression(
     ::Type{T}, g, dataset::Dataset, options::AbstractOptions
 ) where {T}
+    parsed_guess = _normalize_guess_for_parse(g, dataset.variable_names)
     return parse_expression(
-        g;
+        parsed_guess;
         operators=options.operators,
         variable_names=dataset.variable_names,
         node_type=with_type_parameters(options.node_type, T),
