@@ -376,7 +376,9 @@ which is useful for debugging and profiling.
     is the output feature to predict with each equation, and the
     second dimension is rows.
 - `niterations::Union{Int,Nothing}=nothing`: The number of iterations to perform the search.
-    If omitted, this defaults to an effort-scaled value based on `options.effort`.
+    If omitted, this defaults to `round(Int, 100 * options.effort^0.5)` for `Options`
+    (with a minimum of 0, so at `effort=1.0` this is `100`), and `100` for other
+    `AbstractOptions` subtypes.
 - `weights::Union{AbstractMatrix{T}, AbstractVector{T}, Nothing}=nothing`: Optionally
     weight the loss for each `y` by this value (same shape as `y`).
 - `options::AbstractOptions=Options()`: The options for the search, such as
@@ -556,13 +558,6 @@ function equation_search(dataset::Dataset; kws...)
     return equation_search([dataset]; kws..., v_dim_out=Val(1))
 end
 
-_default_niterations(options::AbstractOptions) = 100
-function _default_niterations(options::Options)
-    CoreModule.OptionsModule._scale_effort_default(
-        options.effort, 100, CoreModule.OptionsModule.EFFORT_NITERATIONS_EXPONENT; minimum=0
-    )
-end
-
 function equation_search(
     datasets::Vector{D};
     options::AbstractOptions=Options(),
@@ -575,7 +570,9 @@ function equation_search(
     _runtime_options = @something(
         runtime_options,
         RuntimeOptions(;
-            niterations=something(niterations, _default_niterations(options)),
+            niterations=something(
+                niterations, CoreModule.OptionsModule._default_niterations(options)
+            ),
             options_return_state=options.return_state,
             options_verbosity=options.verbosity,
             options_progress=options.progress,

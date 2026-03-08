@@ -37,9 +37,9 @@ using ..OperatorsModule:
     safe_acosh,
     safe_atanh
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
-import ..OptionsStructModule: Options
+import ..OptionsStructModule: AbstractOptions, Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
-using ..UtilsModule: @save_kwargs, @ignore
+using ..UtilsModule: @ignore, @save_kwargs, @something
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
     ExpressionSpec,
@@ -506,6 +506,11 @@ const EFFORT_NCYCLES_PER_ITERATION_EXPONENT = 0.325
     return max(minimum, scaled)
 end
 
+_default_niterations(options::AbstractOptions) = 100
+function _default_niterations(options::Options)
+    _scale_effort_default(options.effort, 100, EFFORT_NITERATIONS_EXPONENT; minimum=0)
+end
+
 """
     Options(;kws...) <: AbstractOptions
 
@@ -807,7 +812,7 @@ $(OPTION_DESCRIPTIONS)
     #! format: off
     _default_options = default_options(defaults)
     maxsize = something(maxsize, _default_options.maxsize)
-    populations = something(
+    populations = @something(
         populations,
         _scale_effort_default(
             effort,
@@ -815,7 +820,7 @@ $(OPTION_DESCRIPTIONS)
             EFFORT_POPULATIONS_EXPONENT,
         ),
     )
-    population_size = something(
+    population_size = @something(
         population_size,
         _scale_effort_default(
             effort,
@@ -823,7 +828,7 @@ $(OPTION_DESCRIPTIONS)
             EFFORT_POPULATION_SIZE_EXPONENT,
         ),
     )
-    ncycles_per_iteration = something(
+    ncycles_per_iteration = @something(
         ncycles_per_iteration,
         _scale_effort_default(
             effort,

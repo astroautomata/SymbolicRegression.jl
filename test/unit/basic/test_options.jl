@@ -116,20 +116,20 @@ end
 
 @testitem "Test effort scaling" begin
     using SymbolicRegression
+    using SymbolicRegression.CoreModule.OptionsModule: _default_niterations
 
     baseline = Options()
     @test baseline.effort == 1.0
-    @test SymbolicRegression._default_niterations(baseline) == 100
+    @test _default_niterations(baseline) == 100
 
     identity = Options(; effort=1.0)
-    @test SymbolicRegression._default_niterations(identity) ==
-        SymbolicRegression._default_niterations(baseline)
+    @test _default_niterations(identity) == _default_niterations(baseline)
     @test identity.populations == baseline.populations
     @test identity.population_size == baseline.population_size
     @test identity.ncycles_per_iteration == baseline.ncycles_per_iteration
 
     scaled = Options(; effort=4.0)
-    @test SymbolicRegression._default_niterations(scaled) == 200
+    @test _default_niterations(scaled) == 200
     @test scaled.populations == 37
     @test scaled.population_size == 29
     @test scaled.ncycles_per_iteration == 596
@@ -140,8 +140,7 @@ end
 
     low = Options(; effort=0.5)
     high = Options(; effort=2.0)
-    @test SymbolicRegression._default_niterations(high) >=
-        SymbolicRegression._default_niterations(low)
+    @test _default_niterations(high) >= _default_niterations(low)
     @test high.populations >= low.populations
     @test high.population_size >= low.population_size
     @test high.ncycles_per_iteration >= low.ncycles_per_iteration
