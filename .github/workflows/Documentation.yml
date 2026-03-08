@@ -42,7 +42,7 @@ jobs:
           node-version: "20"
       - name: Load Julia packages from cache
         id: julia-cache
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
         with:
           cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};os=${{ runner.os }};julia=1;project=${{ hashFiles('**/Project.toml') }}
       - name: "Install Julia dependencies"
