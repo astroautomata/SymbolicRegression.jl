@@ -494,16 +494,6 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     for constructing and evaluating trees.
 """
 
-"""
-    Options(;kws...) <: AbstractOptions
-
-Construct options for `equation_search` and other functions.
-The current arguments have been tuned using the median values from
-https://github.com/MilesCranmer/PySR/discussions/115.
-
-# Arguments
-$(OPTION_DESCRIPTIONS)
-"""
 const EFFORT_NITERATIONS_EXPONENT = 0.50
 const EFFORT_POPULATIONS_EXPONENT = 0.125
 const EFFORT_POPULATION_SIZE_EXPONENT = 0.05
@@ -516,6 +506,16 @@ const EFFORT_NCYCLES_PER_ITERATION_EXPONENT = 0.325
     return max(minimum, scaled)
 end
 
+"""
+    Options(;kws...) <: AbstractOptions
+
+Construct options for `equation_search` and other functions.
+The current arguments have been tuned using the median values from
+https://github.com/MilesCranmer/PySR/discussions/115.
+
+# Arguments
+$(OPTION_DESCRIPTIONS)
+"""
 @unstable @save_kwargs DEFAULT_OPTIONS function Options(;
     # Note: We can only `@nospecialize` on the first 32 arguments, which is why
     #       we have to declare some of these later on.
