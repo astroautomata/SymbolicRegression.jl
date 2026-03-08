@@ -557,12 +557,11 @@ function equation_search(dataset::Dataset; kws...)
 end
 
 _default_niterations(options::AbstractOptions) = 100
-_default_niterations(options::Options) = CoreModule.OptionsModule._scale_effort_default(
-    options.effort,
-    100,
-    CoreModule.OptionsModule.EFFORT_NITERATIONS_EXPONENT;
-    minimum=0,
-)
+function _default_niterations(options::Options)
+    CoreModule.OptionsModule._scale_effort_default(
+        options.effort, 100, CoreModule.OptionsModule.EFFORT_NITERATIONS_EXPONENT; minimum=0
+    )
+end
 
 function equation_search(
     datasets::Vector{D};
