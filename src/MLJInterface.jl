@@ -94,15 +94,17 @@ function modelexpr(
     # TODO: store `procs` from initial run if parallelism is `:multiprocessing`
     fields = last(last(struct_def.args).args).args
 
+    options_fields = [option for option in DEFAULT_OPTIONS if getsymb(first(option.args)) != :niterations]
+
     # Add everything from `Options` constructor directly to struct:
-    for (i, option) in enumerate(DEFAULT_OPTIONS)
+    for (i, option) in enumerate(options_fields)
         insert!(fields, i, Expr(:(=), option.args...))
     end
 
     # We also need to create the `get_options` function, based on this:
     constructor = :(Options(;))
     constructor_fields = last(constructor.args).args
-    for option in DEFAULT_OPTIONS
+    for option in options_fields
         symb = getsymb(first(option.args))
         push!(constructor_fields, Expr(:kw, symb, Expr(:(.), :m, Core.QuoteNode(symb))))
     end

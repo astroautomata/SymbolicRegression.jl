@@ -358,6 +358,9 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
 - `expression_spec::AbstractExpressionSpec`: A specification of what types of expressions to use in the
     search. For example, `ExpressionSpec()` (default). You can also see `TemplateExpressionSpec` and
     `ParametricExpressionSpec` for specialized cases.
+- `effort::Real=1.0`: Scales compute defaults for search size.
+    Must be positive. At `effort=1`, defaults are unchanged.
+- `niterations`: Number of iterations to perform in `equation_search` when omitted there.
 - `populations`: How many populations of equations to use.
 - `population_size`: How many equations in each population.
 - `ncycles_per_iteration`: How many generations to consider per iteration.
@@ -502,6 +505,18 @@ https://github.com/MilesCranmer/PySR/discussions/115.
 # Arguments
 $(OPTION_DESCRIPTIONS)
 """
+const EFFORT_NITERATIONS_EXPONENT = 0.50
+const EFFORT_POPULATIONS_EXPONENT = 0.125
+const EFFORT_POPULATION_SIZE_EXPONENT = 0.05
+const EFFORT_NCYCLES_PER_ITERATION_EXPONENT = 0.325
+
+@unstable function _scale_effort_default(
+    effort::Float64, baseline::Integer, exponent::Real; minimum::Int=1
+)
+    scaled = round(Int, baseline * effort^exponent)
+    return max(minimum, scaled)
+end
+
 @unstable @save_kwargs DEFAULT_OPTIONS function Options(;
     # Note: We can only `@nospecialize` on the first 32 arguments, which is why
     #       we have to declare some of these later on.
@@ -513,6 +528,7 @@ $(OPTION_DESCRIPTIONS)
     @nospecialize(maxdepth::Union{Nothing,Integer} = nothing),
     @nospecialize(expression_spec::Union{Nothing,AbstractExpressionSpec} = nothing),
     ## 2. Setting the Search Size:
+    @nospecialize(niterations::Union{Nothing,Integer} = nothing),
     @nospecialize(populations::Union{Nothing,Integer} = nothing),
     @nospecialize(population_size::Union{Nothing,Integer} = nothing),
     @nospecialize(ncycles_per_iteration::Union{Nothing,Integer} = nothing),
@@ -599,6 +615,7 @@ $(OPTION_DESCRIPTIONS)
     # Other search, but no specializations (since Julia limits us to 32!)
     ## 1. Search Space:
     ## 2. Setting the Search Size:
+    effort::Real=1.0,
     ## 3. The Objective:
     dimensionless_constants_only::Bool=false,
     loss_scale::Symbol=:log,
@@ -775,6 +792,11 @@ $(OPTION_DESCRIPTIONS)
 
     elementwise_loss = something(elementwise_loss, L2DistLoss())
 
+    effort = Float64(effort)
+    if !isfinite(effort) || effort <= 0.0
+        throw(ArgumentError("`effort` must be a positive finite number."))
+    end
+
     if complexity_mapping !== nothing
         @assert all(
             isnothing,
@@ -787,9 +809,38 @@ $(OPTION_DESCRIPTIONS)
     #! format: off
     _default_options = default_options(defaults)
     maxsize = something(maxsize, _default_options.maxsize)
-    populations = something(populations, _default_options.populations)
-    population_size = something(population_size, _default_options.population_size)
-    ncycles_per_iteration = something(ncycles_per_iteration, _default_options.ncycles_per_iteration)
+    niterations = something(
+        niterations,
+        _scale_effort_default(
+            effort,
+            _default_options.niterations,
+            EFFORT_NITERATIONS_EXPONENT,
+        ),
+    )
+    populations = something(
+        populations,
+        _scale_effort_default(
+            effort,
+            _default_options.populations,
+            EFFORT_POPULATIONS_EXPONENT,
+        ),
+    )
+    population_size = something(
+        population_size,
+        _scale_effort_default(
+            effort,
+            _default_options.population_size,
+            EFFORT_POPULATION_SIZE_EXPONENT,
+        ),
+    )
+    ncycles_per_iteration = something(
+        ncycles_per_iteration,
+        _scale_effort_default(
+            effort,
+            _default_options.ncycles_per_iteration,
+            EFFORT_NCYCLES_PER_ITERATION_EXPONENT,
+        ),
+    )
     parsimony = something(parsimony, _default_options.parsimony)
     warmup_maxsize_by = something(warmup_maxsize_by, _default_options.warmup_maxsize_by)
     adaptive_parsimony_scaling = something(adaptive_parsimony_scaling, _default_options.adaptive_parsimony_scaling)
@@ -824,6 +875,7 @@ $(OPTION_DESCRIPTIONS)
         )
     end
 
+    @assert niterations >= 0
     @assert maxsize > 3
     @assert warmup_maxsize_by >= 0.0f0
     @assert tournament_selection_n < population_size "`tournament_selection_n` must be less than `population_size`"
@@ -1061,7 +1113,9 @@ $(OPTION_DESCRIPTIONS)
         should_simplify,
         should_optimize_constants,
         _output_directory,
+        niterations,
         populations,
+        effort,
         perturbation_factor,
         annealing,
         batching,
@@ -1123,6 +1177,7 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
             operators=OperatorEnum(((), (+, -, /, *))),
             maxsize=20,
             # Setting the Search Size
+            niterations=100,
             populations=15,
             population_size=33,
             ncycles_per_iteration=550,
@@ -1169,6 +1224,7 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
         operators=OperatorEnum(((), (+, -, /, *))),
         maxsize=30,
         # Setting the Search Size
+        niterations=100,
         populations=31,
         population_size=27,
         ncycles_per_iteration=380,

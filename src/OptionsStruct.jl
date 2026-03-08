@@ -209,7 +209,9 @@ struct Options{
     should_simplify::Bool
     should_optimize_constants::Bool
     output_directory::Union{String,Nothing}
+    niterations::Int
     populations::Int
+    effort::Float64
     perturbation_factor::Float32
     annealing::Bool
     batching::Bool
