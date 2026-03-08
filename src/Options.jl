@@ -360,7 +360,6 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     `ParametricExpressionSpec` for specialized cases.
 - `effort::Real=1.0`: Scales compute defaults for search size.
     Must be positive. At `effort=1`, defaults are unchanged.
-- `niterations`: Number of iterations to perform in `equation_search` when omitted there.
 - `populations`: How many populations of equations to use.
 - `population_size`: How many equations in each population.
 - `ncycles_per_iteration`: How many generations to consider per iteration.
@@ -528,7 +527,6 @@ end
     @nospecialize(maxdepth::Union{Nothing,Integer} = nothing),
     @nospecialize(expression_spec::Union{Nothing,AbstractExpressionSpec} = nothing),
     ## 2. Setting the Search Size:
-    @nospecialize(niterations::Union{Nothing,Integer} = nothing),
     @nospecialize(populations::Union{Nothing,Integer} = nothing),
     @nospecialize(population_size::Union{Nothing,Integer} = nothing),
     @nospecialize(ncycles_per_iteration::Union{Nothing,Integer} = nothing),
@@ -809,14 +807,6 @@ end
     #! format: off
     _default_options = default_options(defaults)
     maxsize = something(maxsize, _default_options.maxsize)
-    niterations = something(
-        niterations,
-        _scale_effort_default(
-            effort,
-            _default_options.niterations,
-            EFFORT_NITERATIONS_EXPONENT,
-        ),
-    )
     populations = something(
         populations,
         _scale_effort_default(
@@ -875,7 +865,6 @@ end
         )
     end
 
-    @assert niterations >= 0
     @assert maxsize > 3
     @assert warmup_maxsize_by >= 0.0f0
     @assert tournament_selection_n < population_size "`tournament_selection_n` must be less than `population_size`"
@@ -1113,7 +1102,6 @@ end
         should_simplify,
         should_optimize_constants,
         _output_directory,
-        niterations,
         populations,
         effort,
         perturbation_factor,
@@ -1177,7 +1165,6 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
             operators=OperatorEnum(((), (+, -, /, *))),
             maxsize=20,
             # Setting the Search Size
-            niterations=100,
             populations=15,
             population_size=33,
             ncycles_per_iteration=550,
@@ -1224,7 +1211,6 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
         operators=OperatorEnum(((), (+, -, /, *))),
         maxsize=30,
         # Setting the Search Size
-        niterations=100,
         populations=31,
         population_size=27,
         ncycles_per_iteration=380,

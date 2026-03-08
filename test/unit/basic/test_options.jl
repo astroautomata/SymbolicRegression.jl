@@ -119,28 +119,29 @@ end
 
     baseline = Options()
     @test baseline.effort == 1.0
-    @test baseline.niterations == 100
+    @test SymbolicRegression._default_niterations(baseline) == 100
 
     identity = Options(; effort=1.0)
-    @test identity.niterations == baseline.niterations
+    @test SymbolicRegression._default_niterations(identity) ==
+          SymbolicRegression._default_niterations(baseline)
     @test identity.populations == baseline.populations
     @test identity.population_size == baseline.population_size
     @test identity.ncycles_per_iteration == baseline.ncycles_per_iteration
 
     scaled = Options(; effort=4.0)
-    @test scaled.niterations == 200
+    @test SymbolicRegression._default_niterations(scaled) == 200
     @test scaled.populations == 37
     @test scaled.population_size == 29
     @test scaled.ncycles_per_iteration == 596
 
-    @test Options(; effort=4.0, niterations=123).niterations == 123
     @test Options(; effort=4.0, populations=7).populations == 7
     @test Options(; effort=4.0, population_size=20).population_size == 20
     @test Options(; effort=4.0, ncycles_per_iteration=5).ncycles_per_iteration == 5
 
     low = Options(; effort=0.5)
     high = Options(; effort=2.0)
-    @test high.niterations >= low.niterations
+    @test SymbolicRegression._default_niterations(high) >=
+          SymbolicRegression._default_niterations(low)
     @test high.populations >= low.populations
     @test high.population_size >= low.population_size
     @test high.ncycles_per_iteration >= low.ncycles_per_iteration

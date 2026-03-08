@@ -376,7 +376,7 @@ which is useful for debugging and profiling.
     is the output feature to predict with each equation, and the
     second dimension is rows.
 - `niterations::Union{Int,Nothing}=nothing`: The number of iterations to perform the search.
-    If omitted, this defaults to `options.niterations`, which can auto-scale with `options.effort`.
+    If omitted, this defaults to an effort-scaled value based on `options.effort`.
 - `weights::Union{AbstractMatrix{T}, AbstractVector{T}, Nothing}=nothing`: Optionally
     weight the loss for each `y` by this value (same shape as `y`).
 - `options::AbstractOptions=Options()`: The options for the search, such as
@@ -557,7 +557,12 @@ function equation_search(dataset::Dataset; kws...)
 end
 
 _default_niterations(options::AbstractOptions) = 100
-_default_niterations(options::Options) = options.niterations
+_default_niterations(options::Options) = CoreModule.OptionsModule._scale_effort_default(
+    options.effort,
+    100,
+    CoreModule.OptionsModule.EFFORT_NITERATIONS_EXPONENT;
+    minimum=0,
+)
 
 function equation_search(
     datasets::Vector{D};
