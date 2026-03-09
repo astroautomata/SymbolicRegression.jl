@@ -39,7 +39,7 @@ using ..OperatorsModule:
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
 import ..OptionsStructModule: AbstractOptions, Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
-using ..UtilsModule: @ignore, @save_kwargs, @something
+using ..UtilsModule: @ignore, @save_kwargs
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
     ExpressionSpec,
