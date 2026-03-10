@@ -75,7 +75,7 @@ function _optimize_constants(
     for _ in 1:(options.optimizer_nrestarts)
         ET = eltype(x0)
         eps = randn(ET, size(x0)...)
-        xt = @. x0 * (ET(1) + ET(1 // 2) * eps)
+        xt = @. x0 * (ET(1) + ET(1//2) * eps)
         tmpresult = Optim.optimize(obj, xt, algorithm, optimizer_options)
         num_evals += tmpresult.f_calls * eval_fraction
         # TODO: Does this need to take into account h_calls?

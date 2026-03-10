@@ -7,7 +7,7 @@
         pack_scalar_constants!,
         unpack_scalar_constants
     using Optim: Optim
-    using Random: default_rng
+    using Random: default_rng, seed!
     using SymbolicRegression: Dataset, Options, PopMember
     using SymbolicRegression.ConstantOptimizationModule: _optimize_constants
 
@@ -42,6 +42,7 @@
     end
 
     rng = default_rng()
+    seed!(rng, 0)
 
     n = 16
     X = fill(Vec2(0.0, 0.0), 1, n)
@@ -82,7 +83,7 @@
     optimizer_options = Optim.Options(; iterations=200)
 
     new_member, _ = _optimize_constants(
-        dataset, member, options, algorithm, optimizer_options, rng
+        dataset, member, options, algorithm, optimizer_options
     )
 
     c = get_tree(new_member.tree).val::Vec2
