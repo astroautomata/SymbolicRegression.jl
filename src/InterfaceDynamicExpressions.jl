@@ -91,8 +91,6 @@ which speed up evaluation significantly.
 function expected_array_type(X::AbstractArray, ::Type)
     return typeof(similar(X, axes(X, 2)))
 end
-expected_array_type(X::AbstractArray, ::Type, ::Val{:eval_grad_tree_array}) =
-    AbstractMatrix{eltype(X)}
 expected_array_type(::Matrix{T}, ::Type) where {T} = Vector{T}
 expected_array_type(::SubArray{T,2,Matrix{T}}, ::Type) where {T} = Vector{T}
 
@@ -158,11 +156,11 @@ function DE.eval_grad_tree_array(
     kws...,
 )
     A = expected_array_type(X, typeof(tree))
-    dA = expected_array_type(X, typeof(tree), Val(:eval_grad_tree_array))
+    dA = Matrix{eltype(X)}
     out, grad, complete = DE.eval_grad_tree_array(
         tree, X, DE.get_operators(tree, options); kws...
     )
-    return out::A, grad::dA, complete::Bool
+    return out::A, dA(grad)::dA, complete::Bool
 end
 
 """
