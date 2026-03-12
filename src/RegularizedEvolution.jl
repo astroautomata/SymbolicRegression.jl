@@ -1,7 +1,8 @@
 module RegularizedEvolutionModule
 
 using DynamicExpressions: string_tree
-using ..CoreModule: AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE
+using ..CoreModule:
+    AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE, AbstractPluginState, NoPluginState
 using ..PopulationModule: Population, best_of_sample
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..MutateModule: next_generation, crossover_generation
@@ -17,7 +18,8 @@ function reg_evol_cycle(
     curmaxsize::Int,
     running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions,
-    record::RecordType,
+    record::RecordType;
+    plugin_state::AbstractPluginState=NoPluginState(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,P<:Population{T,L}}
     num_evals = 0.0
     n_evol_cycles = ceil(Int, pop.n / options.tournament_selection_n)
@@ -34,6 +36,7 @@ function reg_evol_cycle(
                 running_search_statistics,
                 options;
                 tmp_recorder=mutation_recorder,
+                plugin_state,
             )
             num_evals += tmp_num_evals
 

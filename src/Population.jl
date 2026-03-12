@@ -3,7 +3,18 @@ module PopulationModule
 using StatsBase: StatsBase
 using DispatchDoctor: @unstable
 using DynamicExpressions: AbstractExpression, string_tree, constructorof
-using ..CoreModule: AbstractOptions, Options, Dataset, RecordType, DATA_TYPE, LOSS_TYPE
+using ..CoreModule:
+    AbstractOptions,
+    Options,
+    Dataset,
+    RecordType,
+    DATA_TYPE,
+    LOSS_TYPE,
+    AbstractPlugin,
+    AbstractPluginState,
+    NoPlugin,
+    NoPluginState,
+    init_member
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, update_baseline_loss!
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
@@ -29,9 +40,32 @@ function Population(pop::Vector{<:AbstractPopMember})
 end
 
 """
+    _init_tree(plugin, plugin_state, dataset, options, nlength, nfeatures, ::Type{T})
+
+Initialize a tree for a new population member. If the plugin's `init_member` returns
+a non-nothing expression, use that. Otherwise, fall back to `gen_random_tree`.
+"""
+function _init_tree(
+    plugin::AbstractPlugin,
+    plugin_state::AbstractPluginState,
+    dataset,
+    options,
+    nlength::Int,
+    nfeatures::Int,
+    ::Type{T},
+) where {T}
+    candidate = init_member(plugin, plugin_state, dataset, options)
+    return if isnothing(candidate)
+        gen_random_tree(nlength, options, nfeatures, T)
+    else
+        candidate
+    end
+end
+
+"""
     Population(dataset::Dataset{T,L};
                population_size, nlength::Int=3, options::AbstractOptions,
-               nfeatures::Int)
+               nfeatures::Int, plugin=NoPlugin(), plugin_state=NoPluginState())
 
 Create random population and evaluate them on the dataset.
 """
@@ -42,6 +76,8 @@ function Population(
     nlength::Int=3,
     nfeatures::Int,
     npop=nothing,
+    plugin::AbstractPlugin=NoPlugin(),
+    plugin_state::AbstractPluginState=NoPluginState(),
 ) where {T,L}
     @assert (population_size !== nothing) ⊻ (npop !== nothing)
     population_size = something(population_size, npop)
@@ -50,7 +86,7 @@ function Population(
     # Create first member to get concrete type
     first_member = constructorof(PM)(
         dataset,
-        gen_random_tree(nlength, options, nfeatures, T),
+        _init_tree(plugin, plugin_state, dataset, options, nlength, nfeatures, T),
         options;
         parent=-1,
         deterministic=options.deterministic,
@@ -63,7 +99,7 @@ function Population(
         else
             constructorof(PM)(
                 dataset,
-                gen_random_tree(nlength, options, nfeatures, T),
+                _init_tree(plugin, plugin_state, dataset, options, nlength, nfeatures, T),
                 options;
                 parent=-1,
                 deterministic=options.deterministic,

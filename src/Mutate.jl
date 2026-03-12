@@ -17,7 +17,9 @@ using ..CoreModule:
     RecordType,
     sample_mutation,
     max_features,
-    dataset_fraction
+    dataset_fraction,
+    AbstractPluginState,
+    NoPluginState
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
@@ -180,6 +182,7 @@ end
     running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions;
     tmp_recorder::RecordType,
+    plugin_state::AbstractPluginState=NoPluginState(),
 )::Tuple{
     P,Bool,Float64
 } where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:AbstractPopMember{T,L,N}}
@@ -224,6 +227,7 @@ end
             parent_ref,
             curmaxsize,
             nfeatures,
+            plugin_state,
         )
         mutation_result::AbstractMutationResult{N,P}
         num_evals += mutation_result.num_evals::Float64
