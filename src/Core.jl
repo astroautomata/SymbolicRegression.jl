@@ -73,11 +73,8 @@ using .ExpressionSpecModule:
     get_node_type
 using .InterfaceDataTypesModule: init_value, sample_value, mutate_value
 using .PluginModule:
-    AbstractPlugin,
     AbstractPluginState,
-    NoPlugin,
     NoPluginState,
-    get_plugin,
     init_plugin_state,
     on_search_start!,
     on_search_end!,

@@ -1,11 +1,8 @@
 @testitem "Plugin interface: types and defaults" begin
     using SymbolicRegression
     import SymbolicRegression:
-        AbstractPlugin,
         AbstractPluginState,
-        NoPlugin,
         NoPluginState,
-        get_plugin,
         init_plugin_state,
         on_search_start!,
         on_search_end!,
@@ -15,31 +12,26 @@
     using Test
 
     # Default types exist
-    @test NoPlugin() isa AbstractPlugin
     @test NoPluginState() isa AbstractPluginState
 
-    # Default hooks return nothing
+    # Default init_plugin_state returns NoPluginState
     opts = Options(binary_operators=[+, *])
-    plugin = get_plugin(opts)
-    @test plugin isa NoPlugin
-
-    state = init_plugin_state(plugin, [], opts)
+    state = init_plugin_state(opts, [])
     @test state isa NoPluginState
 
-    @test on_search_start!(plugin, state, [], opts, nothing) === nothing
-    @test on_search_end!(plugin, state, nothing, [], opts, nothing) === nothing
-    @test on_generation_complete!(plugin, state, nothing, [], opts, nothing) === nothing
-    @test on_population_evaluated!(plugin, state, nothing, nothing, nothing, opts) === nothing
-    @test init_member(plugin, state, nothing, opts) === nothing
+    # Default hooks return nothing
+    @test on_search_start!(state, [], opts, nothing) === nothing
+    @test on_search_end!(state, nothing, [], opts, nothing) === nothing
+    @test on_generation_complete!(state, nothing, [], opts, nothing) === nothing
+    @test on_population_evaluated!(state, nothing, nothing, nothing, opts) === nothing
+    @test init_member(state, nothing, opts) === nothing
 end
 
 @testitem "Plugin interface: lifecycle hooks called" begin
     using SymbolicRegression
     import SymbolicRegression:
-        AbstractPlugin,
         AbstractPluginState,
         AbstractOptions,
-        get_plugin,
         init_plugin_state,
         on_search_start!,
         on_search_end!,
@@ -50,33 +42,28 @@ end
     # Use a channel to safely count from multiple threads/tasks
     counter_ch = Channel{Symbol}(1000)
 
-    mutable struct LifecyclePluginState <: AbstractPluginState end
-    struct LifecyclePlugin <: AbstractPlugin
+    mutable struct LifecyclePluginState <: AbstractPluginState
         counter_ch::Channel{Symbol}
     end
     struct LifecycleOptions{O} <: AbstractOptions
         base::O
-        plugin::LifecyclePlugin
+        counter_ch::Channel{Symbol}
     end
     Base.getproperty(o::LifecycleOptions, k::Symbol) =
-        k === :plugin ? getfield(o, :plugin) : getproperty(getfield(o, :base), k)
-    SymbolicRegression.get_plugin(o::LifecycleOptions) = o.plugin
-    SymbolicRegression.init_plugin_state(::LifecyclePlugin, datasets, options) =
-        LifecyclePluginState()
-    SymbolicRegression.on_search_start!(p::LifecyclePlugin, ::LifecyclePluginState, d, o, r) =
-        (put!(p.counter_ch, :start); nothing)
-    SymbolicRegression.on_search_end!(
-        p::LifecyclePlugin, ::LifecyclePluginState, ss, d, o, r
-    ) = (put!(p.counter_ch, :end); nothing)
-    SymbolicRegression.on_generation_complete!(
-        p::LifecyclePlugin, ::LifecyclePluginState, ss, d, o, r
-    ) = (put!(p.counter_ch, :gen); nothing)
-    SymbolicRegression.on_population_evaluated!(
-        p::LifecyclePlugin, ::LifecyclePluginState, pop, d, h, o
-    ) = (put!(p.counter_ch, :pop); nothing)
+        k === :counter_ch ? getfield(o, :counter_ch) : getproperty(getfield(o, :base), k)
+    SymbolicRegression.init_plugin_state(opts::LifecycleOptions, datasets) =
+        LifecyclePluginState(opts.counter_ch)
+    SymbolicRegression.on_search_start!(s::LifecyclePluginState, d, o, r) =
+        (put!(s.counter_ch, :start); nothing)
+    SymbolicRegression.on_search_end!(s::LifecyclePluginState, ss, d, o, r) =
+        (put!(s.counter_ch, :end); nothing)
+    SymbolicRegression.on_generation_complete!(s::LifecyclePluginState, ss, d, o, r) =
+        (put!(s.counter_ch, :gen); nothing)
+    SymbolicRegression.on_population_evaluated!(s::LifecyclePluginState, pop, d, h, o) =
+        (put!(s.counter_ch, :pop); nothing)
 
     base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
-    opts = LifecycleOptions(base_opts, LifecyclePlugin(counter_ch))
+    opts = LifecycleOptions(base_opts, counter_ch)
     X = rand(Float32, 2, 30)
     y = 2f0 .* X[1, :] .+ X[2, :]
 
@@ -97,29 +84,25 @@ end
 @testitem "Plugin interface: init_member hook" begin
     using SymbolicRegression
     import SymbolicRegression:
-        AbstractPlugin, AbstractPluginState, AbstractOptions, get_plugin, init_plugin_state,
-        init_member
+        AbstractPluginState, AbstractOptions, init_plugin_state, init_member
     using Test
 
     const init_count = Ref(0)
 
     mutable struct InitMemberPluginState <: AbstractPluginState end
-    struct InitMemberPlugin <: AbstractPlugin end
     struct InitMemberOptions{O} <: AbstractOptions
         base::O
-        plugin::InitMemberPlugin
     end
     Base.getproperty(o::InitMemberOptions, k::Symbol) =
-        k === :plugin ? getfield(o, :plugin) : getproperty(getfield(o, :base), k)
-    SymbolicRegression.get_plugin(o::InitMemberOptions) = o.plugin
-    SymbolicRegression.init_plugin_state(::InitMemberPlugin, datasets, options) =
+        getproperty(getfield(o, :base), k)
+    SymbolicRegression.init_plugin_state(::InitMemberOptions, datasets) =
         InitMemberPluginState()
     # Return nothing to fall through to gen_random_tree, but count calls
-    SymbolicRegression.init_member(::InitMemberPlugin, ::InitMemberPluginState, dataset, options) =
+    SymbolicRegression.init_member(::InitMemberPluginState, dataset, options) =
         (init_count[] += 1; nothing)
 
     base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
-    opts = InitMemberOptions(base_opts, InitMemberPlugin())
+    opts = InitMemberOptions(base_opts)
     X = rand(Float32, 2, 30)
     y = X[1, :] .+ X[2, :]
 

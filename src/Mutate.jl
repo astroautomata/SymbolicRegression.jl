@@ -404,6 +404,8 @@ You may overload this function to handle new mutation types for new `AbstractMut
 - `nfeatures`: The number of features in the dataset.
 - `parent_ref`: Reference to the mutated member's parent (only used for logging purposes).
 - `recorder::RecordType`: A recorder to log mutation details.
+- `plugin_state::AbstractPluginState`: The active worker plugin state. If your mutation
+  method needs it, capture it via `; plugin_state::MyState, kws...`.
 
 # Returns
 

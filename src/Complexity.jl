@@ -11,11 +11,22 @@ function past_complexity_limit(
 end
 
 """
+    compute_complexity(tree, options::AbstractOptions; kws...)
+
 Compute the complexity of a tree.
 
 By default, this is the number of nodes in a tree.
 However, it could use the custom settings in options.complexity_mapping
 if these are defined.
+
+Override by dispatching on a custom `AbstractOptions` subtype to implement
+a fully custom complexity metric:
+
+```julia
+function SymbolicRegression.compute_complexity(tree::AbstractExpression, opts::MyOptions; kws...)
+    return my_complexity_metric(tree)
+end
+```
 """
 function compute_complexity(
     tree::AbstractExpression, options::AbstractOptions; break_sharing=Val(false)
