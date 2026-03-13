@@ -8,10 +8,10 @@ SymbolicRegression.jl provides two complementary layers of extension. This guide
 
 ## Overview: Two Layers of Extension
 
-| Layer | Mechanism | Best for |
-|-------|-----------|----------|
-| **Layer 1** | Dispatch on a custom `AbstractOptions` subtype | Swapping out algorithms (complexity, loss, optimizer, mutations) |
-| **Layer 2** | Lifecycle hooks + per-worker `AbstractPluginState` | Cross-generation state, concept databases, logging, steering |
+| Layer       | Mechanism                                          | Best for                                                         |
+| ----------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| **Layer 1** | Dispatch on a custom `AbstractOptions` subtype     | Swapping out algorithms (complexity, loss, optimizer, mutations) |
+| **Layer 2** | Lifecycle hooks + per-worker `AbstractPluginState` | Cross-generation state, concept databases, logging, steering     |
 
 These layers are independent and composable — most plugins will use both.
 
@@ -184,7 +184,7 @@ init_member
 is an existing system built on SymbolicRegression.jl that uses a concept database to
 guide the search with an LLM. This example sketches the same architectural pattern.
 
-**Key design point**: the head node and each worker have *separate* `AbstractPluginState`
+**Key design point**: the head node and each worker have _separate_ `AbstractPluginState`
 instances. To share data from head to workers, store a `Channel` in `options` — the head
 pushes batches of concepts in, workers drain it into their local state.
 
@@ -273,14 +273,14 @@ result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial
 
 ### What runs where
 
-| Hook | Where | Concurrency |
-|------|-------|-------------|
-| `init_plugin_state` | Head node (once) + each worker (once, lazily) | Safe |
-| `on_search_start!` | Head node | Serial |
-| `on_generation_complete!` | Head node | Serial |
-| `on_search_end!` | Head node | Serial |
-| `on_population_evaluated!` | Worker | **Concurrent** in `:multithreading` |
-| `init_member` | Worker | **Concurrent** in `:multithreading` |
+| Hook                       | Where                                         | Concurrency                         |
+| -------------------------- | --------------------------------------------- | ----------------------------------- |
+| `init_plugin_state`        | Head node (once) + each worker (once, lazily) | Safe                                |
+| `on_search_start!`         | Head node                                     | Serial                              |
+| `on_generation_complete!`  | Head node                                     | Serial                              |
+| `on_search_end!`           | Head node                                     | Serial                              |
+| `on_population_evaluated!` | Worker                                        | **Concurrent** in `:multithreading` |
+| `init_member`              | Worker                                        | **Concurrent** in `:multithreading` |
 
 ### Rules
 
