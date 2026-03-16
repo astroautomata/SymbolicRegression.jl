@@ -5,63 +5,34 @@ using StatsBase: StatsBase
 """
     AbstractMutationWeights
 
-An abstract type that defines the interface for mutation weight structures in the symbolic regression framework. Subtypes of `AbstractMutationWeights` specify how often different mutation operations occur during the mutation process.
+Abstract type for mutation weight structs. Every field is treated as the name and
+weight of a mutation type by the internal dispatch mechanism.
 
-You can create custom mutation weight types by subtyping `AbstractMutationWeights` and defining your own mutation operations. Additionally, you can overload the `sample_mutation` function to handle sampling from your custom mutation types.
-
-# Usage
-
-To create a custom mutation weighting scheme with new mutation types, define a new subtype of `AbstractMutationWeights` and implement the necessary fields. Here's an example using `Base.@kwdef` to define the struct with default values:
+**Recommended usage**: use [`@extend_mutation_weights`](@ref) to create a subtype that
+inherits all standard [`MutationWeights`](@ref) fields plus your own:
 
 ```julia
-using SymbolicRegression: AbstractMutationWeights
+using SymbolicRegression
 
-# Define custom mutation weights with default values
-Base.@kwdef struct MyMutationWeights <: AbstractMutationWeights
-    mutate_constant::Float64 = 0.1
-    mutate_operator::Float64 = 0.2
-    custom_mutation::Float64 = 0.7
+@extend_mutation_weights MyWeights begin
+    my_mutation::Float64 = 0.5
 end
 ```
 
-Next, overload the `sample_mutation` function to include your custom mutation types:
+This generates the struct, `Base.copy`, and `sample_mutation` automatically. Then
+implement `mutate!` for your new mutation type. See [`@extend_mutation_weights`](@ref)
+for the full recipe.
 
-```julia
-# Define the list of mutation names (symbols)
-const MY_MUTATIONS = [
-    :mutate_constant,
-    :mutate_operator,
-    :custom_mutation
-]
-
-# Import the `sample_mutation` function to overload it
-import SymbolicRegression: sample_mutation
-using StatsBase: StatsBase
-
-# Overload the `sample_mutation` function
-function sample_mutation(w::MyMutationWeights)
-    weights = [
-        w.mutate_constant,
-        w.mutate_operator,
-        w.custom_mutation
-    ]
-    weights = weights ./ sum(weights)  # Normalize weights to sum to 1.0
-    return StatsBase.sample(MY_MUTATIONS, StatsBase.Weights(weights))
-end
-
-# Pass it when defining `Options`:
-using SymbolicRegression: Options
-options = Options(mutation_weights=MyMutationWeights())
-```
-
-This allows you to customize the mutation sampling process to include your custom mutations according to their specified weights.
-
-To integrate your custom mutations into the mutation process, ensure that the mutation functions corresponding to your custom mutation types are defined and properly registered with the symbolic regression framework. You may need to define methods for `mutate!` that handle your custom mutation types.
+!!! note "All fields must be Float64"
+    Every field in an `AbstractMutationWeights` subtype is used as a mutation weight.
+    Non-Float64 fields are not supported. If you use `@extend_mutation_weights`, this
+    is enforced at macro-expansion time.
 
 # See Also
 
-- [`MutationWeights`](@ref): A concrete implementation of `AbstractMutationWeights` that defines default mutation weightings.
-- [`sample_mutation`](@ref): Function to sample a mutation based on current mutation weights.
+- [`@extend_mutation_weights`](@ref): Macro to define a custom subtype with pre-populated standard fields.
+- [`MutationWeights`](@ref): The concrete default implementation.
+- [`sample_mutation`](@ref): Function to sample a mutation based on current weights.
 - [`mutate!`](@ref SymbolicRegression.MutateModule.mutate!): Function to apply a mutation to an expression tree.
 - [`AbstractOptions`](@ref SymbolicRegression.OptionsStruct.AbstractOptions): See how to extend abstract types for customizing options.
 """
@@ -136,6 +107,97 @@ end
 function sample_mutation(w::AbstractMutationWeights)
     weights = convert(Vector, w)
     return StatsBase.sample(v_mutations, StatsBase.Weights(weights))
+end
+
+"""
+    @extend_mutation_weights Name begin
+        extra_field::Float64 = default
+        ...
+    end
+
+Define a new `AbstractMutationWeights` subtype with all standard
+[`MutationWeights`](@ref) fields (with their default values) pre-populated,
+plus any extra fields you declare in the block.
+
+Also generates:
+- A keyword constructor (via `Base.@kwdef`)
+- `Base.copy`
+- `sample_mutation` (samples over all fields, weighted by their values)
+
+!!! note "Float64 fields only"
+    All extra fields must be annotated `::Float64`. Every field in an
+    `AbstractMutationWeights` subtype is treated as a mutation weight (probability)
+    by the internal dispatch mechanism, so non-Float64 fields are not supported.
+    The macro enforces this at expansion time.
+
+# Example
+
+```julia
+@extend_mutation_weights PerturbWeights begin
+    perturb_all_constants::Float64 = 0.5
+end
+```
+
+This is equivalent to manually defining a `mutable struct` with all standard
+fields copied from `MutationWeights` plus `perturb_all_constants`, along with the
+required `Base.copy` and `sample_mutation` methods.
+
+After defining the struct, implement `mutate!` for your new mutation type
+(using `import SymbolicRegression: AbstractPopMember` and
+`using DynamicExpressions: AbstractExpression`):
+
+```julia
+function SymbolicRegression.mutate!(
+    tree::N, member::P, ::Val{:perturb_all_constants},
+    weights::PerturbWeights, opts::MyOptions;
+    kws...,
+) where {N<:AbstractExpression, P<:AbstractPopMember}
+    # ... apply mutation ...
+    return MutationResult{N,P}(; tree=tree, num_evals=0.0)
+end
+```
+"""
+macro extend_mutation_weights(name, block)
+    std_names = fieldnames(MutationWeights)
+    defaults = MutationWeights()
+    std_fields = [
+        Expr(:(=), Expr(:(::), f, :Float64), getfield(defaults, f))
+        for f in std_names
+    ]
+    extra_fields = filter(e -> !(e isa LineNumberNode), block.args)
+    # Validate that every extra field is annotated ::Float64.
+    # Required because _dispatch_mutations! treats every fieldname as a mutation
+    # type, and the generated sample_mutation/copy collect field values as Float64.
+    for ex in extra_fields
+        type_ann = ex isa Expr && ex.head == :(=) ? ex.args[1] : ex
+        if !(type_ann isa Expr && type_ann.head == :(::) && type_ann.args[2] == :Float64)
+            error(
+                "@extend_mutation_weights: extra fields must be annotated `::Float64`, got: $ex\n" *
+                "Every field in an AbstractMutationWeights subtype is treated as a " *
+                "mutation weight (probability), so only Float64 fields are supported.",
+            )
+        end
+    end
+    # GlobalRef ensures the generated method extends *this* module's sample_mutation,
+    # not accidentally creating a new function in the calling module.
+    sample_mutation_ref = GlobalRef(@__MODULE__, :sample_mutation)
+    # Module-level const avoids allocating a new Vector{Symbol} on every
+    # sample_mutation call — consistent with how v_mutations works for MutationWeights.
+    mutations_const = esc(Symbol(:_, name, :_mutations))
+    return quote
+        Base.@kwdef mutable struct $(esc(name)) <: AbstractMutationWeights
+            $(std_fields...)
+            $(extra_fields...)
+        end
+        const $(mutations_const) = Symbol[fieldnames($(esc(name)))...]
+        function Base.copy(w::$(esc(name)))
+            return $(esc(name))(Float64[getfield(w, f) for f in $(mutations_const)]...)
+        end
+        function $(sample_mutation_ref)(w::$(esc(name)))
+            weights = Float64[getfield(w, f) for f in $(mutations_const)]
+            return StatsBase.sample($(mutations_const), StatsBase.Weights(weights))
+        end
+    end
 end
 
 end

@@ -55,6 +55,7 @@ export Population,
     gen_random_tree,
     gen_random_tree_fixed_size,
     @extend_operators,
+    @extend_mutation_weights,
     get_tree,
     get_contents,
     get_metadata,
@@ -178,7 +179,7 @@ using Compat: @compat, Fix
     (
         AbstractOptions, AbstractRuntimeOptions, RuntimeOptions,
         AbstractMutationWeights, mutate!, condition_mutation_weights!,
-        sample_mutation, MutationResult, AbstractSearchState, SearchState,
+        sample_mutation, MutationResult, AbstractPopMember, AbstractSearchState, SearchState,
         LOSS_TYPE, DATA_TYPE, node_type,
         AbstractPluginState, NoPluginState,
         init_plugin_state, on_search_start!, on_search_end!,
@@ -252,6 +253,7 @@ using .CoreModule:
     WarmStartIncompatibleError,
     AbstractMutationWeights,
     MutationWeights,
+    @extend_mutation_weights,
     AbstractExpressionSpec,
     ExpressionSpec,
     init_value,
@@ -878,7 +880,10 @@ function _warmup_search!(
         PM = popmember_type(PopType)
         HallType = HallOfFame{T,L,N,PM}
 
-        c_plugin_state_ref = Ref{Union{Nothing,AbstractPluginState}}(nothing)
+        # Use a pre-populated NoPluginState ref so that init_plugin_state is not
+        # called during warmup — worker state is initialized lazily on the first
+        # real iteration in _main_search_loop!.
+        c_plugin_state_ref = Ref{Union{Nothing,AbstractPluginState}}(NoPluginState())
         updated_pop = @sr_spawner(
             begin
                 in_pop = first(extract_from_worker(last_pop, PopType, HallType))

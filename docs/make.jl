@@ -16,6 +16,7 @@ using SymbolicRegression:
     AbstractRuntimeOptions,
     AbstractSearchState,
     @extend_operators,
+    @extend_mutation_weights,
     AbstractPluginState,
     NoPluginState,
     init_plugin_state,

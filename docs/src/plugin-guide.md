@@ -44,6 +44,7 @@ Every core algorithm in SR.jl dispatches on `options::AbstractOptions`. To overr
 
 ```julia
 using SymbolicRegression
+import SymbolicRegression: AbstractOptions
 
 struct MyOptions{O<:AbstractOptions} <: AbstractOptions
     base::O
@@ -110,35 +111,49 @@ See [`optimize_constants`](@ref) for the default implementation.
 
 ### Overriding `mutate!`
 
-Custom mutations require both a custom `AbstractMutationWeights` type and a `mutate!` method:
+Use [`@extend_mutation_weights`](@ref) to define the weights type, then implement `mutate!`:
 
 ```julia
-Base.@kwdef mutable struct MyWeights <: AbstractMutationWeights
-    # Include all fields from MutationWeights
-    mutate_constant::Float64 = 0.035
-    # ... other standard fields ...
-    # Add your new mutation weight
+import SymbolicRegression: AbstractOptions, AbstractPopMember, MutationResult, mutate!
+using DynamicExpressions: AbstractExpression
+
+@extend_mutation_weights MyWeights begin
     my_mutation::Float64 = 0.5
 end
 
 function SymbolicRegression.mutate!(
-    tree, member, ::Val{:my_mutation}, weights::MyWeights, opts::MyOptions; kws...
-)
+    tree::N, member::P, ::Val{:my_mutation},
+    weights::MyWeights, opts::MyOptions;
+    kws...,
+) where {N<:AbstractExpression, P<:AbstractPopMember}
     new_tree = apply_my_mutation(tree, opts.my_param)
-    return MutationResult{typeof(tree),typeof(member)}(; tree=new_tree, num_evals=0)
+    return MutationResult{N,P}(; tree=new_tree, num_evals=0.0)
 end
 ```
 
-Note: `kws...` includes `plugin_state` — if your mutation needs access to the plugin state, capture it:
+`@extend_mutation_weights` generates the struct with all 14 standard [`MutationWeights`](@ref)
+fields pre-populated, plus `Base.copy` and `sample_mutation` automatically. The one thing
+that still requires care: use precise type bounds (`N<:AbstractExpression, P<:AbstractPopMember`)
+on your `mutate!` to avoid ambiguity with the fallback error method.
+
+If your mutation needs access to the worker plugin state, capture it from `kws...`:
 
 ```julia
 function SymbolicRegression.mutate!(
-    tree, member, ::Val{:concept_guided}, weights::MyWeights, opts::MyOptions;
-    plugin_state::MyPluginState, kws...
-)
+    tree::N, member::P, ::Val{:concept_guided},
+    weights::MyWeights, opts::MyOptions;
+    plugin_state::MyPluginState, kws...,
+) where {N<:AbstractExpression, P<:AbstractPopMember}
     new_tree = guide_from_concepts(tree, plugin_state.concept_db)
-    return MutationResult{typeof(tree),typeof(member)}(; tree=new_tree, num_evals=0)
+    return MutationResult{N,P}(; tree=new_tree, num_evals=0.0)
 end
+```
+
+A complete runnable example is in
+[`examples/plugin_mutation.jl`](https://github.com/MilesCranmer/SymbolicRegression.jl/blob/master/examples/plugin_mutation.jl).
+
+```@docs
+@extend_mutation_weights
 ```
 
 See [`mutate!`](@ref SymbolicRegression.MutateModule.mutate!) and [`AbstractMutationWeights`](@ref) for more details.
@@ -172,7 +187,7 @@ init_member
 1. `init_plugin_state(options, datasets)` is called on the **head node** (receives the full `datasets` vector) to create the state stored in `SearchState`.
 2. Per-worker state is initialized lazily: on the first `s_r_cycle` call, each worker calls `init_plugin_state(options, (dataset,))` (receives a single-element tuple) to create a local copy.
 3. `on_search_start!` and `on_search_end!` run once on the head node.
-4. `on_generation_complete!` runs on the head node after every generation (after HoF update + migration) — safe to mutate state.
+4. `on_generation_complete!` runs on the head node each time any population completes a cycle (after HoF update + migration) — safe to mutate state. With `populations=N`, this fires up to `N` times per "global" generation step.
 5. `on_population_evaluated!` runs on the **worker** after each `s_r_cycle` — may be concurrent.
 6. `init_member` runs on the worker during **initial population creation only** — it is not called during ongoing mutations. To inject trees into the running search, use the `seed_members` field of `SearchState` via `on_generation_complete!`.
 
@@ -191,7 +206,7 @@ pushes batches of concepts in, workers drain it into their local state.
 ```julia
 using SymbolicRegression
 import SymbolicRegression:
-    AbstractPluginState, init_plugin_state,
+    AbstractOptions, AbstractPluginState, init_plugin_state,
     on_generation_complete!, on_population_evaluated!, init_member
 
 # --- Plugin state (one instance per worker, plus one on head node) ---
@@ -277,7 +292,7 @@ result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial
 | -------------------------- | --------------------------------------------- | ----------------------------------- |
 | `init_plugin_state`        | Head node (once) + each worker (once, lazily) | Safe                                |
 | `on_search_start!`         | Head node                                     | Serial                              |
-| `on_generation_complete!`  | Head node                                     | Serial                              |
+| `on_generation_complete!`  | Head node (once per population cycle)         | Serial                              |
 | `on_search_end!`           | Head node                                     | Serial                              |
 | `on_population_evaluated!` | Worker                                        | **Concurrent** in `:multithreading` |
 | `init_member`              | Worker                                        | **Concurrent** in `:multithreading` |
@@ -316,7 +331,7 @@ module MyPlugin
 
 using SymbolicRegression
 import SymbolicRegression:
-    AbstractPluginState, init_plugin_state,
+    AbstractOptions, AbstractPluginState, init_plugin_state,
     on_generation_complete!, on_population_evaluated!, init_member
 
 export MyOptions

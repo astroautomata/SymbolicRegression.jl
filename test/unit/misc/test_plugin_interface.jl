@@ -87,7 +87,7 @@ end
         AbstractPluginState, AbstractOptions, init_plugin_state, init_member
     using Test
 
-    const init_count = Ref(0)
+    init_count = Ref(0)
 
     mutable struct InitMemberPluginState <: AbstractPluginState end
     struct InitMemberOptions{O} <: AbstractOptions
@@ -109,4 +109,52 @@ end
     equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
 
     @test init_count[] > 0
+end
+
+@testitem "Plugin interface: @extend_mutation_weights macro" begin
+    using SymbolicRegression
+    import SymbolicRegression: sample_mutation, MutationWeights
+    using Test
+
+    @extend_mutation_weights TestWeights begin
+        my_mutation::Float64 = 2.0
+    end
+
+    w = TestWeights()
+
+    # All standard fields present with correct defaults
+    @test w.mutate_constant == MutationWeights().mutate_constant
+    @test w.my_mutation == 2.0
+    @test length(fieldnames(TestWeights)) == length(fieldnames(MutationWeights)) + 1
+
+    # copy produces an equal but independent object
+    w2 = copy(w)
+    @test w2.my_mutation == w.my_mutation
+    @test w2 !== w
+    w2.my_mutation = 99.0
+    @test w.my_mutation == 2.0  # original unchanged
+
+    # sample_mutation dispatches to the generated method and returns a valid field
+    s = sample_mutation(w)
+    @test s isa Symbol
+    @test s in fieldnames(TestWeights)
+
+    # With all weight on my_mutation, it should always be sampled
+    w_biased = TestWeights(;
+        mutate_constant=0.0, mutate_operator=0.0, mutate_feature=0.0,
+        swap_operands=0.0, rotate_tree=0.0, add_node=0.0, insert_node=0.0,
+        delete_node=0.0, simplify=0.0, randomize=0.0, do_nothing=0.0,
+        optimize=0.0, form_connection=0.0, break_connection=0.0,
+        my_mutation=1.0,
+    )
+    @test all(sample_mutation(w_biased) === :my_mutation for _ in 1:20)
+end
+
+@testitem "Plugin interface: @extend_mutation_weights rejects non-Float64 fields" begin
+    using SymbolicRegression
+    using Test
+
+    @test_throws ErrorException @macroexpand @extend_mutation_weights BadWeights begin
+        my_count::Int = 0
+    end
 end
