@@ -81,7 +81,4 @@ opts = PerturbOptions(base, 0.1, PerturbWeights())
 X = rand(Float32, 2, 100)
 y = @. 2f0 * X[1, :] + 3f0 * X[2, :] - 1f0
 
-result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial)
-
-println("\n=== Pareto frontier ===")
-println(result)
+equation_search(X, y; options=opts, niterations=10, parallelism=:serial)

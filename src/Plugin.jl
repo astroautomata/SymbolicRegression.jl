@@ -13,9 +13,11 @@ Each worker gets its own instance via `init_plugin_state`. See the
 
 **Thread / Multiprocessing Safety**:
 - `on_generation_complete!` runs serially on the head node — safe to mutate.
-- `on_population_evaluated!` and `init_member` run on workers concurrently.
-  In multithreading mode, each `(output, population)` slot has its own state Ref,
-  so no cross-slot races occur. Cross-worker communication must use `Channel`.
+- `on_population_evaluated!` runs on workers concurrently in multithreading mode.
+  Each `(output, population)` slot has its own state Ref, so no cross-slot races occur.
+  Cross-worker communication must use `Channel`.
+- `init_member` uses the head node's state during initial population creation.
+  In multithreading mode, multiple slots are created concurrently — keep it read-only or thread-safe.
 - In multiprocessing mode, plugin config is serialized to workers (via options);
   worker state is initialized lazily on each worker process.
 
@@ -60,7 +62,7 @@ end
 """
     on_search_start!(plugin_state, datasets, options, ropt)
 
-Lifecycle hook called on the head node after initialization, before the main search loop.
+Lifecycle hook called on the head node after initialization, before warmup and the main search loop.
 
 Override by dispatching on your `AbstractPluginState` subtype:
 
@@ -80,7 +82,8 @@ end
 """
     on_search_end!(plugin_state, search_state, datasets, options, ropt)
 
-Lifecycle hook called on the head node before tearing down workers.
+Lifecycle hook called on the head node after all workers have completed,
+before tearing down processes/threads.
 
 Override by dispatching on your `AbstractPluginState` subtype.
 
@@ -132,12 +135,18 @@ end
 """
     init_member(plugin_state, dataset, options)
 
-Called when initializing each population member's tree.
+Called when initializing each population member's tree during **initial population creation only**.
 
 Override by dispatching on your `AbstractPluginState` subtype.
 
 Return an expression tree to override `gen_random_tree`, or `nothing` to use
 the default random tree generation.
+
+!!! note "State used"
+    `init_member` is called with the **head node's** `AbstractPluginState` instance,
+    not a per-worker copy. In `:multithreading` mode, multiple population-creation
+    tasks may call it concurrently — ensure your implementation is thread-safe or
+    limit it to read-only access of the state.
 
 Default returns `nothing` (falls through to default random tree generation).
 

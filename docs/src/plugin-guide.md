@@ -189,7 +189,7 @@ init_member
 3. `on_search_start!` and `on_search_end!` run once on the head node.
 4. `on_generation_complete!` runs on the head node each time any population completes a cycle (after HoF update + migration) — safe to mutate state. With `populations=N`, this fires up to `N` times per "global" generation step.
 5. `on_population_evaluated!` runs on the **worker** after each `s_r_cycle` — may be concurrent.
-6. `init_member` runs on the worker during **initial population creation only** — it is not called during ongoing mutations. To inject trees into the running search, use the `seed_members` field of `SearchState` via `on_generation_complete!`.
+6. `init_member` runs on the worker during **initial population creation only** — it is not called during ongoing mutations. To inject trees into the running search, use the `seed_members` field of `SearchState` via `on_generation_complete!`. Note that `seed_members[j]` **persists across generations** — it is read but never cleared by the search loop, so whatever you push will be re-injected on every subsequent generation. Clear it manually (e.g., `empty!(search_state.seed_members[j])`) after a one-shot injection.
 
 ---
 
@@ -282,6 +282,9 @@ result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial
 > `:multiprocessing`, replace `Channel` with `RemoteChannel` and adjust the
 > `put!`/`take!` calls accordingly.
 
+A complete, runnable Layer 2 example (operator frequency reporter) is in
+[`examples/plugin_operator_stats.jl`](https://github.com/MilesCranmer/SymbolicRegression.jl/blob/master/examples/plugin_operator_stats.jl).
+
 ---
 
 ## Threading and Multiprocessing Safety
@@ -293,14 +296,15 @@ result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial
 | `init_plugin_state`        | Head node (once) + each worker (once, lazily) | Safe                                |
 | `on_search_start!`         | Head node                                     | Serial                              |
 | `on_generation_complete!`  | Head node (once per population cycle)         | Serial                              |
-| `on_search_end!`           | Head node                                     | Serial                              |
+| `on_search_end!`           | Head node (after all workers finish)          | Serial                              |
 | `on_population_evaluated!` | Worker                                        | **Concurrent** in `:multithreading` |
-| `init_member`              | Worker                                        | **Concurrent** in `:multithreading` |
+| `init_member`              | Head node (initial population creation only)  | **Concurrent** in `:multithreading` |
 
 ### Rules
 
 - **Head node hooks** (`on_generation_complete!`, `on_search_start!`, `on_search_end!`) are always serial — safe to mutate shared state.
-- **Worker hooks** (`on_population_evaluated!`, `init_member`) may run concurrently in multithreading mode. In `:multithreading`, each `(output, population)` slot has its own `AbstractPluginState` Ref, so **there are no races between slots**. Each worker thread only touches its own state.
+- **Worker hooks** (`on_population_evaluated!`) may run concurrently in multithreading mode. Each `(output, population)` slot has its own `AbstractPluginState` Ref, so **there are no races between slots**. Each worker thread only touches its own state.
+- **`init_member`** uses the **head node's** state and is called only during initial population creation. In `:multithreading`, multiple population slots are created concurrently — keep `init_member` read-only or thread-safe.
 - To push data from workers to the head node (e.g., promising trees found during evaluation), use a `Channel{T}` stored in your options and drained in `on_generation_complete!`.
 
 ### Multiprocessing

@@ -183,7 +183,7 @@ using Compat: @compat, Fix
         LOSS_TYPE, DATA_TYPE, node_type,
         AbstractPluginState, NoPluginState,
         init_plugin_state, on_search_start!, on_search_end!,
-        on_generation_complete!, on_population_evaluated!, init_member,
+        on_generation_complete!, on_population_evaluated!, init_member
     )
 )
 #! format: on
@@ -882,7 +882,8 @@ function _warmup_search!(
 
         # Use a pre-populated NoPluginState ref so that init_plugin_state is not
         # called during warmup — worker state is initialized lazily on the first
-        # real iteration in _main_search_loop!.
+        # real iteration in _main_search_loop!. (nothing would trigger lazy init;
+        # NoPluginState() suppresses it intentionally.)
         c_plugin_state_ref = Ref{Union{Nothing,AbstractPluginState}}(NoPluginState())
         updated_pop = @sr_spawner(
             begin
@@ -1175,9 +1176,9 @@ function _tear_down!(
     ropt::AbstractRuntimeOptions,
     options::AbstractOptions,
 )
-    on_search_end!(state.plugin_state, state, datasets, options, ropt)
     close_reader!(state.stdin_reader)
-    # Safely close all processes or threads
+    # Wait for all in-flight workers before calling on_search_end!, so the hook
+    # sees all worker output (e.g., can fully drain Channels written by workers).
     if ropt.parallelism == :multiprocessing
         # TODO: We should unwrap the error monitors here
         state.we_created_procs && rmprocs(state.procs)
@@ -1187,6 +1188,7 @@ function _tear_down!(
             wait(state.worker_output[j][i])
         end
     end
+    on_search_end!(state.plugin_state, state, datasets, options, ropt)
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
 end
