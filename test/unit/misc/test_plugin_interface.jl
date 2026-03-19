@@ -118,24 +118,25 @@ end
         init_plugin_state, on_mutation_evaluated!
     using Test
 
-    # Collect (mutation_type, accepted) pairs via a Channel
-    events_ch = Channel{Tuple{Symbol,Bool}}(10_000)
+    # Collect (mutation_type, accepted, delta_loss) triples via a Channel
+    events_ch = Channel{Tuple{Symbol,Bool,Float64}}(10_000)
 
     mutable struct MutEvalPluginState <: AbstractPluginState
-        events_ch::Channel{Tuple{Symbol,Bool}}
+        events_ch::Channel{Tuple{Symbol,Bool,Float64}}
     end
     struct MutEvalOptions{O} <: AbstractOptions
         base::O
-        events_ch::Channel{Tuple{Symbol,Bool}}
+        events_ch::Channel{Tuple{Symbol,Bool,Float64}}
     end
     Base.getproperty(o::MutEvalOptions, k::Symbol) =
         k === :events_ch ? getfield(o, :events_ch) : getproperty(getfield(o, :base), k)
     SymbolicRegression.init_plugin_state(opts::MutEvalOptions, datasets) =
         MutEvalPluginState(opts.events_ch)
     function SymbolicRegression.on_mutation_evaluated!(
-        state::MutEvalPluginState, mutation_type::Symbol, accepted::Bool, dataset, opts::MutEvalOptions
+        state::MutEvalPluginState, mutation_type::Symbol, accepted::Bool,
+        delta_loss::Float64, dataset, opts::MutEvalOptions
     )
-        put!(state.events_ch, (mutation_type, accepted))
+        put!(state.events_ch, (mutation_type, accepted, delta_loss))
         return nothing
     end
 
@@ -154,15 +155,19 @@ end
 
     # All mutation types are valid Symbols (fields of MutationWeights)
     valid_mutations = Set(fieldnames(MutationWeights))
-    for (mt, acc) in events
+    for (mt, acc, dl) in events
         @test mt isa Symbol
         @test mt in valid_mutations
         @test acc isa Bool
+        @test dl isa Float64
     end
 
     # Both accepted and rejected mutations should appear (over many calls)
-    @test any(acc for (_, acc) in events)
-    @test any(!acc for (_, acc) in events)
+    @test any(acc for (_, acc, _) in events)
+    @test any(!acc for (_, acc, _) in events)
+
+    # Some events should have finite delta_loss (valid evaluations occurred)
+    @test any(isfinite(dl) for (_, _, dl) in events)
 end
 
 @testitem "Plugin interface: @extend_mutation_weights macro" begin

@@ -1,9 +1,9 @@
 """
 Adaptive Mutation Weights via the Plugin Interface (Layer 1 + 2)
 
-This example tracks per-mutation success rates during the search and adapts
+This example tracks per-mutation improvement rates during the search and adapts
 mutation weights using an exponential moving average — the discrete-type analogue
-of CMA-ES. Mutations that are frequently accepted get higher weights; rarely-accepted
+of CMA-ES. Mutations that frequently improve loss get higher weights; rarely-improving
 mutations are down-weighted toward a configurable floor.
 
 It demonstrates:
@@ -70,18 +70,21 @@ SymbolicRegression.init_plugin_state(opts::AdaptiveOptions, datasets) =
     AdaptiveState(Dict(), Dict(), opts.stats_channel, 0)
 
 # ============================================================
-# Step 4: Worker hook — record accept/reject per mutation type
+# Step 4: Worker hook — record improvement per mutation type
 # ============================================================
 #
-# Skip :do_nothing — it always "succeeds" trivially (return_immediately=true)
-# and would dominate the statistics, obscuring meaningful signal.
+# Use delta_loss > 0 (strict improvement) rather than `accepted` as the
+# success criterion — temperature-independent and continuous.
+# Skip :do_nothing (always delta=0) and NaN evals (constraint/NaN failures).
 
 function SymbolicRegression.on_mutation_evaluated!(
-    state::AdaptiveState, mutation_type::Symbol, accepted::Bool, dataset, opts::AdaptiveOptions
+    state::AdaptiveState, mutation_type::Symbol, accepted::Bool,
+    delta_loss::Float64, dataset, opts::AdaptiveOptions
 )
-    mutation_type === :do_nothing && return
+    mutation_type === :do_nothing && return  # always delta=0, no signal
+    isnan(delta_loss) && return              # constraint failure or NaN eval
     state.attempts[mutation_type] = get(state.attempts, mutation_type, 0) + 1
-    if accepted
+    if delta_loss > 0
         state.successes[mutation_type] = get(state.successes, mutation_type, 0) + 1
     end
     return nothing
@@ -127,6 +130,7 @@ function SymbolicRegression.on_generation_complete!(
     isempty(totals_attempts) && return
 
     w = opts.adaptive_weights
+    prev = copy(w)
     α = opts.smoothing
     for m in fieldnames(AdaptiveWeights)
         a = get(totals_attempts, m, 0)
@@ -146,25 +150,27 @@ function SymbolicRegression.on_generation_complete!(
 
     state.generation += 1
     if state.generation % opts.log_every == 0
-        _print_weights(opts.adaptive_weights, state.generation, totals_attempts, totals_successes)
+        _print_weights(opts.adaptive_weights, prev, state.generation, totals_attempts, totals_successes)
     end
     return nothing
 end
 
 function _print_weights(
-    w::AdaptiveWeights, gen::Int,
+    w::AdaptiveWeights, prev::AdaptiveWeights, gen::Int,
     attempts::Dict{Symbol,Int}, successes::Dict{Symbol,Int}
 )
     defaults = AdaptiveWeights()
-    println("\n--- Generation $gen: adaptive weights (success rate → weight) ---")
-    @printf "  %-25s  %6s  %6s  %8s\n" "mutation" "rate%" "evals" "weight"
+    println("\n--- Generation $gen: adaptive weights (improvement rate → weight) ---")
+    @printf "  %-25s  %6s  %6s  %8s  %8s\n" "mutation" "rate%" "evals" "prev" "adapted"
     for m in fieldnames(AdaptiveWeights)
         getfield(defaults, m) == 0.0 && continue  # skip disabled-by-default
         a = get(attempts, m, 0)
         s = get(successes, m, 0)
+        p = getfield(prev, m)
         wt = getfield(w, m)
         rate_str = a > 0 ? @sprintf("%5.1f%%", 100 * s / a) : "     —"
-        @printf "  %-25s  %s  %6d  %8.4f\n" m rate_str a wt
+        marker = abs(wt - p) > 0.005 ? (wt > p ? " ▲" : " ▼") : ""
+        @printf "  %-25s  %s  %6d  %8.4f  %8.4f%s\n" m rate_str a p wt marker
     end
 end
 
@@ -192,7 +198,7 @@ equation_search(X, y; options=opts, niterations=30, parallelism=:serial)
 
 # Print final weights vs defaults for comparison
 println("\n=== Final adaptive weights ===")
-println("  (weights > default → more successful; near min_weight → rarely accepted)\n")
+println("  (weights > default → improves loss more often; near min_weight → low improvement rate)\n")
 defaults = AdaptiveWeights()
 @printf "  %-25s %8s  %8s\n" "mutation" "default" "adapted"
 println("  ", "-"^44)
