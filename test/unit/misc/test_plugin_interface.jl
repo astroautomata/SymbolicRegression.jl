@@ -111,6 +111,60 @@ end
     @test init_count[] > 0
 end
 
+@testitem "Plugin interface: on_mutation_evaluated! fires with correct args" begin
+    using SymbolicRegression
+    import SymbolicRegression:
+        AbstractPluginState, AbstractOptions,
+        init_plugin_state, on_mutation_evaluated!
+    using Test
+
+    # Collect (mutation_type, accepted) pairs via a Channel
+    events_ch = Channel{Tuple{Symbol,Bool}}(10_000)
+
+    mutable struct MutEvalPluginState <: AbstractPluginState
+        events_ch::Channel{Tuple{Symbol,Bool}}
+    end
+    struct MutEvalOptions{O} <: AbstractOptions
+        base::O
+        events_ch::Channel{Tuple{Symbol,Bool}}
+    end
+    Base.getproperty(o::MutEvalOptions, k::Symbol) =
+        k === :events_ch ? getfield(o, :events_ch) : getproperty(getfield(o, :base), k)
+    SymbolicRegression.init_plugin_state(opts::MutEvalOptions, datasets) =
+        MutEvalPluginState(opts.events_ch)
+    function SymbolicRegression.on_mutation_evaluated!(
+        state::MutEvalPluginState, mutation_type::Symbol, accepted::Bool, dataset, opts::MutEvalOptions
+    )
+        put!(state.events_ch, (mutation_type, accepted))
+        return nothing
+    end
+
+    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
+    opts = MutEvalOptions(base_opts, events_ch)
+    X = rand(Float32, 2, 30)
+    y = X[1, :] .+ X[2, :]
+
+    equation_search(X, y; options=opts, niterations=3, parallelism=:serial)
+
+    close(events_ch)
+    events = collect(events_ch)
+
+    # Hook fired at all
+    @test length(events) > 0
+
+    # All mutation types are valid Symbols (fields of MutationWeights)
+    valid_mutations = Set(fieldnames(MutationWeights))
+    for (mt, acc) in events
+        @test mt isa Symbol
+        @test mt in valid_mutations
+        @test acc isa Bool
+    end
+
+    # Both accepted and rejected mutations should appear (over many calls)
+    @test any(acc for (_, acc) in events)
+    @test any(!acc for (_, acc) in events)
+end
+
 @testitem "Plugin interface: @extend_mutation_weights macro" begin
     using SymbolicRegression
     import SymbolicRegression: sample_mutation, MutationWeights

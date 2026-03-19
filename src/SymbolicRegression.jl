@@ -183,7 +183,7 @@ using Compat: @compat, Fix
         LOSS_TYPE, DATA_TYPE, node_type,
         AbstractPluginState, NoPluginState,
         init_plugin_state, on_search_start!, on_search_end!,
-        on_generation_complete!, on_population_evaluated!, init_member
+        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member
     )
 )
 #! format: on
@@ -302,6 +302,7 @@ using .CoreModule:
     on_search_end!,
     on_generation_complete!,
     on_population_evaluated!,
+    on_mutation_evaluated!,
     init_member
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity

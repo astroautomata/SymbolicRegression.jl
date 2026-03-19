@@ -179,6 +179,7 @@ on_search_start!
 on_search_end!
 on_generation_complete!
 on_population_evaluated!
+on_mutation_evaluated!
 init_member
 ```
 
@@ -298,12 +299,13 @@ A complete, runnable Layer 2 example (operator frequency reporter) is in
 | `on_generation_complete!`  | Head node (once per population cycle)         | Serial                              |
 | `on_search_end!`           | Head node (after all workers finish)          | Serial                              |
 | `on_population_evaluated!` | Worker                                        | **Concurrent** in `:multithreading` |
+| `on_mutation_evaluated!`   | Worker (once per `next_generation` return)    | **Concurrent** in `:multithreading` |
 | `init_member`              | Head node (initial population creation only)  | **Concurrent** in `:multithreading` |
 
 ### Rules
 
 - **Head node hooks** (`on_generation_complete!`, `on_search_start!`, `on_search_end!`) are always serial — safe to mutate shared state.
-- **Worker hooks** (`on_population_evaluated!`) may run concurrently in multithreading mode. Each `(output, population)` slot has its own `AbstractPluginState` Ref, so **there are no races between slots**. Each worker thread only touches its own state.
+- **Worker hooks** (`on_population_evaluated!`, `on_mutation_evaluated!`) may run concurrently in multithreading mode. Each `(output, population)` slot has its own `AbstractPluginState` Ref, so **there are no races between slots**. Each worker thread only touches its own state.
 - **`init_member`** uses the **head node's** state and is called only during initial population creation. In `:multithreading`, multiple population slots are created concurrently — keep `init_member` read-only or thread-safe.
 - To push data from workers to the head node (e.g., promising trees found during evaluation), use a `Channel{T}` stored in your options and drained in `on_generation_complete!`.
 

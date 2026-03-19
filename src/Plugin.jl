@@ -133,6 +133,34 @@ function on_population_evaluated!(::AbstractPluginState, pop, dataset, hof, opti
 end
 
 """
+    on_mutation_evaluated!(plugin_state, mutation_type::Symbol, accepted::Bool, dataset, options)
+
+Lifecycle hook called on the WORKER immediately before each return from `next_generation`,
+after the final accept/reject decision for a mutation.
+
+- `mutation_type`: the `Symbol` identifying which mutation was attempted
+  (e.g. `:mutate_constant`, `:add_node`, `:crossover`).
+- `accepted`: `true` if the mutation was accepted (via `return_immediately` or fitness
+  improvement / annealing acceptance); `false` if rejected (constraint failure, NaN loss,
+  or annealing/frequency rejection).
+
+Use this hook to track per-mutation success rates, adapt mutation weights, or log mutation
+outcomes. Runs on the worker; same concurrency properties as `on_population_evaluated!`.
+
+Override by dispatching on your `AbstractPluginState` subtype.
+
+Default is a no-op.
+
+!!! warning "Experimental"
+    The plugin interface is experimental.
+"""
+function on_mutation_evaluated!(
+    ::AbstractPluginState, ::Symbol, ::Bool, dataset, options
+)
+    return nothing
+end
+
+"""
     init_member(plugin_state, dataset, options)
 
 Called when initializing each population member's tree during **initial population creation only**.

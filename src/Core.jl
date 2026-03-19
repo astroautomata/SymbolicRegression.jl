@@ -81,6 +81,7 @@ using .PluginModule:
     on_search_end!,
     on_generation_complete!,
     on_population_evaluated!,
+    on_mutation_evaluated!,
     init_member
 
 end

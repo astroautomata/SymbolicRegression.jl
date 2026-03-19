@@ -19,7 +19,8 @@ using ..CoreModule:
     max_features,
     dataset_fraction,
     AbstractPluginState,
-    NoPluginState
+    NoPluginState,
+    on_mutation_evaluated!
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
@@ -237,6 +238,7 @@ end
                 mutation_result.member isa P,
                 "Mutation result must return a `PopMember` if `return_immediately` is true"
             )
+            on_mutation_evaluated!(plugin_state, mutation_choice, true, dataset, options)
             return mutation_result.member::P, true, num_evals
         else
             @assert(
@@ -257,6 +259,7 @@ end
             tmp_recorder["reason"] = "failed_constraint_check"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, dataset, options)
         return (
             create_child(
                 member,
@@ -281,6 +284,7 @@ end
             tmp_recorder["reason"] = "nan_loss"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, dataset, options)
         return (
             create_child(
                 member,
@@ -325,6 +329,7 @@ end
             tmp_recorder["reason"] = "annealing_or_frequency"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, dataset, options)
         return (
             create_child(
                 member,
@@ -352,6 +357,7 @@ end
             complexity=newSize,
             parent_ref=parent_ref,
         )
+        on_mutation_evaluated!(plugin_state, mutation_choice, true, dataset, options)
         return (new_member, mutation_accepted, num_evals)
     end
 end
