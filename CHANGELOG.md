@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.0.0-alpha.10](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.9...v2.0.0-alpha.10) (2026-03-23)
+
+### ⚠ BREAKING CHANGES
+
+- cost after simplification must be recomputed ([#550](https://github.com/astroautomata/SymbolicRegression.jl/issues/550))
+
+### Features
+
+- add atan to ValidVector unary operators ([#546](https://github.com/astroautomata/SymbolicRegression.jl/issues/546)) ([5a9d08c](https://github.com/astroautomata/SymbolicRegression.jl/commit/5a9d08c33022f241db321479ca5947c14e991bec))
+
+### Bug Fixes
+
+- cost after simplification must be recomputed ([#550](https://github.com/astroautomata/SymbolicRegression.jl/issues/550)) ([7d87479](https://github.com/astroautomata/SymbolicRegression.jl/commit/7d8747918f3f35effcc6eaa3d27f9340266819bb))
+- use scalar type rather than leaf type for randn ([#570](https://github.com/astroautomata/SymbolicRegression.jl/issues/570)) ([9c6460e](https://github.com/astroautomata/SymbolicRegression.jl/commit/9c6460e3fbd151e891b0bae926fa4913dc7ff787))
+
 ## [1.13.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.1...v1.13.0) (2026-03-09)
 
 ### Bug Fixes
