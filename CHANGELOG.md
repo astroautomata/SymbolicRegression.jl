@@ -4,6 +4,532 @@
 
 # Changelog
 
+## [1.13.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.1...v1.13.0) (2026-03-09)
+
+### Bug Fixes
+
+- clean up output of errormonitor ([#555](https://github.com/astroautomata/SymbolicRegression.jl/issues/555)) ([210deac](https://github.com/astroautomata/SymbolicRegression.jl/commit/210deacdaf253777c3041c4749eac1898d555083))
+
+## [1.12.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.0...v1.12.1) (2026-02-14)
+
+## [1.12.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.3...v1.12.0) (2025-06-24)
+
+### Bug Fixes
+
+- issue where minimizer is not loaded to tree ([f0ff1a0](https://github.com/astroautomata/SymbolicRegression.jl/commit/f0ff1a01e48a30b19effe6d610dd571f9ed4dfd0))
+- issue where minimizer is not loaded to tree ([8b05c9f](https://github.com/astroautomata/SymbolicRegression.jl/commit/8b05c9fdbdce740f43db06ab9d75e95335cfcd5b))
+
+## [1.11.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.2...v1.11.3) (2025-06-15)
+
+## [1.11.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.1...v1.11.2) (2025-06-12)
+
+## [1.11.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.0...v1.11.1) (2025-05-20)
+
+### Features
+
+- enable template expressions in a distributed setting ([4c96cc9](https://github.com/astroautomata/SymbolicRegression.jl/commit/4c96cc90de73e8db3cab7f422c8e3ea69cfbf0a3))
+
+### Bug Fixes
+
+- use generic interface for worker distribution ([6311632](https://github.com/astroautomata/SymbolicRegression.jl/commit/6311632d772d1f2665cc98c009353ed945999d1d))
+
+## [1.11.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.10.0...v1.11.0) (2025-05-18)
+
+### Features
+
+- allow `@template_spec` to declare explicit num_features ([ebb1a80](https://github.com/astroautomata/SymbolicRegression.jl/commit/ebb1a80f449fa608670a8565fc319e8f42d37a2c))
+- allow `@template_spec` to declare explicit num_features ([b24f707](https://github.com/astroautomata/SymbolicRegression.jl/commit/b24f70762ddb6a8804cc49bed6b35719c6600329))
+- allow negative losses ([fc9fcdb](https://github.com/astroautomata/SymbolicRegression.jl/commit/fc9fcdbfac515efe2b53e1af0ee7f7cdeb23986a))
+- allow negative losses ([2f38af9](https://github.com/astroautomata/SymbolicRegression.jl/commit/2f38af9ed20ed1090adeb4a45e3a6633538b83f2))
+- avoid use of scores when assuming negative losses ([996d930](https://github.com/astroautomata/SymbolicRegression.jl/commit/996d93097b447a379873be72484b78e2d1d5aff8))
+- move `get_options` into top namespace ([3726466](https://github.com/astroautomata/SymbolicRegression.jl/commit/37264668adcb06279ea23f203ca91bcf99d4caae))
+- recommend users use TemplateExpressionSpec instead ([ad07294](https://github.com/astroautomata/SymbolicRegression.jl/commit/ad072940ad2deb9c9b588645b2cf6e44e0fab664))
+
+### Bug Fixes
+
+- avoid printing heap size hint if already created ([4334193](https://github.com/astroautomata/SymbolicRegression.jl/commit/43341939ad9b1224de60254dfc1e7c3bfe7cb321))
+- avoid printing heap size hint if already created ([64c0780](https://github.com/astroautomata/SymbolicRegression.jl/commit/64c0780d268f13a0a0e54615d273ffbb123170de))
+- Enzyme extension (up to issues of Enzyme itself) ([8f32e96](https://github.com/astroautomata/SymbolicRegression.jl/commit/8f32e9689c823a61277b19224b789a7c59ce2090))
+- per task cache can be immutable ([2a8663c](https://github.com/astroautomata/SymbolicRegression.jl/commit/2a8663c0040baf1fe394fd54b6c725fda6e08768))
+- per task cache can be immutable ([7708ff9](https://github.com/astroautomata/SymbolicRegression.jl/commit/7708ff969293189b6c25d059f76029a3edd2d491))
+- scope error in hall of fame formatting ([64c994d](https://github.com/astroautomata/SymbolicRegression.jl/commit/64c994d9c4f9569882a0c24fb7259c077e5696f7))
+
+## [1.10.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.3...v1.10.0) (2025-05-01)
+
+### Features
+
+- allow `Any` for input types ([07dbceb](https://github.com/astroautomata/SymbolicRegression.jl/commit/07dbceb489f65a5779afbe0b0439648296826fef))
+- finish remaining parts of string interface ([247f533](https://github.com/astroautomata/SymbolicRegression.jl/commit/247f53316f4fe4cd88eb2314b44c38dfe194c738))
+- initial compat with string features ([008cdc1](https://github.com/astroautomata/SymbolicRegression.jl/commit/008cdc19d327424c419921f74024ed8e2f8672ed))
+
+## [1.9.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.2...v1.9.3) (2025-04-25)
+
+### Bug Fixes
+
+- unary constraint check missed ([bfbb254](https://github.com/astroautomata/SymbolicRegression.jl/commit/bfbb2546128bb2704ff08770d58443c8fa79007c))
+- unary constraint check missed ([f08f76d](https://github.com/astroautomata/SymbolicRegression.jl/commit/f08f76d309917ed50946272d6e09621f9adc8681))
+
+## [1.9.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.1...v1.9.2) (2025-04-10)
+
+## [1.9.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.0...v1.9.1) (2025-04-04)
+
+## [1.9.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.8.0...v1.9.0) (2025-03-01)
+
+### Bug Fixes
+
+- printing greater and lesser ([d5f6fbd](https://github.com/astroautomata/SymbolicRegression.jl/commit/d5f6fbd1aacd1a5fe7dc9c6729d6dacf29b61830))
+- printing greater and lesser ([3a85b69](https://github.com/astroautomata/SymbolicRegression.jl/commit/3a85b69659e387383f3210960460e4557eb259a8))
+
+## [1.8.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.2...v1.8.0) (2025-02-22)
+
+### Features
+
+- allow recording crossovers ([#415](https://github.com/astroautomata/SymbolicRegression.jl/issues/415)) ([23a4f2e](https://github.com/astroautomata/SymbolicRegression.jl/commit/23a4f2e7dbd86b6ab1f5f7c71d519ec16b906840))
+- better error for mismatched eltypes ([68d6397](https://github.com/astroautomata/SymbolicRegression.jl/commit/68d63978d414940a9c492bd1b75471173120fe1e))
+- better error for mismatched eltypes ([d70fe09](https://github.com/astroautomata/SymbolicRegression.jl/commit/d70fe09d38864b4f2b2ecdf6d17c7b7a8bcaf9b4))
+- explicitly monitor errors in workers ([b86b4c1](https://github.com/astroautomata/SymbolicRegression.jl/commit/b86b4c1ed37328b83635d2f5fa7d826d84092c7a))
+- explicitly monitor errors in workers ([28eb285](https://github.com/astroautomata/SymbolicRegression.jl/commit/28eb28503fd13b36f7dea98657ccd6cb1247caba))
+- generic getters for datasets ([3b923bd](https://github.com/astroautomata/SymbolicRegression.jl/commit/3b923bd65a7bd16d629a054f07e3e680e4da1022))
+- utility functions for batching dataset ([bb406ed](https://github.com/astroautomata/SymbolicRegression.jl/commit/bb406edb0c137bbcca3cefcb64d0d02b5406b38e))
+
+### Bug Fixes
+
+- batched dataset for optimisation ([d085fd8](https://github.com/astroautomata/SymbolicRegression.jl/commit/d085fd837e323d82bf363f4e8f986bd6ab5fb5f9))
+- batched dataset for optimisation ([5629410](https://github.com/astroautomata/SymbolicRegression.jl/commit/562941040d95f6154d41ddde8ec4d5e5ee57fbff))
+- only optimize hall of fame if exists ([cc3a8a5](https://github.com/astroautomata/SymbolicRegression.jl/commit/cc3a8a52b3f6e90fc847e4bebd2694a143455f95))
+- parametric expressions batching ([2d6f665](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d6f665bc327f6a1ee5a9c9d04b48c99afcc17e7))
+
+## [1.7.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.1...v1.7.2) (2025-02-13)
+
+### Bug Fixes
+
+- max of 6 expressions bug ([fcb03d9](https://github.com/astroautomata/SymbolicRegression.jl/commit/fcb03d9c9692df5d8e756d35653f3206c1a914a1))
+- max of 6 expressions bug ([1badff4](https://github.com/astroautomata/SymbolicRegression.jl/commit/1badff4e6f7f1b58bd42ca88b21cbd4eab357d9f))
+
+## [1.7.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.0...v1.7.1) (2025-02-09)
+
+### Bug Fixes
+
+- loss_function_expression in distributed mode ([c7877f3](https://github.com/astroautomata/SymbolicRegression.jl/commit/c7877f3aeae2719926cbf24d16382e65daf3756c))
+
+## [1.7.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.6.0...v1.7.0) (2025-02-08)
+
+### Features
+
+- add max and min ([8d0d34d](https://github.com/astroautomata/SymbolicRegression.jl/commit/8d0d34d649f3cd04a1f5b71cba478659cd404e68))
+- allow initializing parameters from naked array ([99b1598](https://github.com/astroautomata/SymbolicRegression.jl/commit/99b1598d722a62f7c0be3ecc70ad07da9ddbb719))
+- allow multiple parameter keys in TemplateExpression ([fb0e21c](https://github.com/astroautomata/SymbolicRegression.jl/commit/fb0e21c99cd94771a846833605f18aefaf00196a))
+- allow no parameters in `@template` macro ([204be7e](https://github.com/astroautomata/SymbolicRegression.jl/commit/204be7e569f80ee60cfcf92eed46f562f15fab44))
+- automatically map comparison operators ([d08c5d7](https://github.com/astroautomata/SymbolicRegression.jl/commit/d08c5d79669d57a67ccffedefdcbee2fd9a9781b))
+- create `num_params`1 argument ([f8b1ad0](https://github.com/astroautomata/SymbolicRegression.jl/commit/f8b1ad03d7246a8df0a39ae341f677d058f1767e))
+- custom `mutate_constant` for parametric template expression ([a71a545](https://github.com/astroautomata/SymbolicRegression.jl/commit/a71a54576d0586228952b935ee6b8bbc81c49581))
+- export expression spec ([fc2df00](https://github.com/astroautomata/SymbolicRegression.jl/commit/fc2df005a28a601405385821e236289eef7c33e2))
+- have TemplateExpression store all parameters in raw string ([5e62569](https://github.com/astroautomata/SymbolicRegression.jl/commit/5e62569c584554e0ccf440e6fbf4ec6033d963e2))
+- introduce `ExpressionSpec` ([f48e74c](https://github.com/astroautomata/SymbolicRegression.jl/commit/f48e74ced0eea6d9744ddacce8e4f0fbb18a58d2))
+- introduce parameter feature for `TemplateExpression` ([5c5a07e](https://github.com/astroautomata/SymbolicRegression.jl/commit/5c5a07e031778499fd2f7cdd5841fd63d1512c38))
+- macro for easy template expressions ([3c076e9](https://github.com/astroautomata/SymbolicRegression.jl/commit/3c076e9fbb6e5cd6488f6ee0eb5f8358be00a2c4))
+- overload additional operations for ComposableExpression ([437a9ca](https://github.com/astroautomata/SymbolicRegression.jl/commit/437a9ca46547aea79950e63e010b9ab99438b30e))
+- overload additional operations for ComposableExpression ([288824d](https://github.com/astroautomata/SymbolicRegression.jl/commit/288824def89a95710931c5e775271f2642637b10))
+- permit `variable_names=nothing` in `ComposableExpression` ([e478322](https://github.com/astroautomata/SymbolicRegression.jl/commit/e478322b1bde9fb6e02d7695dc5ec294a59f373c))
+- remove node type option for TemplateExpression ([b279002](https://github.com/astroautomata/SymbolicRegression.jl/commit/b279002406ef18e567e758963387ab1c66732544))
+- rename `num_params`5 to `num_params`6 ([bb927ef](https://github.com/astroautomata/SymbolicRegression.jl/commit/bb927ef271b88858a106de503d05b949a4b52880))
+- safety checks for `@template` macro ([91ee759](https://github.com/astroautomata/SymbolicRegression.jl/commit/91ee759fbcb637936fed0b5eeee7b2055df799cf))
+- warn for `num_params`2 and `num_params`3 ([2d9c0d8](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d9c0d8d7f677005fd5e494a01d7e4606d336fbc))
+
+### Bug Fixes
+
+- better defensive coding ([7faeb4d](https://github.com/astroautomata/SymbolicRegression.jl/commit/7faeb4d4837675c4cb4b2520b6f95e06fc977a31))
+- condition for constant mutation of template ([8f1b7dc](https://github.com/astroautomata/SymbolicRegression.jl/commit/8f1b7dc9a6884c8fe9f30b3a951cab5fe028017a))
+- jet error ([415fc5c](https://github.com/astroautomata/SymbolicRegression.jl/commit/415fc5cb5cfe95e5eb3f9eff882e64b743ef881e))
+- JET flagged issue ([432d7a5](https://github.com/astroautomata/SymbolicRegression.jl/commit/432d7a5b12b24fcb41d7ebc0c871edc7143ea7fc))
+- missing import ([ab53c16](https://github.com/astroautomata/SymbolicRegression.jl/commit/ab53c164b0b77187da1703d1d9412446bad0c60b))
+- param assertion ([a42aa91](https://github.com/astroautomata/SymbolicRegression.jl/commit/a42aa91def83b1a07b6de8e9ff4a177f396c8844))
+- some issues in TemplateExpression ([29c5e4c](https://github.com/astroautomata/SymbolicRegression.jl/commit/29c5e4c91dd73b0e37d15addcb53b5fba5a23a16))
+- type definition ([5b8ba79](https://github.com/astroautomata/SymbolicRegression.jl/commit/5b8ba79cbd807afdf5f5684d252c1448d66c1ee4))
+
+## [1.6.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.2...v1.6.0) (2025-02-02)
+
+### Bug Fixes
+
+- allow for variable `nthreads` ([d29742b](https://github.com/astroautomata/SymbolicRegression.jl/commit/d29742b9687400c2d6aced5379670b25e7479189))
+- allow for variable `nthreads` ([9fabc30](https://github.com/astroautomata/SymbolicRegression.jl/commit/9fabc303dd33c624739e759d960374c7f85e56f7))
+
+## [1.5.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.1...v1.5.2) (2025-01-03)
+
+### Features
+
+- conditionally widen MLJ scitype ([21443d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/21443d49d74881f4896abf1d6ba79d887177f45b))
+- introduce new trait for special class column ([01e3bfc](https://github.com/astroautomata/SymbolicRegression.jl/commit/01e3bfc28862c012733228fc8ccbc2489e1c39b0))
+
+### Bug Fixes
+
+- ambiguity in target scitype ([ea27c1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/ea27c1a2e08cb84b87cba6e5067ddd65bef3702d))
+- make `:class` col more generic to `X` type ([864eb63](https://github.com/astroautomata/SymbolicRegression.jl/commit/864eb6392e7bcb06eb5401389dc2eddda8aea2e7))
+- pass eval options through TemplateExpression ([40cca0e](https://github.com/astroautomata/SymbolicRegression.jl/commit/40cca0ebbfce1ec0d9af44ebc0bb72956f2664c7))
+- switch to `Unknown` rather than `Any` ([9f82c13](https://github.com/astroautomata/SymbolicRegression.jl/commit/9f82c13666a326d4fd560382001abb2ccda59102))
+
+## [1.5.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.0...v1.5.1) (2024-12-26)
+
+### Bug Fixes
+
+- add `literal_pow` for composable expression ([2cd4c1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/2cd4c1a6dd37c8011184f569ac2ab75fb1aadf54))
+- add missing `literal_pow` ([2a92af1](https://github.com/astroautomata/SymbolicRegression.jl/commit/2a92af1464c80edcf68b7fd8bc769deed545296d))
+- higher order safe operators ([12449ca](https://github.com/astroautomata/SymbolicRegression.jl/commit/12449ca4451fbd3867063a81d4f25c83f90b37ba))
+- higher order safe operators ([5dbd23a](https://github.com/astroautomata/SymbolicRegression.jl/commit/5dbd23abd698412de59b3a08f7889ea09bcf5345))
+- zero-arg ComposableExpression when nan ([d875abb](https://github.com/astroautomata/SymbolicRegression.jl/commit/d875abb1581e9062691bc9c72ef079981fc1520b))
+
+## [1.5.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.4.0...v1.5.0) (2024-12-14)
+
+### Features
+
+- add safe versions of `asin` and `acos` ([42dfd8d](https://github.com/astroautomata/SymbolicRegression.jl/commit/42dfd8d145cc182adc08e72ab2ed4093f1eb152e))
+- create `safe_atanh` operator ([f5a41e7](https://github.com/astroautomata/SymbolicRegression.jl/commit/f5a41e7963321ce2b2576daf1a8e64d692a1b7f5))
+- make safe operators compatible with ForwardDiff ([58ade27](https://github.com/astroautomata/SymbolicRegression.jl/commit/58ade27e87eb9f2cb7b28342a6834974cf4b296d))
+
+## [1.4.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.3.1...v1.4.0) (2024-12-13)
+
+### Features
+
+- dynamic autodiff integration ([edcb9ed](https://github.com/astroautomata/SymbolicRegression.jl/commit/edcb9ed66bb84e70242e40acdf44e1f76e5b0eab))
+- re-use allocations within mutation loop ([bf1c521](https://github.com/astroautomata/SymbolicRegression.jl/commit/bf1c52134a80e8951446fe93f9f69d7b9e6f5b27))
+- reduce allocations within `next_generation` ([530689f](https://github.com/astroautomata/SymbolicRegression.jl/commit/530689fdcb3660bbab55b55c90c7224675092445))
+
+### Bug Fixes
+
+- allocate node storage for actual size ([adcdf15](https://github.com/astroautomata/SymbolicRegression.jl/commit/adcdf154ad541d25cbbfd086b89deb24e24510ef))
+- ensure right size for preallocated storage ([399b86a](https://github.com/astroautomata/SymbolicRegression.jl/commit/399b86a8e350567bd333be65a50c6eb4ca41a88d))
+- prealloc for template expressions ([693ef01](https://github.com/astroautomata/SymbolicRegression.jl/commit/693ef0180fc678220f4994c9a42c57620f4b7bd8))
+- prealloc was unused ([a397dad](https://github.com/astroautomata/SymbolicRegression.jl/commit/a397dad099aaaabc96156ddf50c1a9ccc22d6dbb))
+
+## [1.3.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.3.0...v1.3.1) (2024-12-11)
+
+### Bug Fixes
+
+- ambiguity in TemplateExpression ([652ea0b](https://github.com/astroautomata/SymbolicRegression.jl/commit/652ea0b7330e1745e523fa8462ebabcdba1b8f24))
+
+## [1.3.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.2.0...v1.3.0) (2024-12-09)
+
+### Features
+
+- add printing for DivMonomial ([f5f7637](https://github.com/astroautomata/SymbolicRegression.jl/commit/f5f7637a5b6288af38ea85a02b59c2ae42c0e62f))
+- allow user-specified `stdin` ([457c9cc](https://github.com/astroautomata/SymbolicRegression.jl/commit/457c9cc8ec3506beff38c871b5de4e98b9735cfe))
+- allow user-specified `stdin` ([1fc4611](https://github.com/astroautomata/SymbolicRegression.jl/commit/1fc461168efb46aad98babe764132a1d25f03a30))
+- automatic simplification in derivatives ([2c2d9fc](https://github.com/astroautomata/SymbolicRegression.jl/commit/2c2d9fcfac6fb5ca04016d2fac373dffb0000bb0))
+- derivative operator for ComposableExpression ([015ac95](https://github.com/astroautomata/SymbolicRegression.jl/commit/015ac952b3860aeb4b29a5dbf02e6f572c2cfdbd))
+- derivative speed hack for no dependence on variable ([39da124](https://github.com/astroautomata/SymbolicRegression.jl/commit/39da124f542fe8ce97bb4692bff2d2bd367b4c30))
+- heavier automatic simplification in derivatives ([72e21fe](https://github.com/astroautomata/SymbolicRegression.jl/commit/72e21fea11328f0bc90e819c89c6ff521bc78281))
+- include pretty printing of derivative operators ([73584d3](https://github.com/astroautomata/SymbolicRegression.jl/commit/73584d3189c7985b53bb429ee8ee29b861230970))
+- make `D` operator compatible with TemplateExpression ([410e882](https://github.com/astroautomata/SymbolicRegression.jl/commit/410e88259611b59dce20e8541a4eead8ac6fe715))
+- prefer ForwardDiff over Zygote for ComposableExpression derivatives ([74d2d33](https://github.com/astroautomata/SymbolicRegression.jl/commit/74d2d33331e6051072617f111588ff608d1d5058))
+- simplify common derivatives ([472f0a7](https://github.com/astroautomata/SymbolicRegression.jl/commit/472f0a7bb14b00c3dc3340f41548a98311d3f01c))
+- use newer `_zygote_gradient` operators ([3db5f99](https://github.com/astroautomata/SymbolicRegression.jl/commit/3db5f99f45352a21e4e2b91d3f56b05c5ebc103a))
+
+### Bug Fixes
+
+- old imports ([e05da70](https://github.com/astroautomata/SymbolicRegression.jl/commit/e05da7070973f126efa3855da24013acaa985351))
+
+## [1.2.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.1.0...v1.2.0) (2024-12-08)
+
+### Bug Fixes
+
+- add missing `condition_mutation_weights!` to fix [#378](https://github.com/astroautomata/SymbolicRegression.jl/issues/378) ([f0027f4](https://github.com/astroautomata/SymbolicRegression.jl/commit/f0027f4174e577279d2c7be08ec2531688fbcc18))
+- add missing `count_scalar_constants` for TemplateExpression ([802a370](https://github.com/astroautomata/SymbolicRegression.jl/commit/802a370838809f63e468061c4fc9bf9e84029734))
+- add missing `condition_mutation_weights!` to fix [#378](https://github.com/astroautomata/SymbolicRegression.jl/issues/378) ([3565421](https://github.com/astroautomata/SymbolicRegression.jl/commit/35654219dbca65aef75609c918e7722675a73734))
+
+## [1.1.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.3...v1.1.0) (2024-12-03)
+
+### Features
+
+- allow passing additional extensions for worker imports ([788ce37](https://github.com/astroautomata/SymbolicRegression.jl/commit/788ce37f48c9106a95c2158be3aa137a0cea8bca))
+
+### Bug Fixes
+
+- distributed TensorBoardLogging ([272195e](https://github.com/astroautomata/SymbolicRegression.jl/commit/272195e8057693d4908800c66ed5c7f1d8c11548))
+
+## [1.0.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.2...v1.0.3) (2024-11-28)
+
+### Features
+
+- allow argument-less TemplateExpression parts ([f4c0d7c](https://github.com/astroautomata/SymbolicRegression.jl/commit/f4c0d7c51b83fa52d39be23f5359db93c126bc44))
+- allow argument-less TemplateExpression parts ([6d2a72d](https://github.com/astroautomata/SymbolicRegression.jl/commit/6d2a72d0d42d5aeda4c3f9b75231319cef420575))
+
+### Bug Fixes
+
+- `predict` for TemplateExpressions ([808bd10](https://github.com/astroautomata/SymbolicRegression.jl/commit/808bd10111a1232ec722f1f6a89ffb7a4417bb68))
+- `predict` for TemplateExpressions ([3f4b201](https://github.com/astroautomata/SymbolicRegression.jl/commit/3f4b201254e5a80af67843d2e997aa6ec1227506))
+
+## [1.0.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.1...v1.0.2) (2024-11-24)
+
+### Bug Fixes
+
+- widen type constraints for TemplateExpression ([b5fc8eb](https://github.com/astroautomata/SymbolicRegression.jl/commit/b5fc8eb63bbd48444266c6dcb862c88ead7717db))
+- widen type constraints for TemplateExpression evaluation ([dedb41a](https://github.com/astroautomata/SymbolicRegression.jl/commit/dedb41a6b7c40f97e74d361046d34717d83f2fb9))
+
+## [1.0.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.0...v1.0.1) (2024-11-20)
+
+## [1.13.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.1...v1.13.0) (2026-03-09)
+
+### Bug Fixes
+
+- clean up output of errormonitor ([#555](https://github.com/astroautomata/SymbolicRegression.jl/issues/555)) ([210deac](https://github.com/astroautomata/SymbolicRegression.jl/commit/210deacdaf253777c3041c4749eac1898d555083))
+
+## [1.12.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.0...v1.12.1) (2026-02-14)
+
+## [1.12.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.3...v1.12.0) (2025-06-24)
+
+### Bug Fixes
+
+- issue where minimizer is not loaded to tree ([f0ff1a0](https://github.com/astroautomata/SymbolicRegression.jl/commit/f0ff1a01e48a30b19effe6d610dd571f9ed4dfd0))
+- issue where minimizer is not loaded to tree ([8b05c9f](https://github.com/astroautomata/SymbolicRegression.jl/commit/8b05c9fdbdce740f43db06ab9d75e95335cfcd5b))
+
+## [1.11.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.2...v1.11.3) (2025-06-15)
+
+## [1.11.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.1...v1.11.2) (2025-06-12)
+
+## [1.11.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.11.0...v1.11.1) (2025-05-20)
+
+### Features
+
+- enable template expressions in a distributed setting ([4c96cc9](https://github.com/astroautomata/SymbolicRegression.jl/commit/4c96cc90de73e8db3cab7f422c8e3ea69cfbf0a3))
+
+### Bug Fixes
+
+- use generic interface for worker distribution ([6311632](https://github.com/astroautomata/SymbolicRegression.jl/commit/6311632d772d1f2665cc98c009353ed945999d1d))
+
+## [1.11.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.10.0...v1.11.0) (2025-05-18)
+
+### Features
+
+- allow `@template_spec` to declare explicit num_features ([ebb1a80](https://github.com/astroautomata/SymbolicRegression.jl/commit/ebb1a80f449fa608670a8565fc319e8f42d37a2c))
+- allow `@template_spec` to declare explicit num_features ([b24f707](https://github.com/astroautomata/SymbolicRegression.jl/commit/b24f70762ddb6a8804cc49bed6b35719c6600329))
+- allow negative losses ([fc9fcdb](https://github.com/astroautomata/SymbolicRegression.jl/commit/fc9fcdbfac515efe2b53e1af0ee7f7cdeb23986a))
+- allow negative losses ([2f38af9](https://github.com/astroautomata/SymbolicRegression.jl/commit/2f38af9ed20ed1090adeb4a45e3a6633538b83f2))
+- avoid use of scores when assuming negative losses ([996d930](https://github.com/astroautomata/SymbolicRegression.jl/commit/996d93097b447a379873be72484b78e2d1d5aff8))
+- move `get_options` into top namespace ([3726466](https://github.com/astroautomata/SymbolicRegression.jl/commit/37264668adcb06279ea23f203ca91bcf99d4caae))
+- recommend users use TemplateExpressionSpec instead ([ad07294](https://github.com/astroautomata/SymbolicRegression.jl/commit/ad072940ad2deb9c9b588645b2cf6e44e0fab664))
+
+### Bug Fixes
+
+- avoid printing heap size hint if already created ([4334193](https://github.com/astroautomata/SymbolicRegression.jl/commit/43341939ad9b1224de60254dfc1e7c3bfe7cb321))
+- avoid printing heap size hint if already created ([64c0780](https://github.com/astroautomata/SymbolicRegression.jl/commit/64c0780d268f13a0a0e54615d273ffbb123170de))
+- Enzyme extension (up to issues of Enzyme itself) ([8f32e96](https://github.com/astroautomata/SymbolicRegression.jl/commit/8f32e9689c823a61277b19224b789a7c59ce2090))
+- per task cache can be immutable ([2a8663c](https://github.com/astroautomata/SymbolicRegression.jl/commit/2a8663c0040baf1fe394fd54b6c725fda6e08768))
+- per task cache can be immutable ([7708ff9](https://github.com/astroautomata/SymbolicRegression.jl/commit/7708ff969293189b6c25d059f76029a3edd2d491))
+- scope error in hall of fame formatting ([64c994d](https://github.com/astroautomata/SymbolicRegression.jl/commit/64c994d9c4f9569882a0c24fb7259c077e5696f7))
+
+## [1.10.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.3...v1.10.0) (2025-05-01)
+
+### Features
+
+- allow `Any` for input types ([07dbceb](https://github.com/astroautomata/SymbolicRegression.jl/commit/07dbceb489f65a5779afbe0b0439648296826fef))
+- finish remaining parts of string interface ([247f533](https://github.com/astroautomata/SymbolicRegression.jl/commit/247f53316f4fe4cd88eb2314b44c38dfe194c738))
+- initial compat with string features ([008cdc1](https://github.com/astroautomata/SymbolicRegression.jl/commit/008cdc19d327424c419921f74024ed8e2f8672ed))
+
+## [1.9.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.2...v1.9.3) (2025-04-25)
+
+### Bug Fixes
+
+- unary constraint check missed ([bfbb254](https://github.com/astroautomata/SymbolicRegression.jl/commit/bfbb2546128bb2704ff08770d58443c8fa79007c))
+- unary constraint check missed ([f08f76d](https://github.com/astroautomata/SymbolicRegression.jl/commit/f08f76d309917ed50946272d6e09621f9adc8681))
+
+## [1.9.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.1...v1.9.2) (2025-04-10)
+
+## [1.9.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.9.0...v1.9.1) (2025-04-04)
+
+## [1.9.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.8.0...v1.9.0) (2025-03-01)
+
+### Bug Fixes
+
+- printing greater and lesser ([d5f6fbd](https://github.com/astroautomata/SymbolicRegression.jl/commit/d5f6fbd1aacd1a5fe7dc9c6729d6dacf29b61830))
+- printing greater and lesser ([3a85b69](https://github.com/astroautomata/SymbolicRegression.jl/commit/3a85b69659e387383f3210960460e4557eb259a8))
+
+## [1.8.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.2...v1.8.0) (2025-02-22)
+
+### Features
+
+- allow recording crossovers ([#415](https://github.com/astroautomata/SymbolicRegression.jl/issues/415)) ([23a4f2e](https://github.com/astroautomata/SymbolicRegression.jl/commit/23a4f2e7dbd86b6ab1f5f7c71d519ec16b906840))
+- better error for mismatched eltypes ([68d6397](https://github.com/astroautomata/SymbolicRegression.jl/commit/68d63978d414940a9c492bd1b75471173120fe1e))
+- better error for mismatched eltypes ([d70fe09](https://github.com/astroautomata/SymbolicRegression.jl/commit/d70fe09d38864b4f2b2ecdf6d17c7b7a8bcaf9b4))
+- explicitly monitor errors in workers ([b86b4c1](https://github.com/astroautomata/SymbolicRegression.jl/commit/b86b4c1ed37328b83635d2f5fa7d826d84092c7a))
+- explicitly monitor errors in workers ([28eb285](https://github.com/astroautomata/SymbolicRegression.jl/commit/28eb28503fd13b36f7dea98657ccd6cb1247caba))
+- generic getters for datasets ([3b923bd](https://github.com/astroautomata/SymbolicRegression.jl/commit/3b923bd65a7bd16d629a054f07e3e680e4da1022))
+- utility functions for batching dataset ([bb406ed](https://github.com/astroautomata/SymbolicRegression.jl/commit/bb406edb0c137bbcca3cefcb64d0d02b5406b38e))
+
+### Bug Fixes
+
+- batched dataset for optimisation ([d085fd8](https://github.com/astroautomata/SymbolicRegression.jl/commit/d085fd837e323d82bf363f4e8f986bd6ab5fb5f9))
+- batched dataset for optimisation ([5629410](https://github.com/astroautomata/SymbolicRegression.jl/commit/562941040d95f6154d41ddde8ec4d5e5ee57fbff))
+- only optimize hall of fame if exists ([cc3a8a5](https://github.com/astroautomata/SymbolicRegression.jl/commit/cc3a8a52b3f6e90fc847e4bebd2694a143455f95))
+- parametric expressions batching ([2d6f665](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d6f665bc327f6a1ee5a9c9d04b48c99afcc17e7))
+
+## [1.7.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.1...v1.7.2) (2025-02-13)
+
+### Bug Fixes
+
+- max of 6 expressions bug ([fcb03d9](https://github.com/astroautomata/SymbolicRegression.jl/commit/fcb03d9c9692df5d8e756d35653f3206c1a914a1))
+- max of 6 expressions bug ([1badff4](https://github.com/astroautomata/SymbolicRegression.jl/commit/1badff4e6f7f1b58bd42ca88b21cbd4eab357d9f))
+
+## [1.7.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.7.0...v1.7.1) (2025-02-09)
+
+### Bug Fixes
+
+- loss_function_expression in distributed mode ([c7877f3](https://github.com/astroautomata/SymbolicRegression.jl/commit/c7877f3aeae2719926cbf24d16382e65daf3756c))
+
+## [1.7.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.6.0...v1.7.0) (2025-02-08)
+
+### Features
+
+- add max and min ([8d0d34d](https://github.com/astroautomata/SymbolicRegression.jl/commit/8d0d34d649f3cd04a1f5b71cba478659cd404e68))
+- allow initializing parameters from naked array ([99b1598](https://github.com/astroautomata/SymbolicRegression.jl/commit/99b1598d722a62f7c0be3ecc70ad07da9ddbb719))
+- allow multiple parameter keys in TemplateExpression ([fb0e21c](https://github.com/astroautomata/SymbolicRegression.jl/commit/fb0e21c99cd94771a846833605f18aefaf00196a))
+- allow no parameters in `@template` macro ([204be7e](https://github.com/astroautomata/SymbolicRegression.jl/commit/204be7e569f80ee60cfcf92eed46f562f15fab44))
+- automatically map comparison operators ([d08c5d7](https://github.com/astroautomata/SymbolicRegression.jl/commit/d08c5d79669d57a67ccffedefdcbee2fd9a9781b))
+- create `num_params`1 argument ([f8b1ad0](https://github.com/astroautomata/SymbolicRegression.jl/commit/f8b1ad03d7246a8df0a39ae341f677d058f1767e))
+- custom `mutate_constant` for parametric template expression ([a71a545](https://github.com/astroautomata/SymbolicRegression.jl/commit/a71a54576d0586228952b935ee6b8bbc81c49581))
+- export expression spec ([fc2df00](https://github.com/astroautomata/SymbolicRegression.jl/commit/fc2df005a28a601405385821e236289eef7c33e2))
+- have TemplateExpression store all parameters in raw string ([5e62569](https://github.com/astroautomata/SymbolicRegression.jl/commit/5e62569c584554e0ccf440e6fbf4ec6033d963e2))
+- introduce `ExpressionSpec` ([f48e74c](https://github.com/astroautomata/SymbolicRegression.jl/commit/f48e74ced0eea6d9744ddacce8e4f0fbb18a58d2))
+- introduce parameter feature for `TemplateExpression` ([5c5a07e](https://github.com/astroautomata/SymbolicRegression.jl/commit/5c5a07e031778499fd2f7cdd5841fd63d1512c38))
+- macro for easy template expressions ([3c076e9](https://github.com/astroautomata/SymbolicRegression.jl/commit/3c076e9fbb6e5cd6488f6ee0eb5f8358be00a2c4))
+- overload additional operations for ComposableExpression ([437a9ca](https://github.com/astroautomata/SymbolicRegression.jl/commit/437a9ca46547aea79950e63e010b9ab99438b30e))
+- overload additional operations for ComposableExpression ([288824d](https://github.com/astroautomata/SymbolicRegression.jl/commit/288824def89a95710931c5e775271f2642637b10))
+- permit `variable_names=nothing` in `ComposableExpression` ([e478322](https://github.com/astroautomata/SymbolicRegression.jl/commit/e478322b1bde9fb6e02d7695dc5ec294a59f373c))
+- remove node type option for TemplateExpression ([b279002](https://github.com/astroautomata/SymbolicRegression.jl/commit/b279002406ef18e567e758963387ab1c66732544))
+- rename `num_params`5 to `num_params`6 ([bb927ef](https://github.com/astroautomata/SymbolicRegression.jl/commit/bb927ef271b88858a106de503d05b949a4b52880))
+- safety checks for `@template` macro ([91ee759](https://github.com/astroautomata/SymbolicRegression.jl/commit/91ee759fbcb637936fed0b5eeee7b2055df799cf))
+- warn for `num_params`2 and `num_params`3 ([2d9c0d8](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d9c0d8d7f677005fd5e494a01d7e4606d336fbc))
+
+### Bug Fixes
+
+- better defensive coding ([7faeb4d](https://github.com/astroautomata/SymbolicRegression.jl/commit/7faeb4d4837675c4cb4b2520b6f95e06fc977a31))
+- condition for constant mutation of template ([8f1b7dc](https://github.com/astroautomata/SymbolicRegression.jl/commit/8f1b7dc9a6884c8fe9f30b3a951cab5fe028017a))
+- jet error ([415fc5c](https://github.com/astroautomata/SymbolicRegression.jl/commit/415fc5cb5cfe95e5eb3f9eff882e64b743ef881e))
+- JET flagged issue ([432d7a5](https://github.com/astroautomata/SymbolicRegression.jl/commit/432d7a5b12b24fcb41d7ebc0c871edc7143ea7fc))
+- missing import ([ab53c16](https://github.com/astroautomata/SymbolicRegression.jl/commit/ab53c164b0b77187da1703d1d9412446bad0c60b))
+- param assertion ([a42aa91](https://github.com/astroautomata/SymbolicRegression.jl/commit/a42aa91def83b1a07b6de8e9ff4a177f396c8844))
+- some issues in TemplateExpression ([29c5e4c](https://github.com/astroautomata/SymbolicRegression.jl/commit/29c5e4c91dd73b0e37d15addcb53b5fba5a23a16))
+- type definition ([5b8ba79](https://github.com/astroautomata/SymbolicRegression.jl/commit/5b8ba79cbd807afdf5f5684d252c1448d66c1ee4))
+
+## [1.6.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.2...v1.6.0) (2025-02-02)
+
+### Bug Fixes
+
+- allow for variable `nthreads` ([d29742b](https://github.com/astroautomata/SymbolicRegression.jl/commit/d29742b9687400c2d6aced5379670b25e7479189))
+- allow for variable `nthreads` ([9fabc30](https://github.com/astroautomata/SymbolicRegression.jl/commit/9fabc303dd33c624739e759d960374c7f85e56f7))
+
+## [1.5.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.1...v1.5.2) (2025-01-03)
+
+### Features
+
+- conditionally widen MLJ scitype ([21443d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/21443d49d74881f4896abf1d6ba79d887177f45b))
+- introduce new trait for special class column ([01e3bfc](https://github.com/astroautomata/SymbolicRegression.jl/commit/01e3bfc28862c012733228fc8ccbc2489e1c39b0))
+
+### Bug Fixes
+
+- ambiguity in target scitype ([ea27c1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/ea27c1a2e08cb84b87cba6e5067ddd65bef3702d))
+- make `:class` col more generic to `X` type ([864eb63](https://github.com/astroautomata/SymbolicRegression.jl/commit/864eb6392e7bcb06eb5401389dc2eddda8aea2e7))
+- pass eval options through TemplateExpression ([40cca0e](https://github.com/astroautomata/SymbolicRegression.jl/commit/40cca0ebbfce1ec0d9af44ebc0bb72956f2664c7))
+- switch to `Unknown` rather than `Any` ([9f82c13](https://github.com/astroautomata/SymbolicRegression.jl/commit/9f82c13666a326d4fd560382001abb2ccda59102))
+
+## [1.5.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.5.0...v1.5.1) (2024-12-26)
+
+### Bug Fixes
+
+- add `literal_pow` for composable expression ([2cd4c1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/2cd4c1a6dd37c8011184f569ac2ab75fb1aadf54))
+- add missing `literal_pow` ([2a92af1](https://github.com/astroautomata/SymbolicRegression.jl/commit/2a92af1464c80edcf68b7fd8bc769deed545296d))
+- higher order safe operators ([12449ca](https://github.com/astroautomata/SymbolicRegression.jl/commit/12449ca4451fbd3867063a81d4f25c83f90b37ba))
+- higher order safe operators ([5dbd23a](https://github.com/astroautomata/SymbolicRegression.jl/commit/5dbd23abd698412de59b3a08f7889ea09bcf5345))
+- zero-arg ComposableExpression when nan ([d875abb](https://github.com/astroautomata/SymbolicRegression.jl/commit/d875abb1581e9062691bc9c72ef079981fc1520b))
+
+## [1.5.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.4.0...v1.5.0) (2024-12-14)
+
+### Features
+
+- add safe versions of `asin` and `acos` ([42dfd8d](https://github.com/astroautomata/SymbolicRegression.jl/commit/42dfd8d145cc182adc08e72ab2ed4093f1eb152e))
+- create `safe_atanh` operator ([f5a41e7](https://github.com/astroautomata/SymbolicRegression.jl/commit/f5a41e7963321ce2b2576daf1a8e64d692a1b7f5))
+- make safe operators compatible with ForwardDiff ([58ade27](https://github.com/astroautomata/SymbolicRegression.jl/commit/58ade27e87eb9f2cb7b28342a6834974cf4b296d))
+
+## [1.4.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.3.1...v1.4.0) (2024-12-13)
+
+### Features
+
+- dynamic autodiff integration ([edcb9ed](https://github.com/astroautomata/SymbolicRegression.jl/commit/edcb9ed66bb84e70242e40acdf44e1f76e5b0eab))
+- re-use allocations within mutation loop ([bf1c521](https://github.com/astroautomata/SymbolicRegression.jl/commit/bf1c52134a80e8951446fe93f9f69d7b9e6f5b27))
+- reduce allocations within `next_generation` ([530689f](https://github.com/astroautomata/SymbolicRegression.jl/commit/530689fdcb3660bbab55b55c90c7224675092445))
+
+### Bug Fixes
+
+- allocate node storage for actual size ([adcdf15](https://github.com/astroautomata/SymbolicRegression.jl/commit/adcdf154ad541d25cbbfd086b89deb24e24510ef))
+- ensure right size for preallocated storage ([399b86a](https://github.com/astroautomata/SymbolicRegression.jl/commit/399b86a8e350567bd333be65a50c6eb4ca41a88d))
+- prealloc for template expressions ([693ef01](https://github.com/astroautomata/SymbolicRegression.jl/commit/693ef0180fc678220f4994c9a42c57620f4b7bd8))
+- prealloc was unused ([a397dad](https://github.com/astroautomata/SymbolicRegression.jl/commit/a397dad099aaaabc96156ddf50c1a9ccc22d6dbb))
+
+## [1.3.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.3.0...v1.3.1) (2024-12-11)
+
+### Bug Fixes
+
+- ambiguity in TemplateExpression ([652ea0b](https://github.com/astroautomata/SymbolicRegression.jl/commit/652ea0b7330e1745e523fa8462ebabcdba1b8f24))
+
+## [1.3.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.2.0...v1.3.0) (2024-12-09)
+
+### Features
+
+- add printing for DivMonomial ([f5f7637](https://github.com/astroautomata/SymbolicRegression.jl/commit/f5f7637a5b6288af38ea85a02b59c2ae42c0e62f))
+- allow user-specified `stdin` ([457c9cc](https://github.com/astroautomata/SymbolicRegression.jl/commit/457c9cc8ec3506beff38c871b5de4e98b9735cfe))
+- allow user-specified `stdin` ([1fc4611](https://github.com/astroautomata/SymbolicRegression.jl/commit/1fc461168efb46aad98babe764132a1d25f03a30))
+- automatic simplification in derivatives ([2c2d9fc](https://github.com/astroautomata/SymbolicRegression.jl/commit/2c2d9fcfac6fb5ca04016d2fac373dffb0000bb0))
+- derivative operator for ComposableExpression ([015ac95](https://github.com/astroautomata/SymbolicRegression.jl/commit/015ac952b3860aeb4b29a5dbf02e6f572c2cfdbd))
+- derivative speed hack for no dependence on variable ([39da124](https://github.com/astroautomata/SymbolicRegression.jl/commit/39da124f542fe8ce97bb4692bff2d2bd367b4c30))
+- heavier automatic simplification in derivatives ([72e21fe](https://github.com/astroautomata/SymbolicRegression.jl/commit/72e21fea11328f0bc90e819c89c6ff521bc78281))
+- include pretty printing of derivative operators ([73584d3](https://github.com/astroautomata/SymbolicRegression.jl/commit/73584d3189c7985b53bb429ee8ee29b861230970))
+- make `D` operator compatible with TemplateExpression ([410e882](https://github.com/astroautomata/SymbolicRegression.jl/commit/410e88259611b59dce20e8541a4eead8ac6fe715))
+- prefer ForwardDiff over Zygote for ComposableExpression derivatives ([74d2d33](https://github.com/astroautomata/SymbolicRegression.jl/commit/74d2d33331e6051072617f111588ff608d1d5058))
+- simplify common derivatives ([472f0a7](https://github.com/astroautomata/SymbolicRegression.jl/commit/472f0a7bb14b00c3dc3340f41548a98311d3f01c))
+- use newer `_zygote_gradient` operators ([3db5f99](https://github.com/astroautomata/SymbolicRegression.jl/commit/3db5f99f45352a21e4e2b91d3f56b05c5ebc103a))
+
+### Bug Fixes
+
+- old imports ([e05da70](https://github.com/astroautomata/SymbolicRegression.jl/commit/e05da7070973f126efa3855da24013acaa985351))
+
+## [1.2.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.1.0...v1.2.0) (2024-12-08)
+
+### Bug Fixes
+
+- add missing `condition_mutation_weights!` to fix [#378](https://github.com/astroautomata/SymbolicRegression.jl/issues/378) ([f0027f4](https://github.com/astroautomata/SymbolicRegression.jl/commit/f0027f4174e577279d2c7be08ec2531688fbcc18))
+- add missing `count_scalar_constants` for TemplateExpression ([802a370](https://github.com/astroautomata/SymbolicRegression.jl/commit/802a370838809f63e468061c4fc9bf9e84029734))
+- add missing `condition_mutation_weights!` to fix [#378](https://github.com/astroautomata/SymbolicRegression.jl/issues/378) ([3565421](https://github.com/astroautomata/SymbolicRegression.jl/commit/35654219dbca65aef75609c918e7722675a73734))
+
+## [1.1.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.3...v1.1.0) (2024-12-03)
+
+### Features
+
+- allow passing additional extensions for worker imports ([788ce37](https://github.com/astroautomata/SymbolicRegression.jl/commit/788ce37f48c9106a95c2158be3aa137a0cea8bca))
+
+### Bug Fixes
+
+- distributed TensorBoardLogging ([272195e](https://github.com/astroautomata/SymbolicRegression.jl/commit/272195e8057693d4908800c66ed5c7f1d8c11548))
+
+## [1.0.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.2...v1.0.3) (2024-11-28)
+
+### Features
+
+- allow argument-less TemplateExpression parts ([f4c0d7c](https://github.com/astroautomata/SymbolicRegression.jl/commit/f4c0d7c51b83fa52d39be23f5359db93c126bc44))
+- allow argument-less TemplateExpression parts ([6d2a72d](https://github.com/astroautomata/SymbolicRegression.jl/commit/6d2a72d0d42d5aeda4c3f9b75231319cef420575))
+
+### Bug Fixes
+
+- `predict` for TemplateExpressions ([808bd10](https://github.com/astroautomata/SymbolicRegression.jl/commit/808bd10111a1232ec722f1f6a89ffb7a4417bb68))
+- `predict` for TemplateExpressions ([3f4b201](https://github.com/astroautomata/SymbolicRegression.jl/commit/3f4b201254e5a80af67843d2e997aa6ec1227506))
+
+## [1.0.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.1...v1.0.2) (2024-11-24)
+
+### Bug Fixes
+
+- widen type constraints for TemplateExpression ([b5fc8eb](https://github.com/astroautomata/SymbolicRegression.jl/commit/b5fc8eb63bbd48444266c6dcb862c88ead7717db))
+- widen type constraints for TemplateExpression evaluation ([dedb41a](https://github.com/astroautomata/SymbolicRegression.jl/commit/dedb41a6b7c40f97e74d361046d34717d83f2fb9))
+
+## [1.0.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.0.0...v1.0.1) (2024-11-20)
+
 ## SymbolicRegression.jl v1.0.0
 
 New URL: https://ai.damtp.cam.ac.uk/symbolicregression
