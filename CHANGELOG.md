@@ -4,6 +4,13 @@
 
 # Changelog
 
+## [1.13.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.0...v1.13.1) (2026-03-23)
+
+
+### Bug Fixes
+
+* use eltype(x0) instead of T for randn in constant optimization (backport to release-v1) ([#571](https://github.com/astroautomata/SymbolicRegression.jl/issues/571)) ([13ca9c4](https://github.com/astroautomata/SymbolicRegression.jl/commit/13ca9c4bfad9b50ef4c7e88961f1a736bc979c98))
+
 ## [1.13.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.12.1...v1.13.0) (2026-03-09)
 
 ### Bug Fixes
