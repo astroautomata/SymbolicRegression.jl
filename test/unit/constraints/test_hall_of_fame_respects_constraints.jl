@@ -27,6 +27,6 @@
     size = compute_complexity(member, options)
     @test 0 < size <= options.maxsize
 
-    update_hall_of_fame!(hof, [member], options)
+    SymbolicRegression.update_hall_of_fame!(hof, [member], options)
     @test !hof.exists[size]
 end
