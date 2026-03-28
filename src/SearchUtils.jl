@@ -704,13 +704,10 @@ end
 function update_hall_of_fame!(
     hall_of_fame::HallOfFame, members::Vector{PM}, options::AbstractOptions
 ) where {PM<:PopMember}
-    # Only run constraint checks if any user-passed constraints are active.
-    # (This avoids unnecessary work in the common unconstrained case, which can
-    # affect performance and, in turn, nondeterministic search results.)
     check_user_constraints =
-        (options.nested_constraints !== nothing) ||
-        any(cons -> cons != (-1, -1), options.bin_constraints) ||
-        any(cons -> cons != -1, options.una_constraints)
+        !isnothing(options.nested_constraints) ||
+        any(!=((-1, -1)), options.bin_constraints) ||
+        any(!=(-1), options.una_constraints)
 
     for member in members
         size = compute_complexity(member, options)
