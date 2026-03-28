@@ -20,6 +20,7 @@ using ..PopMemberModule: PopMember
 using ..HallOfFameModule: HallOfFame, string_dominating_pareto_curve
 using ..ProgressBarsModule: WrappedProgressBar, manually_iterate!, barlen
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
+using ..CheckConstraintsModule: check_constraints
 
 function logging_callback! end
 
@@ -703,10 +704,19 @@ end
 function update_hall_of_fame!(
     hall_of_fame::HallOfFame, members::Vector{PM}, options::AbstractOptions
 ) where {PM<:PopMember}
+    check_user_constraints =
+        !isnothing(options.nested_constraints) ||
+        any(!=((-1, -1)), options.bin_constraints) ||
+        any(!=(-1), options.una_constraints)
+
     for member in members
         size = compute_complexity(member, options)
         valid_size = 0 < size <= options.maxsize
         if !valid_size
+            continue
+        end
+        if check_user_constraints &&
+            !check_constraints(member.tree, options, options.maxsize, size)
             continue
         end
         not_filled = !hall_of_fame.exists[size]
