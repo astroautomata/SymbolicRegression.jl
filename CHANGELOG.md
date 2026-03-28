@@ -6,10 +6,9 @@
 
 ## [1.13.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.1...v1.13.2) (2026-03-28)
 
-
 ### Bug Fixes
 
-* enforce constraints in hall-of-fame (backport) ([#593](https://github.com/astroautomata/SymbolicRegression.jl/issues/593)) ([cc7e4c0](https://github.com/astroautomata/SymbolicRegression.jl/commit/cc7e4c09dd3152ea91089b0bdd8c2140254c05b5))
+- enforce constraints in hall-of-fame (backport) ([#593](https://github.com/astroautomata/SymbolicRegression.jl/issues/593)) ([cc7e4c0](https://github.com/astroautomata/SymbolicRegression.jl/commit/cc7e4c09dd3152ea91089b0bdd8c2140254c05b5))
 
 ## [1.13.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.0...v1.13.1) (2026-03-23)
 
