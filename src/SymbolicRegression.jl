@@ -741,7 +741,7 @@ function _initialize_search!(
         # case the dataset changed:
         for j in eachindex(init_hall_of_fame, datasets, state.halls_of_fame)
             hof = strip_metadata(init_hall_of_fame[j], options, datasets[j])
-            for member in defined_members(hof)
+            for bucket in hof.cells, member in values(bucket)
                 cost, result_loss = eval_cost(datasets[j], member, options)
                 member.cost = cost
                 member.loss = result_loss

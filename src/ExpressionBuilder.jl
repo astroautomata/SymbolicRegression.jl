@@ -146,13 +146,16 @@ end
     function embed_metadata(
         hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
     ) where {T,L}
-        K = keytype(eltype(hof.cells))
-        PM = typeof(embed_metadata(_prototype_member(options, dataset), options, dataset))
+        prototype = embed_metadata(_prototype_member(options, dataset), options, dataset)
+        PM = typeof(prototype)
+        N = typeof(prototype.tree)
+        C = typeof(hof.criteria)
         new_cells = [
-            Dict{K,PM}(k => embed_metadata(member, options, dataset) for (k, member) in d)
-            for d in hof.cells
+            Dict{Tuple,PM}(
+                k => embed_metadata(member, options, dataset) for (k, member) in d
+            ) for d in hof.cells
         ]
-        return HallOfFame(hof.criteria, new_cells)
+        return HallOfFame{T,L,N,PM,C}(hof.criteria, new_cells)
     end
     function embed_metadata(
         vec::Vector{H}, options::AbstractOptions, dataset::Dataset{T,L}
@@ -194,13 +197,15 @@ end
 function strip_metadata(
     hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T,L}
-    K = keytype(eltype(hof.cells))
-    PM = typeof(_prototype_member(options, dataset))
+    prototype = _prototype_member(options, dataset)
+    PM = typeof(prototype)
+    N = typeof(prototype.tree)
+    C = typeof(hof.criteria)
     new_cells = [
-        Dict{K,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d) for
-        d in hof.cells
+        Dict{Tuple,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d)
+        for d in hof.cells
     ]
-    return HallOfFame(hof.criteria, new_cells)
+    return HallOfFame{T,L,N,PM,C}(hof.criteria, new_cells)
 end
 
 @unstable function get_operators(ex::AbstractExpression, options::AbstractOptions)
