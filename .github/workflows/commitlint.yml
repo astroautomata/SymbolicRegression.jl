@@ -21,7 +21,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: commitlint.config.mjs
+          configFile: .github/commitlint.config.mjs
           failOnWarnings: true
 
   pr-title:
@@ -34,4 +34,4 @@ jobs:
       - run: npm install --no-save @commitlint/cli @commitlint/config-conventional
       - env:
           PR_TITLE: ${{ github.event.pull_request.title }}
-        run: printf '%s\n' "$PR_TITLE" | npx commitlint --config commitlint.config.mjs
+        run: printf '%s\n' "$PR_TITLE" | npx commitlint --config .github/commitlint.config.mjs
