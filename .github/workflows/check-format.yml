@@ -22,7 +22,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - name: "Cache dependencies"
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
       - name: Install JuliaFormatter and format
         run: |
           julia --startup-file=no -e 'using Pkg; pkg"activate --temp"; pkg"add JuliaFormatter@2"; using JuliaFormatter; format("."; verbose=true)'
