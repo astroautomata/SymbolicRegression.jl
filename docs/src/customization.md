@@ -60,6 +60,11 @@ for more examples of custom expression types, though note that `ParametricExpres
 is defined in DynamicExpressions.jl, while that file just overloads some methods for
 SymbolicRegression.jl.
 
+## Plugin Interface (Lifecycle Hooks + Persistent State)
+
+For cross-generation state, concept databases, and search-level callbacks, use the
+plugin interface. See the [Plugin Guide](plugin-guide.md) for a full walkthrough.
+
 ## Other Customizations
 
 Other internal abstract types include the following:

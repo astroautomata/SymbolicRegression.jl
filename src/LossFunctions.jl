@@ -190,6 +190,22 @@ function loss_to_cost(
 end
 
 # Score an equation
+"""
+    eval_cost(dataset, member, options::AbstractOptions; complexity=nothing)
+
+Compute the cost (for tournament selection) and raw loss of a member on a dataset.
+Returns `(cost, loss)`.
+
+Override by dispatching on a custom `AbstractOptions` subtype to implement
+a custom scoring scheme (e.g., multi-objective cost, custom regularization):
+
+```julia
+function SymbolicRegression.eval_cost(dataset, member, opts::MyOptions; kws...)
+    cost, loss = invoke(SymbolicRegression.eval_cost, Tuple{Any,Any,AbstractOptions}, dataset, member, opts; kws...)
+    return cost + my_extra_penalty(member.tree), loss
+end
+```
+"""
 function eval_cost(
     dataset::Dataset{T,L},
     member,

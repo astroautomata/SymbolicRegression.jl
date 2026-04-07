@@ -26,6 +26,23 @@ function can_optimize(::Type{T}, _) where {T<:Number}
     return true
 end
 
+"""
+    optimize_constants(dataset, member, options::AbstractOptions; rng=default_rng())
+
+Optimize the constants in a population member's expression tree.
+Returns `(optimized_member, num_evals)`.
+
+Override by dispatching on a custom `AbstractOptions` subtype to use a
+different optimizer or skip optimization for certain expression types:
+
+```julia
+function SymbolicRegression.optimize_constants(dataset, member, opts::MyOptions; kws...)
+    # e.g., use a custom optimizer or add constraints
+    optimized_member, num_evals = my_optimizer(dataset, member, opts)
+    return optimized_member, num_evals  # must return (member, Float64)
+end
+```
+"""
 @unstable function optimize_constants(
     dataset::Dataset{T,L},
     member::P,

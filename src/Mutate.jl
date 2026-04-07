@@ -17,7 +17,10 @@ using ..CoreModule:
     RecordType,
     sample_mutation,
     max_features,
-    dataset_fraction
+    dataset_fraction,
+    AbstractPluginState,
+    NoPluginState,
+    on_mutation_evaluated!
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
@@ -180,6 +183,7 @@ end
     running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions;
     tmp_recorder::RecordType,
+    plugin_state::AbstractPluginState=NoPluginState(),
 )::Tuple{
     P,Bool,Float64
 } where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:AbstractPopMember{T,L,N}}
@@ -224,6 +228,7 @@ end
             parent_ref,
             curmaxsize,
             nfeatures,
+            plugin_state,
         )
         mutation_result::AbstractMutationResult{N,P}
         num_evals += mutation_result.num_evals::Float64
@@ -233,6 +238,7 @@ end
                 mutation_result.member isa P,
                 "Mutation result must return a `PopMember` if `return_immediately` is true"
             )
+            on_mutation_evaluated!(plugin_state, mutation_choice, true, Float64(before_loss), Float64(mutation_result.member.loss), dataset, options)
             return mutation_result.member::P, true, num_evals
         else
             @assert(
@@ -253,6 +259,7 @@ end
             tmp_recorder["reason"] = "failed_constraint_check"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), NaN, dataset, options)
         return (
             create_child(
                 member,
@@ -277,6 +284,7 @@ end
             tmp_recorder["reason"] = "nan_loss"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), NaN, dataset, options)
         return (
             create_child(
                 member,
@@ -321,6 +329,7 @@ end
             tmp_recorder["reason"] = "annealing_or_frequency"
         end
         mutation_accepted = false
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), Float64(after_loss), dataset, options)
         return (
             create_child(
                 member,
@@ -348,6 +357,7 @@ end
             complexity=newSize,
             parent_ref=parent_ref,
         )
+        on_mutation_evaluated!(plugin_state, mutation_choice, true, Float64(before_loss), Float64(after_loss), dataset, options)
         return (new_member, mutation_accepted, num_evals)
     end
 end
@@ -400,6 +410,8 @@ You may overload this function to handle new mutation types for new `AbstractMut
 - `nfeatures`: The number of features in the dataset.
 - `parent_ref`: Reference to the mutated member's parent (only used for logging purposes).
 - `recorder::RecordType`: A recorder to log mutation details.
+- `plugin_state::AbstractPluginState`: The active worker plugin state. If your mutation
+  method needs it, capture it via `; plugin_state::MyState, kws...`.
 
 # Returns
 

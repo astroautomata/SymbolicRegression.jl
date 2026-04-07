@@ -20,7 +20,14 @@ using DynamicExpressions:
     constructorof
 using ..UtilsModule: subscriptify
 using ..CoreModule:
-    Dataset, AbstractOptions, Options, RecordType, max_features, create_expression
+    Dataset,
+    AbstractOptions,
+    Options,
+    RecordType,
+    max_features,
+    create_expression,
+    AbstractPluginState,
+    NoPluginState
 using ..ComplexityModule: compute_complexity
 using ..PopulationModule: Population
 using ..PopMemberModule: PopMember, AbstractPopMember
@@ -616,6 +623,7 @@ Base.@kwdef struct SearchState{
     stdin_reader::StdinReader
     record::Base.RefValue{RecordType}
     seed_members::Vector{Vector{PM}}
+    plugin_state::AbstractPluginState = NoPluginState()
 end
 
 function save_to_file(

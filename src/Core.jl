@@ -11,6 +11,7 @@ include("Operators.jl")
 include("ExpressionSpec.jl")
 include("Options.jl")
 include("InterfaceDataTypes.jl")
+include("Plugin.jl")
 
 using .ProgramConstantsModule: RecordType, DATA_TYPE, LOSS_TYPE
 using .DatasetModule:
@@ -24,7 +25,8 @@ using .DatasetModule:
     get_indices,
     get_full_dataset,
     dataset_fraction
-using .MutationWeightsModule: AbstractMutationWeights, MutationWeights, sample_mutation
+using .MutationWeightsModule:
+    AbstractMutationWeights, MutationWeights, sample_mutation, @extend_mutation_weights
 using .OptionsStructModule:
     AbstractOptions,
     Options,
@@ -71,5 +73,15 @@ using .ExpressionSpecModule:
     get_expression_options,
     get_node_type
 using .InterfaceDataTypesModule: init_value, sample_value, mutate_value
+using .PluginModule:
+    AbstractPluginState,
+    NoPluginState,
+    init_plugin_state,
+    on_search_start!,
+    on_search_end!,
+    on_generation_complete!,
+    on_population_evaluated!,
+    on_mutation_evaluated!,
+    init_member
 
 end
