@@ -133,7 +133,7 @@ function on_population_evaluated!(::AbstractPluginState, pop, dataset, hof, opti
 end
 
 """
-    on_mutation_evaluated!(plugin_state, mutation_type::Symbol, accepted::Bool, delta_loss::Float64, dataset, options)
+    on_mutation_evaluated!(plugin_state, mutation_type::Symbol, accepted::Bool, before_loss::Float64, after_loss::Float64, dataset, options)
 
 Lifecycle hook called on the WORKER immediately before each return from `next_generation`,
 after the final accept/reject decision for a mutation.
@@ -143,16 +143,20 @@ after the final accept/reject decision for a mutation.
 - `accepted`: `true` if the mutation was accepted (via `return_immediately` or fitness
   improvement / annealing acceptance); `false` if rejected (constraint failure, NaN loss,
   or annealing/frequency rejection).
-- `delta_loss`: `before_loss - after_loss` (positive = improvement). `NaN` if no valid
-  evaluation occurred (constraint failure or NaN loss). `0.0` if loss was unchanged
-  (e.g. `:do_nothing`, or `:simplify` that didn't change the expression).
+- `before_loss`: loss of the parent member before mutation. Always finite (members with
+  NaN loss are never propagated into the population).
+- `after_loss`: loss after mutation. `NaN` if no valid evaluation occurred (constraint
+  failure or NaN loss). Finite if the mutated tree was successfully evaluated — including
+  annealing rejections, where the tree was evaluated but the proposal was stochastically
+  rejected. May be `NaN` even when `accepted=true` in the `return_immediately` path
+  (crossover) if the returned member has a NaN loss.
 
-`accepted` and `delta_loss` carry independent information: annealing rejection has a
-valid finite `delta_loss` but `accepted=false`. A plugin can distinguish "valid tree,
-probabilistically rejected" from "invalid tree, never evaluated" by reading both.
+`accepted` and `after_loss` carry independent information: annealing rejection has a
+finite `after_loss` but `accepted=false`. A plugin can distinguish "valid tree,
+probabilistically rejected" from "invalid tree, never evaluated" by checking `isnan(after_loss)`.
 
-Use this hook to track per-mutation success rates, adapt mutation weights, or log mutation
-outcomes. Runs on the worker; same concurrency properties as `on_population_evaluated!`.
+Use this hook to track per-mutation improvement rates, adapt mutation weights, or log
+mutation outcomes. Runs on the worker; same concurrency properties as `on_population_evaluated!`.
 
 Override by dispatching on your `AbstractPluginState` subtype.
 
@@ -162,7 +166,7 @@ Default is a no-op.
     The plugin interface is experimental.
 """
 function on_mutation_evaluated!(
-    ::AbstractPluginState, ::Symbol, ::Bool, ::Float64, dataset, options
+    ::AbstractPluginState, ::Symbol, ::Bool, ::Float64, ::Float64, dataset, options
 )
     return nothing
 end

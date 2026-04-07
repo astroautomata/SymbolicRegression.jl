@@ -118,15 +118,15 @@ end
         init_plugin_state, on_mutation_evaluated!
     using Test
 
-    # Collect (mutation_type, accepted, delta_loss) triples via a Channel
-    events_ch = Channel{Tuple{Symbol,Bool,Float64}}(10_000)
+    # Collect (mutation_type, accepted, before_loss, after_loss) tuples via a Channel
+    events_ch = Channel{Tuple{Symbol,Bool,Float64,Float64}}(10_000)
 
     mutable struct MutEvalPluginState <: AbstractPluginState
-        events_ch::Channel{Tuple{Symbol,Bool,Float64}}
+        events_ch::Channel{Tuple{Symbol,Bool,Float64,Float64}}
     end
     struct MutEvalOptions{O} <: AbstractOptions
         base::O
-        events_ch::Channel{Tuple{Symbol,Bool,Float64}}
+        events_ch::Channel{Tuple{Symbol,Bool,Float64,Float64}}
     end
     Base.getproperty(o::MutEvalOptions, k::Symbol) =
         k === :events_ch ? getfield(o, :events_ch) : getproperty(getfield(o, :base), k)
@@ -134,13 +134,15 @@ end
         MutEvalPluginState(opts.events_ch)
     function SymbolicRegression.on_mutation_evaluated!(
         state::MutEvalPluginState, mutation_type::Symbol, accepted::Bool,
-        delta_loss::Float64, dataset, opts::MutEvalOptions
+        before_loss::Float64, after_loss::Float64, dataset, opts::MutEvalOptions
     )
-        put!(state.events_ch, (mutation_type, accepted, delta_loss))
+        put!(state.events_ch, (mutation_type, accepted, before_loss, after_loss))
         return nothing
     end
 
-    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
+    # maxsize=5 ensures add_node frequently hits the constraint limit,
+    # producing NaN after_loss events reliably.
+    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false, maxsize=5)
     opts = MutEvalOptions(base_opts, events_ch)
     X = rand(Float32, 2, 30)
     y = X[1, :] .+ X[2, :]
@@ -155,19 +157,24 @@ end
 
     # All mutation types are valid Symbols (fields of MutationWeights)
     valid_mutations = Set(fieldnames(MutationWeights))
-    for (mt, acc, dl) in events
+    for (mt, acc, bl, al) in events
         @test mt isa Symbol
         @test mt in valid_mutations
         @test acc isa Bool
-        @test dl isa Float64
+        @test bl isa Float64
+        @test al isa Float64
+        @test isfinite(bl)
     end
 
     # Both accepted and rejected mutations should appear (over many calls)
-    @test any(acc for (_, acc, _) in events)
-    @test any(!acc for (_, acc, _) in events)
+    @test any(acc for (_, acc, _, _) in events)
+    @test any(!acc for (_, acc, _, _) in events)
 
-    # Some events should have finite delta_loss (valid evaluations occurred)
-    @test any(isfinite(dl) for (_, _, dl) in events)
+    # Some events should have finite after_loss (valid evaluations occurred)
+    @test any(isfinite(al) for (_, _, _, al) in events)
+
+    # Some events should have NaN after_loss (constraint failure or NaN eval)
+    @test any(isnan(al) for (_, _, _, al) in events)
 end
 
 @testitem "Plugin interface: @extend_mutation_weights macro" begin

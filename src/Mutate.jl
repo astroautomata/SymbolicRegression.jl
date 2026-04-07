@@ -238,8 +238,7 @@ end
                 mutation_result.member isa P,
                 "Mutation result must return a `PopMember` if `return_immediately` is true"
             )
-            delta_loss_ri = Float64(before_loss) - Float64(mutation_result.member.loss)
-            on_mutation_evaluated!(plugin_state, mutation_choice, true, delta_loss_ri, dataset, options)
+            on_mutation_evaluated!(plugin_state, mutation_choice, true, Float64(before_loss), Float64(mutation_result.member.loss), dataset, options)
             return mutation_result.member::P, true, num_evals
         else
             @assert(
@@ -260,7 +259,7 @@ end
             tmp_recorder["reason"] = "failed_constraint_check"
         end
         mutation_accepted = false
-        on_mutation_evaluated!(plugin_state, mutation_choice, false, NaN, dataset, options)
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), NaN, dataset, options)
         return (
             create_child(
                 member,
@@ -285,7 +284,7 @@ end
             tmp_recorder["reason"] = "nan_loss"
         end
         mutation_accepted = false
-        on_mutation_evaluated!(plugin_state, mutation_choice, false, NaN, dataset, options)
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), NaN, dataset, options)
         return (
             create_child(
                 member,
@@ -330,8 +329,7 @@ end
             tmp_recorder["reason"] = "annealing_or_frequency"
         end
         mutation_accepted = false
-        delta_loss_rej = Float64(before_loss) - Float64(after_loss)
-        on_mutation_evaluated!(plugin_state, mutation_choice, false, delta_loss_rej, dataset, options)
+        on_mutation_evaluated!(plugin_state, mutation_choice, false, Float64(before_loss), Float64(after_loss), dataset, options)
         return (
             create_child(
                 member,
@@ -359,8 +357,7 @@ end
             complexity=newSize,
             parent_ref=parent_ref,
         )
-        delta_loss_acc = Float64(before_loss) - Float64(after_loss)
-        on_mutation_evaluated!(plugin_state, mutation_choice, true, delta_loss_acc, dataset, options)
+        on_mutation_evaluated!(plugin_state, mutation_choice, true, Float64(before_loss), Float64(after_loss), dataset, options)
         return (new_member, mutation_accepted, num_evals)
     end
 end
