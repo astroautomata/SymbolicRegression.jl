@@ -37,9 +37,9 @@ using ..OperatorsModule:
     safe_acosh,
     safe_atanh
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
-import ..OptionsStructModule: Options
+import ..OptionsStructModule: AbstractOptions, Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
-using ..UtilsModule: @save_kwargs, @ignore
+using ..UtilsModule: @ignore, @save_kwargs
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
     ExpressionSpec,
@@ -358,6 +358,8 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
 - `expression_spec::AbstractExpressionSpec`: A specification of what types of expressions to use in the
     search. For example, `ExpressionSpec()` (default). You can also see `TemplateExpressionSpec` and
     `ParametricExpressionSpec` for specialized cases.
+- `effort::Real=1.0`: Scales compute defaults for search size.
+    Must be positive. At `effort=1`, defaults are unchanged.
 - `populations`: How many populations of equations to use.
 - `population_size`: How many equations in each population.
 - `ncycles_per_iteration`: How many generations to consider per iteration.
@@ -492,6 +494,23 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     for constructing and evaluating trees.
 """
 
+const EFFORT_NITERATIONS_EXPONENT = 0.50
+const EFFORT_POPULATIONS_EXPONENT = 0.125
+const EFFORT_POPULATION_SIZE_EXPONENT = 0.05
+const EFFORT_NCYCLES_PER_ITERATION_EXPONENT = 0.325
+
+@unstable function _scale_effort_default(
+    effort::Float64, baseline::Integer, exponent::Real; minimum::Int=1
+)
+    scaled = round(Int, baseline * effort^exponent)
+    return max(minimum, scaled)
+end
+
+_default_niterations(options::AbstractOptions) = 100
+function _default_niterations(options::Options)
+    _scale_effort_default(options.effort, 100, EFFORT_NITERATIONS_EXPONENT; minimum=0)
+end
+
 """
     Options(;kws...) <: AbstractOptions
 
@@ -599,6 +618,7 @@ $(OPTION_DESCRIPTIONS)
     # Other search, but no specializations (since Julia limits us to 32!)
     ## 1. Search Space:
     ## 2. Setting the Search Size:
+    effort::Real=1.0,
     ## 3. The Objective:
     dimensionless_constants_only::Bool=false,
     loss_scale::Symbol=:log,
@@ -775,6 +795,11 @@ $(OPTION_DESCRIPTIONS)
 
     elementwise_loss = something(elementwise_loss, L2DistLoss())
 
+    effort = Float64(effort)
+    if !isfinite(effort) || effort <= 0.0
+        throw(ArgumentError("`effort` must be a positive finite number."))
+    end
+
     if complexity_mapping !== nothing
         @assert all(
             isnothing,
@@ -787,9 +812,30 @@ $(OPTION_DESCRIPTIONS)
     #! format: off
     _default_options = default_options(defaults)
     maxsize = something(maxsize, _default_options.maxsize)
-    populations = something(populations, _default_options.populations)
-    population_size = something(population_size, _default_options.population_size)
-    ncycles_per_iteration = something(ncycles_per_iteration, _default_options.ncycles_per_iteration)
+    populations = @something(
+        populations,
+        _scale_effort_default(
+            effort,
+            _default_options.populations,
+            EFFORT_POPULATIONS_EXPONENT,
+        ),
+    )
+    population_size = @something(
+        population_size,
+        _scale_effort_default(
+            effort,
+            _default_options.population_size,
+            EFFORT_POPULATION_SIZE_EXPONENT,
+        ),
+    )
+    ncycles_per_iteration = @something(
+        ncycles_per_iteration,
+        _scale_effort_default(
+            effort,
+            _default_options.ncycles_per_iteration,
+            EFFORT_NCYCLES_PER_ITERATION_EXPONENT,
+        ),
+    )
     parsimony = something(parsimony, _default_options.parsimony)
     warmup_maxsize_by = something(warmup_maxsize_by, _default_options.warmup_maxsize_by)
     adaptive_parsimony_scaling = something(adaptive_parsimony_scaling, _default_options.adaptive_parsimony_scaling)
@@ -1062,6 +1108,7 @@ $(OPTION_DESCRIPTIONS)
         should_optimize_constants,
         _output_directory,
         populations,
+        effort,
         perturbation_factor,
         annealing,
         batching,

@@ -375,8 +375,10 @@ which is useful for debugging and profiling.
 - `y::Union{AbstractMatrix{T}, AbstractVector{T}}`: The values to predict. The first dimension
     is the output feature to predict with each equation, and the
     second dimension is rows.
-- `niterations::Int=100`: The number of iterations to perform the search.
-    More iterations will improve the results.
+- `niterations::Union{Int,Nothing}=nothing`: The number of iterations to perform the search.
+    If omitted, this defaults to `round(Int, 100 * options.effort^0.5)` for `Options`
+    (with a minimum of 0, so at `effort=1.0` this is `100`), and `100` for other
+    `AbstractOptions` subtypes.
 - `weights::Union{AbstractMatrix{T}, AbstractVector{T}, Nothing}=nothing`: Optionally
     weight the loss for each `y` by this value (same shape as `y`).
 - `options::AbstractOptions=Options()`: The options for the search, such as
@@ -469,7 +471,7 @@ which is useful for debugging and profiling.
 function equation_search(
     X::AbstractMatrix{T},
     y::AbstractMatrix;
-    niterations::Int=100,
+    niterations::Union{Int,Nothing}=nothing,
     weights::Union{AbstractMatrix{T},AbstractVector{T},Nothing}=nothing,
     options::AbstractOptions=Options(),
     variable_names::Union{AbstractVector{String},Nothing}=nothing,
@@ -559,6 +561,7 @@ end
 function equation_search(
     datasets::Vector{D};
     options::AbstractOptions=Options(),
+    niterations::Union{Int,Nothing}=nothing,
     saved_state=nothing,
     guesses::Union{AbstractVector,AbstractVector{<:AbstractVector},Nothing}=nothing,
     runtime_options::Union{AbstractRuntimeOptions,Nothing}=nothing,
@@ -567,6 +570,9 @@ function equation_search(
     _runtime_options = @something(
         runtime_options,
         RuntimeOptions(;
+            niterations=something(
+                niterations, CoreModule.OptionsModule._default_niterations(options)
+            ),
             options_return_state=options.return_state,
             options_verbosity=options.verbosity,
             options_progress=options.progress,
