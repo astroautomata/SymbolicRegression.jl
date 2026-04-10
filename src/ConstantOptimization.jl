@@ -27,6 +27,62 @@ function can_optimize(::Type{T}, _) where {T<:Number}
 end
 
 """
+    count_optimizable_parameters(ex)
+
+Return the number of parameters exposed to `optimize_constants`.
+
+By default this is just the number of scalar constants. Custom expression types can
+override this together with [`get_optimizable_parameters`](@ref),
+[`set_optimizable_parameters!`](@ref), and optionally
+[`sample_optimization_restart`](@ref) to expose a larger optimizable state.
+"""
+count_optimizable_parameters(ex::AbstractExpression) = count_constants_for_optimization(ex)
+
+"""
+    get_optimizable_parameters(ex) -> x0, refs
+
+Flatten all parameters optimized by `optimize_constants` into a single vector `x0`,
+along with any references needed by [`set_optimizable_parameters!`](@ref).
+
+By default this forwards to `get_scalar_constants`.
+"""
+get_optimizable_parameters(ex::AbstractExpression) = get_scalar_constants(ex)
+
+"""
+    set_optimizable_parameters!(ex, x, refs)
+
+Set the optimizable parameters of `ex` from the flat vector `x`, using the `refs`
+returned by [`get_optimizable_parameters`](@ref).
+
+By default this forwards to `set_scalar_constants!`.
+"""
+set_optimizable_parameters!(ex::AbstractExpression, x, refs) =
+    set_scalar_constants!(ex, x, refs)
+
+"""
+    extract_optimizable_gradient(grad, ex)
+
+Extract the gradient of all optimizable parameters of `ex` into the same flattened
+order returned by [`get_optimizable_parameters`](@ref).
+
+By default this forwards to `extract_gradient`.
+"""
+extract_optimizable_gradient(grad, ex::AbstractExpression) = extract_gradient(grad, ex)
+
+"""
+    sample_optimization_restart(ex, x0, refs, options, rng) -> Union{Nothing,AbstractVector}
+
+Optionally provide a custom restart point for `optimize_constants`.
+
+Return `nothing` to fall back to the default multiplicative Gaussian perturbation.
+"""
+function sample_optimization_restart(
+    ex::AbstractExpression, x0, refs, options, rng::AbstractRNG
+)
+    return nothing
+end
+
+"""
     optimize_constants(dataset, member, options::AbstractOptions; rng=default_rng())
 
 Optimize the constants in a population member's expression tree.
@@ -50,7 +106,7 @@ end
     rng::AbstractRNG=default_rng(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
     can_optimize(member.tree, options) || return (member, 0.0)
-    nconst = count_constants_for_optimization(member.tree)
+    nconst = count_optimizable_parameters(member.tree)
     nconst == 0 && return (member, 0.0)
     if nconst == 1 && !(T <: Complex)
         algorithm = Optim.Newton(; linesearch=LineSearches.BackTracking())
@@ -82,8 +138,8 @@ function _optimize_constants(
     dataset, member::P, options, algorithm, optimizer_options, rng
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     tree = member.tree
-    x0, refs = get_scalar_constants(tree)
-    @assert count_constants_for_optimization(tree) == length(x0)
+    x0, refs = get_optimizable_parameters(tree)
+    @assert count_optimizable_parameters(tree) == length(x0)
     ctx = EvaluatorContext(dataset, options)
     f = Evaluator(tree, refs, ctx)
     fg! = GradEvaluator(f, options.autodiff_backend)
@@ -105,9 +161,15 @@ function _optimize_constants_inner(
     num_evals = result.f_calls * eval_fraction
     # Try other initial conditions:
     for _ in 1:(options.optimizer_nrestarts)
-        ET = eltype(x0)
-        eps = randn(rng, ET, size(x0)...)
-        xt = @. x0 * (ET(1) + ET(1 // 2) * eps)
+        xt = let custom = sample_optimization_restart(member.tree, x0, refs, options, rng)
+            if isnothing(custom)
+                ET = eltype(x0)
+                eps = randn(rng, ET, size(x0)...)
+                @. x0 * (ET(1) + ET(1 // 2) * eps)
+            else
+                custom
+            end
+        end
         tmpresult = Optim.optimize(obj, xt, algorithm, optimizer_options)
         num_evals += tmpresult.f_calls * eval_fraction
         # TODO: Does this need to take into account h_calls?
@@ -118,7 +180,7 @@ function _optimize_constants_inner(
     end
 
     if result.minimum < baseline
-        set_scalar_constants!(member.tree, result.minimizer, refs)
+        set_optimizable_parameters!(member.tree, result.minimizer, refs)
         member.loss = f(result.minimizer; regularization=true)
         member.cost = loss_to_cost(
             member.loss, dataset.use_baseline, dataset.baseline_loss, member, options
@@ -127,7 +189,7 @@ function _optimize_constants_inner(
         num_evals += eval_fraction
     else
         # Reset to original state
-        set_scalar_constants!(member.tree, x0, refs)
+        set_optimizable_parameters!(member.tree, x0, refs)
     end
 
     return member, num_evals
@@ -147,7 +209,7 @@ struct Evaluator{N<:AbstractExpression,R,C<:EvaluatorContext} <: Function
     ctx::C
 end
 function (e::Evaluator)(x::AbstractVector; regularization=false)
-    set_scalar_constants!(e.tree, x, e.refs)
+    set_optimizable_parameters!(e.tree, x, e.refs)
     return e.ctx(e.tree; regularization)
 end
 
@@ -175,11 +237,11 @@ end
 
 function (g::GradEvaluator{<:Any,AD})(_, G, x::AbstractVector) where {AD}
     AD isa AutoEnzyme && error("Please load the `Enzyme.jl` package.")
-    set_scalar_constants!(g.e.tree, x, g.e.refs)
+    set_optimizable_parameters!(g.e.tree, x, g.e.refs)
     maybe_prep = isnothing(g.prep) ? () : (g.prep,)
     (val, grad) = value_and_gradient(g.e.ctx, maybe_prep..., g.backend, g.e.tree)
     if G !== nothing && grad !== nothing
-        G .= extract_gradient(grad, g.e.tree)
+        G .= extract_optimizable_gradient(grad, g.e.tree)
     end
     return val
 end

@@ -42,11 +42,11 @@ using ..CheckConstraintsModule: check_constraints
 function logging_callback! end
 
 @unstable @inline function infer_popmember_type(
-    ::Type{T}, ::Type{L}, ::Type{D}, options
+    ::Type{T}, ::Type{L}, dataset::D, options
 ) where {T,L,D<:Dataset}
     NodeType = with_type_parameters(options.node_type, T)
-    N = Base.promote_op(create_expression, NodeType, typeof(options), D)
-    N in (Any, Union{}) && error("Failed to infer expression type")
+    prototype = constructorof(NodeType)(; val=zero(T))
+    N = typeof(create_expression(prototype, options, dataset))
     return with_type_parameters(options.popmember_type, T, L, N)
 end
 
@@ -816,7 +816,7 @@ end
     datasets::Vector{D},
     options::AbstractOptions,
 ) where {T,L,P<:AbstractPopMember{T,L},D<:Dataset{T,L}}
-    ConcreteP = infer_popmember_type(T, L, D, options)
+    ConcreteP = infer_popmember_type(T, L, first(datasets), options)
     return _parse_guesses_impl(ConcreteP, guesses, datasets, options)
 end
 
