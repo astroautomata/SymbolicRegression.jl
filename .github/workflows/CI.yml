@@ -57,7 +57,7 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
       - name: "Cache dependencies"
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
         with:
           cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};os=${{ matrix.os }};julia=${{ matrix.julia-version }};group=unit-${{ matrix.group }};project=${{ hashFiles('test/Project.toml') }}
       - name: "Build package"
@@ -126,7 +126,7 @@ jobs:
           safe_group="${group//\//-}"
           echo "group=$safe_group" >> "$GITHUB_OUTPUT"
       - name: "Cache dependencies"
-        uses: julia-actions/cache@v2
+        uses: julia-actions/cache@v3
         with:
           cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};group=integration-${{ steps.sanitize_integration_group.outputs.group }};julia=${{ matrix.julia-version }};project=${{ hashFiles(format('test/integration/{0}/Project.toml', matrix.group)) }}
       - name: "Run integration test"
@@ -157,7 +157,7 @@ jobs:
           pattern: coverage-*
           path: coverage
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./coverage

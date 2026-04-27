@@ -1,0 +1,12 @@
+{
+  "last-release-sha": "afb5bb6c3403db3f278db1f4a570dcafbedec691",
+  "packages": {
+    ".": {
+      "release-type": "julia",
+      "include-component-in-tag": false,
+      "versioning": "prerelease",
+      "prerelease-type": "alpha",
+      "prerelease": true
+    }
+  }
+}
