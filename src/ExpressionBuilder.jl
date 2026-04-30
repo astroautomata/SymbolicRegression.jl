@@ -15,7 +15,7 @@ using ..PopMemberModule: PopMember, AbstractPopMember, create_child
 using ..ComplexityModule: compute_complexity
 
 import DynamicExpressions: get_operators
-import ..CoreModule: create_expression
+import ..CoreModule: create_expression, init_value
 
 @unstable function create_expression(
     t::T, options::AbstractOptions, dataset::Dataset{T,L}, (::Val{embed})=Val(false)
@@ -127,12 +127,35 @@ end
             map(Fix{2}(Fix{3}(embed_metadata, dataset), options), pop.members)
         )
     end
+    @inline function _prototype_member(
+        options::AbstractOptions, dataset::Dataset{T,L}
+    ) where {T,L}
+        base_tree = create_expression(init_value(T), options, dataset)
+        PM = options.popmember_type
+        return PM(
+            copy(base_tree),
+            L(0),
+            L(Inf),
+            options,
+            1;
+            parent=-1,
+            deterministic=options.deterministic,
+        )
+    end
+
     function embed_metadata(
         hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
     ) where {T,L}
-        return HallOfFame(
-            map(Fix{2}(Fix{3}(embed_metadata, dataset), options), hof.members), hof.exists
-        )
+        prototype = embed_metadata(_prototype_member(options, dataset), options, dataset)
+        PM = typeof(prototype)
+        N = typeof(prototype.tree)
+        C = typeof(hof.criteria)
+        new_cells = [
+            Dict{Tuple,PM}(
+                k => embed_metadata(member, options, dataset) for (k, member) in d
+            ) for d in hof.cells
+        ]
+        return HallOfFame{T,L,N,PM,C}(hof.criteria, new_cells)
     end
     function embed_metadata(
         vec::Vector{H}, options::AbstractOptions, dataset::Dataset{T,L}
@@ -174,9 +197,15 @@ end
 function strip_metadata(
     hof::HallOfFame, options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T,L}
-    return HallOfFame(
-        map(member -> strip_metadata(member, options, dataset), hof.members), hof.exists
-    )
+    prototype = _prototype_member(options, dataset)
+    PM = typeof(prototype)
+    N = typeof(prototype.tree)
+    C = typeof(hof.criteria)
+    new_cells = [
+        Dict{Tuple,PM}(k => strip_metadata(member, options, dataset) for (k, member) in d)
+        for d in hof.cells
+    ]
+    return HallOfFame{T,L,N,PM,C}(hof.criteria, new_cells)
 end
 
 @unstable function get_operators(ex::AbstractExpression, options::AbstractOptions)

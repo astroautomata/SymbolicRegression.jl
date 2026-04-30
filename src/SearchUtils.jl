@@ -24,13 +24,12 @@ using ..CoreModule:
 using ..ComplexityModule: compute_complexity
 using ..PopulationModule: Population
 using ..PopMemberModule: PopMember, AbstractPopMember
-using ..HallOfFameModule: HallOfFame, string_dominating_pareto_curve
+using ..HallOfFameModule: HallOfFame, defined_members, string_dominating_pareto_curve
 using ..ConstantOptimizationModule: optimize_constants
 using ..ProgressBarsModule: WrappedProgressBar, manually_iterate!, barlen
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..ExpressionBuilderModule: strip_metadata
 using ..InterfaceDynamicExpressionsModule: takes_eval_options
-using ..CheckConstraintsModule: check_constraints
 
 function logging_callback! end
 
@@ -408,7 +407,7 @@ function _check_for_loss_threshold(_, ::Nothing, ::AbstractOptions)
 end
 function _check_for_loss_threshold(halls_of_fame, f::F, options::AbstractOptions) where {F}
     return all(halls_of_fame) do hof
-        any(hof.members[hof.exists]) do member
+        any(defined_members(hof)) do member
             f(member.loss, compute_complexity(member, options))::Bool
         end
     end
@@ -590,14 +589,20 @@ Look through the source of `equation_search` to see how this is used.
 abstract type AbstractSearchState{T,L,N<:AbstractExpression{T}} end
 
 """
-    SearchState{T,L,N,WorkerOutputType,ChannelType} <: AbstractSearchState{T,L,N}
+    SearchState{T,L,N,PM,HOF,WorkerOutputType,ChannelType} <: AbstractSearchState{T,L,N}
 
 The state of the search, including the populations, worker outputs, tasks, and
 channels. This is used to manage the search and keep track of runtime variables
 in a single struct.
 """
 Base.@kwdef struct SearchState{
-    T,L,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N},WorkerOutputType,ChannelType
+    T,
+    L,
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    HOF<:HallOfFame{T,L,N,PM},
+    WorkerOutputType,
+    ChannelType,
 } <: AbstractSearchState{T,L,N}
     procs::Vector{Int}
     we_created_procs::Bool
@@ -606,7 +611,7 @@ Base.@kwdef struct SearchState{
     channels::Vector{Vector{ChannelType}}
     worker_assignment::WorkerAssignments
     task_order::Vector{Tuple{Int,Int}}
-    halls_of_fame::Vector{HallOfFame{T,L,N,PM}}
+    halls_of_fame::Vector{HOF}
     last_pops::Vector{Vector{Population{T,L,N,PM}}}
     best_sub_pops::Vector{Vector{Population{T,L,N,PM}}}
     all_running_search_statistics::Vector{RunningSearchStatistics}
@@ -728,27 +733,6 @@ function construct_datasets(
             extra=extra,
         ) for j in 1:nout
     ]
-end
-
-function update_hall_of_fame!(
-    hall_of_fame::HallOfFame, members::Vector{PM}, options::AbstractOptions
-) where {PM<:AbstractPopMember}
-    for member in members
-        size = compute_complexity(member, options)
-        valid_size = 0 < size <= options.maxsize
-        if !valid_size
-            continue
-        end
-        if !check_constraints(member.tree, options, options.maxsize, size)
-            continue
-        end
-        not_filled = !hall_of_fame.exists[size]
-        better_than_current = member.cost < hall_of_fame.members[size].cost
-        if not_filled || better_than_current
-            hall_of_fame.members[size] = copy(member)
-            hall_of_fame.exists[size] = true
-        end
-    end
 end
 
 function _parse_guess_expression(

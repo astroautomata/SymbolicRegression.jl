@@ -1,40 +1,139 @@
 module HallOfFameModule
 
 using StyledStrings: @styled_str
-using DynamicExpressions: AbstractExpression, string_tree
+using DynamicExpressions:
+    AbstractExpression, string_tree, get_tree, count_depth, count_scalar_constants
 using ..UtilsModule: split_string, AnnotatedIOBuffer, dump_buffer
 using ..CoreModule:
     AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, relu, create_expression, init_value
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember, PopMember
+using ..CheckConstraintsModule: check_constraints
 using ..InterfaceDynamicExpressionsModule: format_dimensions, WILDCARD_UNIT_STRING
+import ..CoreModule.OptionsModule: DEFAULT_HALL_OF_FAME_CRITERIA
 using Printf: @sprintf
 
+"""Abstract strategy for hall-of-fame keying."""
+abstract type AbstractHallOfFameCriteria end
+
+"""Built-in hall-of-fame criteria defined by axis symbols.
+
+Complexity is always included as the first axis (it defines the outer bucket).
+The `extra_axes` define additional archive dimensions within each complexity bucket.
+"""
+struct HallOfFameCriteria{N} <: AbstractHallOfFameCriteria
+    extra_axes::NTuple{N,Symbol}
+end
+
+function HallOfFameCriteria(extra_axes::Vararg{Symbol,N}) where {N}
+    any(==(:complexity), extra_axes) && throw(
+        ArgumentError("Do not include :complexity in HallOfFameCriteria; it is implicit."),
+    )
+    length(extra_axes) == length(unique(extra_axes)) ||
+        throw(ArgumentError("HallOfFameCriteria extra_axes must be unique"))
+    return HallOfFameCriteria{N}(extra_axes)
+end
+
+# So Options() can default to a concrete criteria (Options is defined/loaded earlier).
+DEFAULT_HALL_OF_FAME_CRITERIA[] = HallOfFameCriteria()
+
+@inline function _criterion_value(axis::Symbol, member, options)::Int
+    if !(axis in (:complexity, :depth, :nconsts))
+        @noinline throw(
+            ArgumentError(
+                "Unsupported HallOfFameCriteria axis: $(axis). Supported axes are: :complexity, :depth, :nconsts",
+            ),
+        )
+    end
+    if axis === :complexity
+        return compute_complexity(member, options)
+    elseif axis === :depth
+        return count_depth(get_tree(member.tree))
+    else
+        return count_scalar_constants(member.tree)
+    end
+end
+
+function hof_key(criteria::HallOfFameCriteria{N}, member, options)::NTuple{N,Int} where {N}
+    return ntuple(i -> _criterion_value(criteria.extra_axes[i], member, options), Val(N))
+end
 """
     HallOfFame{T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}}
 
-List of the best members seen all time in `.members`, with `.members[c]` being
-the best member seen at complexity c. Including only the members which actually
-have been set, you can run `.members[exists]`.
+List of the best members seen all time.
 
-# Fields
+`cells` is the source-of-truth archive, bucketed by complexity.
 
-- `members::Array{PM,1}`: List of the best members seen all time.
-    These are ordered by complexity, with `.members[1]` the member with complexity 1.
-- `exists::Array{Bool,1}`: Whether the member at the given complexity has been set.
+For backward compatibility we still expose:
+- `hof.exists`: a derived boolean vector indicating which complexity buckets are non-empty.
+- `hof.members`: a derived vector-like view giving the best member per complexity.
+
+Both are *derived*; mutate `hof.cells` (or call `update_hall_of_fame!`) instead.
 """
 struct HallOfFame{
-    T<:DATA_TYPE,L<:LOSS_TYPE,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N}
+    T<:DATA_TYPE,
+    L<:LOSS_TYPE,
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    C<:AbstractHallOfFameCriteria,
 }
-    members::Array{PM,1}
-    exists::Array{Bool,1} #Whether it has been set
+    criteria::C
+    cells::Vector{Dict{Tuple,PM}}
 end
+
+struct DerivedExists{H} <: AbstractVector{Bool}
+    hall_of_fame::H
+end
+Base.IndexStyle(::Type{<:DerivedExists}) = Base.IndexLinear()
+Base.size(de::DerivedExists) = (length(de.hall_of_fame.cells),)
+Base.length(de::DerivedExists) = length(de.hall_of_fame.cells)
+Base.getindex(de::DerivedExists, i::Int) = !isempty(de.hall_of_fame.cells[i])
+function Base.setindex!(::DerivedExists, ::Bool, ::Int)
+    throw(ArgumentError("`hof.exists` is derived; edit `hof.cells` instead."))
+end
+
+struct DerivedMembers{H,PM} <: AbstractVector{PM}
+    hall_of_fame::H
+end
+function DerivedMembers(hof::H) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}}
+    DerivedMembers{H,PM}(hof)
+end
+Base.IndexStyle(::Type{<:DerivedMembers}) = Base.IndexLinear()
+Base.size(dm::DerivedMembers) = (length(dm.hall_of_fame.cells),)
+Base.length(dm::DerivedMembers) = length(dm.hall_of_fame.cells)
+function Base.getindex(dm::DerivedMembers, i::Int)
+    hof = dm.hall_of_fame
+    bucket = hof.cells[i]
+    isempty(bucket) && throw(UndefRefError())
+    return copy(_best_member_in_nonempty_bucket(bucket))
+end
+function Base.setindex!(::DerivedMembers, _, ::Int)
+    throw(ArgumentError("`hof.members` is derived; edit `hof.cells` instead."))
+end
+
+# Legacy compatibility:
+# - `hof.exists[i]` indicates whether complexity-slot `i` has any archived members.
+# - `hof.members[i]` gives the best member per complexity-slot (derived from `cells`).
+function Base.getproperty(hof::HallOfFame, name::Symbol)
+    if name === :exists
+        return DerivedExists(hof)
+    elseif name === :members
+        return DerivedMembers(hof)
+    end
+    return getfield(hof, name)
+end
+
+function Base.propertynames(::HallOfFame, private::Bool=false)
+    private ? (:criteria, :cells, :members, :exists) : (:criteria, :cells)
+end
+
 function Base.show(
-    io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM}
-) where {T,L,N,PM}
+    io::IO, mime::MIME"text/plain", hof::HallOfFame{T,L,N,PM,C}
+) where {T,L,N,PM,C}
     println(io, "HallOfFame{...}:")
-    for i in eachindex(hof.members, hof.exists)
-        s_member, s_exists = if hof.exists[i]
+    for i in eachindex(hof.members)
+        slot_exists = !isempty(hof.cells[i])
+        s_member, s_exists = if slot_exists
             sprint((io, m) -> show(io, mime, m), hof.members[i]), "true"
         else
             "undef", "false"
@@ -51,26 +150,28 @@ function Base.show(
     end
     return nothing
 end
-function Base.eltype(::Union{HOF,Type{HOF}}) where {T,L,N,PM,HOF<:HallOfFame{T,L,N,PM}}
+
+function Base.eltype(::Union{HOF,Type{HOF}}) where {T,L,N,PM,C,HOF<:HallOfFame{T,L,N,PM,C}}
     return PM
 end
 
 """
     HallOfFame(options::AbstractOptions, dataset::Dataset{T,L}) where {T<:DATA_TYPE,L<:LOSS_TYPE}
 
-Create empty HallOfFame. The HallOfFame stores a list
-of `PopMember` objects in `.members`, which is enumerated
-by size (i.e., `.members[1]` is the constant solution).
-`.exists` is used to determine whether the particular member
-has been instantiated or not.
+Construct an empty HallOfFame.
 
-Arguments:
-- `options`: AbstractOptions containing specification about deterministic.
-- `dataset`: Dataset containing the input data.
+If the passed options have `hall_of_fame_criteria`, that criteria is used;
+otherwise defaults to `( :complexity, )` (i.e., no extra axes).
 """
 function HallOfFame(
     options::AbstractOptions, dataset::Dataset{T,L}
 ) where {T<:DATA_TYPE,L<:LOSS_TYPE}
+    return HallOfFame(options, dataset, getproperty(options, :hall_of_fame_criteria))
+end
+
+function HallOfFame(
+    options::AbstractOptions, dataset::Dataset{T,L}, criteria::C
+) where {T<:DATA_TYPE,L<:LOSS_TYPE,C<:AbstractHallOfFameCriteria}
     base_tree = create_expression(init_value(T), options, dataset)
     PM = options.popmember_type
 
@@ -86,63 +187,155 @@ function HallOfFame(
     )
 
     PMtype = typeof(prototype)
+    N = typeof(base_tree)
+    key = hof_key(criteria, prototype, options)
+    key isa Tuple || throw(ArgumentError("`hof_key` must return a tuple"))
 
-    return HallOfFame{T,L,typeof(base_tree),PMtype}(
-        [
-            if i == 1
-                prototype
-            else
-                PM(
-                    copy(base_tree),
-                    L(0),
-                    L(Inf),
-                    options,
-                    1;  # complexity
-                    parent=-1,
-                    deterministic=options.deterministic,
-                )
-            end for i in 1:(options.maxsize)
-        ],
-        [false for i in 1:(options.maxsize)],
-    )
+    cells = [Dict{Tuple,PMtype}() for _ in 1:(options.maxsize)]
+    return HallOfFame{T,L,N,PMtype,C}(criteria, cells)
 end
 
-function Base.copy(hof::HallOfFame)
-    return HallOfFame(
-        [copy(member) for member in hof.members], [exists for exists in hof.exists]
-    )
+function Base.copy(hof::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
+    cells = [Dict{Tuple,PM}(k => copy(member) for (k, member) in d) for d in hof.cells]
+    return HallOfFame(hof.criteria, cells)
 end
 
-"""
-    calculate_pareto_frontier(hallOfFame::HallOfFame{T,L,P}) where {T<:DATA_TYPE,L<:LOSS_TYPE}
-"""
-function calculate_pareto_frontier(hallOfFame::HallOfFame{T,L,N,PM}) where {T,L,N,PM}
-    # TODO - remove dataset from args.
-    # Dominating pareto curve - must be better than all simpler equations
-    dominating = PM[]
-    for size in eachindex(hallOfFame.members)
-        if !hallOfFame.exists[size]
+"""Iterate over all `(key, member)` pairs that are populated."""
+struct DefinedCells{H}
+    hall_of_fame::H
+end
+
+function Base.iterate(dc::DefinedCells, state=(1, nothing))
+    hof = dc.hall_of_fame
+    i, inner = state
+    while i <= length(hof.cells)
+        d = hof.cells[i]
+        step = if inner === nothing
+            iterate(d)
+        else
+            iterate(d, inner)
+        end
+        if step === nothing
+            i += 1
+            inner = nothing
             continue
+        else
+            kv, inner2 = step
+            # Reconstruct a full key (complexity, extra_axes...) for user-facing iteration.
+            return (((i, kv[1]...), kv[2]), (i, inner2))
         end
-        member = hallOfFame.members[size]
-        # We check if this member is better than all members which are smaller than it and
-        # also exist.
-        betterThanAllSmaller = true
-        for i in 1:(size - 1)
-            if !hallOfFame.exists[i]
-                continue
-            end
-            simpler_member = hallOfFame.members[i]
-            if member.loss >= simpler_member.loss
-                betterThanAllSmaller = false
-                break
-            end
+    end
+    return nothing
+end
+
+Base.IteratorEltype(::Type{<:DefinedCells}) = Base.HasEltype()
+function Base.eltype(::Type{DefinedCells{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}}
+    Tuple{Tuple,PM}
+end
+Base.IteratorSize(::Type{<:DefinedCells}) = Base.SizeUnknown()
+Base.length(dc::DefinedCells) = sum(length, dc.hall_of_fame.cells)
+
+"""Return an iterator over members which have been set in the hall of fame."""
+defined_cells(hall_of_fame::HallOfFame) = DefinedCells(hall_of_fame)
+
+"""Iterate over members which have been set in the hall of fame."""
+struct DefinedMembers{H}
+    hall_of_fame::H
+end
+
+function Base.iterate(dm::DefinedMembers, state::Int=1)
+    hof = dm.hall_of_fame
+    for i in state:lastindex(hof.cells)
+        bucket = hof.cells[i]
+        isempty(bucket) && continue
+        return (copy(_best_member_in_nonempty_bucket(bucket)), i + 1)
+    end
+    return nothing
+end
+
+Base.IteratorEltype(::Type{<:DefinedMembers}) = Base.HasEltype()
+Base.eltype(::Type{DefinedMembers{H}}) where {T,L,N,PM,C,H<:HallOfFame{T,L,N,PM,C}} = PM
+Base.IteratorSize(::Type{<:DefinedMembers}) = Base.SizeUnknown()
+Base.length(dm::DefinedMembers) = count(_ -> true, dm)
+
+defined_members(hall_of_fame::HallOfFame) = DefinedMembers(hall_of_fame)
+
+"""Pareto dominance for minimization objectives (complexity, loss)."""
+@inline function dominates(a_complexity::Int, a_loss, b_complexity::Int, b_loss)
+    return (a_complexity <= b_complexity) &&
+           (a_loss <= b_loss) &&
+           ((a_complexity < b_complexity) || (a_loss < b_loss))
+end
+
+"""Return the dominating (non-dominated) set from the hall of fame.
+
+This corresponds to the Pareto frontier in objectives `(complexity, loss)`.
+"""
+@inline function _best_member_in_nonempty_bucket(bucket::Dict{K,PM}) where {K,PM}
+    it = iterate(values(bucket))
+    best, state = it::Tuple{PM,Any}
+    while true
+        it = iterate(values(bucket), state)
+        it === nothing && break
+        member, state = it
+        if member.cost < best.cost
+            best = member
         end
-        if betterThanAllSmaller
+    end
+    return best
+end
+
+function dominating_members(hall_of_fame::HallOfFame{T,L,N,PM,C}) where {T,L,N,PM,C}
+    dominating = PM[]
+    best_loss = typemax(L)
+    for complexity in eachindex(hall_of_fame.cells)
+        bucket = hall_of_fame.cells[complexity]
+        isempty(bucket) && continue
+        member = _best_member_in_nonempty_bucket(bucket)
+        if member.loss < best_loss
             push!(dominating, copy(member))
+            best_loss = member.loss
         end
     end
     return dominating
+end
+
+"""Backward-compatible API: compute the Pareto frontier of a HallOfFame.
+
+This preserves the historical behavior (dominance based on
+`(complexity, loss)`), and does not require passing a `Dataset`.
+"""
+calculate_pareto_frontier(hallOfFame::HallOfFame) = dominating_members(hallOfFame)
+
+"""Update a hall of fame with a single population member."""
+function update_hall_of_fame!(
+    hall_of_fame::HallOfFame, member::AbstractPopMember, options::AbstractOptions
+)
+    size = compute_complexity(member, options)
+    valid_size = 0 < size <= options.maxsize
+    valid_size || return nothing
+
+    check_constraints(member.tree, options, options.maxsize, size) || return nothing
+
+    key = hof_key(hall_of_fame.criteria, member, options)
+    if key === nothing
+        @error("`hof_key` returned `nothing`; skipping update")
+        return nothing
+    end
+    slot = hall_of_fame.cells[size]
+    old = get(slot, key, nothing)
+    if old === nothing || member.cost < old.cost
+        slot[key] = copy(member)
+    end
+    return nothing
+end
+
+"""Update a hall of fame with a collection of population members."""
+function update_hall_of_fame!(hall_of_fame::HallOfFame, members, options::AbstractOptions)
+    for member in members
+        update_hall_of_fame!(hall_of_fame, member, options)
+    end
+    return nothing
 end
 
 let header_parts = (
@@ -289,7 +482,7 @@ end
 
 function format_hall_of_fame(hof::AbstractVector{<:HallOfFame}, options)
     outs = [format_hall_of_fame(h, options) for h in hof]
-    return (;
+    return (
         trees=[out.trees for out in outs],
         scores=[out.scores for out in outs],
         losses=[out.losses for out in outs],

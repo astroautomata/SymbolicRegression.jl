@@ -46,8 +46,7 @@ end
 
     hof = HallOfFame(options, dataset)
     hof = embed_metadata(hof, options, dataset)
-    hof.members[5] = member
-    hof.exists[5] = true
+    hof.cells[5][()] = copy(member)
     s_hof = strip(shower(hof))
     true_s = "HallOfFame{...}:
     .exists[1] = false
