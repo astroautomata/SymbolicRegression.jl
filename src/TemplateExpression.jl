@@ -446,12 +446,6 @@ end
 _parameter_data(x::ParamVector) = x._data
 _parameter_data(x) = x
 
-function CO.count_optimizable_parameters(ex::TemplateExpression)
-    return (
-        sum(CO.count_optimizable_parameters, values(get_contents(ex))) +
-        (has_params(ex) ? sum(length, values(get_metadata(ex).parameters)) : 0)
-    )
-end
 function CO.get_optimizable_parameters(e::TemplateExpression{T}) where {T}
     inner_params_and_refs = map(CO.get_optimizable_parameters, values(get_contents(e)))
     inner_chunks = first.(inner_params_and_refs)
@@ -505,40 +499,6 @@ function CO.extract_optimizable_gradient(grad, ex::TemplateExpression{T}) where 
     return isempty(inner_grad) && isempty(parameter_pieces) ?
            T[] :
            vcat(inner_grad..., parameter_pieces...)
-end
-
-function _default_restart_vector(x0, rng::AbstractRNG)
-    ET = eltype(x0)
-    eps = randn(rng, ET, size(x0)...)
-    return @. x0 * (ET(1) + ET(1 // 2) * eps)
-end
-function CO.sample_optimization_restart(
-    ex::TemplateExpression, x0, refs, options, rng::AbstractRNG
-)
-    cursor = Ref(1)
-    out = copy(x0)
-    used_custom_restart = false
-    for (tree, r) in zip(values(get_contents(ex)), refs.inner)
-        n = r.n
-        i = cursor[]
-        xi = x0[i:(i + n - 1)]
-        custom = CO.sample_optimization_restart(tree, xi, r.ref, options, rng)
-        if isnothing(custom)
-            cursor[] = i + n
-            continue
-        end
-        used_custom_restart = true
-        out[i:(i + n - 1)] .= custom
-        cursor[] = i + n
-    end
-    if !used_custom_restart
-        return nothing
-    end
-    while cursor[] <= length(x0)
-        out[cursor[]:end] .= _default_restart_vector(x0[cursor[]:end], rng)
-        break
-    end
-    return out
 end
 
 Base.@kwdef struct PreallocatedTemplateExpression{A,B}

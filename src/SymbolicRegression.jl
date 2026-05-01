@@ -181,8 +181,8 @@ using Compat: @compat, Fix
         AbstractMutationWeights, mutate!, condition_mutation_weights!,
         sample_mutation, MutationResult, AbstractPopMember, AbstractSearchState, SearchState,
         LOSS_TYPE, DATA_TYPE, node_type,
-        optimize_constants, count_optimizable_parameters, get_optimizable_parameters,
-        set_optimizable_parameters!, extract_optimizable_gradient, sample_optimization_restart,
+        optimize_constants, get_optimizable_parameters,
+        set_optimizable_parameters!, extract_optimizable_gradient,
         AbstractPluginState, NoPluginState,
         init_plugin_state, on_search_start!, on_search_end!,
         on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member
@@ -318,11 +318,9 @@ using .InterfaceDynamicExpressionsModule:
 using .LossFunctionsModule: eval_loss, eval_cost, update_baseline_loss!, score_func
 using .ConstantOptimizationModule:
     optimize_constants,
-    count_optimizable_parameters,
     get_optimizable_parameters,
     set_optimizable_parameters!,
-    extract_optimizable_gradient,
-    sample_optimization_restart
+    extract_optimizable_gradient
 using .PopMemberModule:
     AbstractPopMember, PopMember, reset_birth!, popmember_type, expression_type
 using .CoreModule.UtilsModule: get_birth_order

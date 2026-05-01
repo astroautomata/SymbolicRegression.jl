@@ -98,6 +98,63 @@ end
 
 See [`eval_cost`](@ref) for the default implementation.
 
+### Exposing extra optimizable parameters
+
+If a plugin expression type wants the built-in constant optimizer to see more than
+ordinary scalar constants in the tree, first implement:
+
+- [`get_optimizable_parameters`](@ref)
+- [`set_optimizable_parameters!`](@ref)
+- [`extract_optimizable_gradient`](@ref)
+
+These hooks flatten extra expression state into the same vector as ordinary tree
+constants, so the default [`optimize_constants`](@ref) loop can optimize both.
+Only override `optimize_constants` when you need a custom optimization algorithm,
+explicit constraints, or custom restart behavior.
+
+For example, a mutable expression wrapper with ordinary tree constants and one
+extra metadata scalar, `scale`, can expose both in one optimizable vector:
+
+```julia
+using DynamicExpressions:
+    get_contents,
+    get_metadata,
+    get_scalar_constants,
+    set_scalar_constants!,
+    extract_gradient,
+    Metadata
+
+function SymbolicRegression.get_optimizable_parameters(ex::MyExpression{T}) where {T}
+    tree_values, tree_refs = get_scalar_constants(get_contents(ex))
+    metadata = get_metadata(ex)
+    return vcat(tree_values, T[metadata.scale]), (;
+        tree_refs, n_tree=length(tree_values)
+    )
+end
+
+function SymbolicRegression.set_optimizable_parameters!(
+    ex::MyExpression{T}, x, refs
+) where {T}
+    set_scalar_constants!(get_contents(ex), x[1:(refs.n_tree)], refs.tree_refs)
+
+    metadata = get_metadata(ex)
+    ex.metadata = Metadata((;
+        operators=metadata.operators,
+        variable_names=metadata.variable_names,
+        eval_options=metadata.eval_options,
+        scale=T(x[refs.n_tree + 1]),
+    ))
+    return ex
+end
+
+function SymbolicRegression.extract_optimizable_gradient(
+    grad, ex::MyExpression{T}
+) where {T}
+    tree_gradient = extract_gradient(get_contents(grad), get_contents(ex))
+    return vcat(tree_gradient, T[get_metadata(grad).scale])
+end
+```
+
 ### Overriding `optimize_constants`
 
 ```julia

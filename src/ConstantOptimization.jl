@@ -27,18 +27,6 @@ function can_optimize(::Type{T}, _) where {T<:Number}
 end
 
 """
-    count_optimizable_parameters(ex)
-
-Return the number of parameters exposed to `optimize_constants`.
-
-By default this is just the number of scalar constants. Custom expression types can
-override this together with [`get_optimizable_parameters`](@ref),
-[`set_optimizable_parameters!`](@ref), and optionally
-[`sample_optimization_restart`](@ref) to expose a larger optimizable state.
-"""
-count_optimizable_parameters(ex::AbstractExpression) = count_constants_for_optimization(ex)
-
-"""
     get_optimizable_parameters(ex) -> x0, refs
 
 Flatten all parameters optimized by `optimize_constants` into a single vector `x0`,
@@ -70,19 +58,6 @@ By default this forwards to `extract_gradient`.
 extract_optimizable_gradient(grad, ex::AbstractExpression) = extract_gradient(grad, ex)
 
 """
-    sample_optimization_restart(ex, x0, refs, options, rng) -> Union{Nothing,AbstractVector}
-
-Optionally provide a custom restart point for `optimize_constants`.
-
-Return `nothing` to fall back to the default multiplicative Gaussian perturbation.
-"""
-function sample_optimization_restart(
-    ex::AbstractExpression, x0, refs, options, rng::AbstractRNG
-)
-    return nothing
-end
-
-"""
     optimize_constants(dataset, member, options::AbstractOptions; rng=default_rng())
 
 Optimize the constants in a population member's expression tree.
@@ -106,13 +81,16 @@ end
     rng::AbstractRNG=default_rng(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
     can_optimize(member.tree, options) || return (member, 0.0)
-    nconst = count_optimizable_parameters(member.tree)
+    x0, refs = get_optimizable_parameters(member.tree)
+    nconst = length(x0)
     nconst == 0 && return (member, 0.0)
     if nconst == 1 && !(T <: Complex)
         algorithm = Optim.Newton(; linesearch=LineSearches.BackTracking())
         return _optimize_constants(
             dataset,
             member,
+            x0,
+            refs,
             specialized_options(options),
             algorithm,
             options.optimizer_options,
@@ -122,6 +100,8 @@ end
     return _optimize_constants(
         dataset,
         member,
+        x0,
+        refs,
         specialized_options(options),
         # We use specialized options here due to Enzyme being
         # more particular about dynamic dispatch
@@ -135,16 +115,22 @@ end
 count_constants_for_optimization(ex::Expression) = count_scalar_constants(ex)
 
 function _optimize_constants(
-    dataset, member::P, options, algorithm, optimizer_options, rng
+    dataset, member::P, x0, refs, options, algorithm, optimizer_options, rng
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     tree = member.tree
-    x0, refs = get_optimizable_parameters(tree)
-    @assert count_optimizable_parameters(tree) == length(x0)
     ctx = EvaluatorContext(dataset, options)
     f = Evaluator(tree, refs, ctx)
     fg! = GradEvaluator(f, options.autodiff_backend)
     return _optimize_constants_inner(
         f, fg!, x0, refs, dataset, member, options, algorithm, optimizer_options, rng
+    )
+end
+function _optimize_constants(
+    dataset, member::P, options, algorithm, optimizer_options, rng
+)::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
+    x0, refs = get_optimizable_parameters(member.tree)
+    return _optimize_constants(
+        dataset, member, x0, refs, options, algorithm, optimizer_options, rng
     )
 end
 function _optimize_constants_inner(
@@ -161,14 +147,10 @@ function _optimize_constants_inner(
     num_evals = result.f_calls * eval_fraction
     # Try other initial conditions:
     for _ in 1:(options.optimizer_nrestarts)
-        xt = let custom = sample_optimization_restart(member.tree, x0, refs, options, rng)
-            if isnothing(custom)
-                ET = eltype(x0)
-                eps = randn(rng, ET, size(x0)...)
-                @. x0 * (ET(1) + ET(1 // 2) * eps)
-            else
-                custom
-            end
+        xt = let
+            ET = eltype(x0)
+            eps = randn(rng, ET, size(x0)...)
+            @. x0 * (ET(1) + ET(1 // 2) * eps)
         end
         tmpresult = Optim.optimize(obj, xt, algorithm, optimizer_options)
         num_evals += tmpresult.f_calls * eval_fraction
