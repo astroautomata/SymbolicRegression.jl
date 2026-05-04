@@ -1,7 +1,7 @@
 @testitem "TemplateExpressionSpec supports custom inner expression types" begin
     using DynamicExpressions: DynamicExpressions, AbstractExpressionNode, AbstractOperatorEnum, EvalOptions, Metadata, Node, OperatorEnum, get_contents, get_metadata
     using SymbolicRegression
-    using SymbolicRegression.ComposableExpressionModule: AbstractComposableExpression
+    using SymbolicRegression: AbstractComposableExpression
     using SymbolicRegression.ExpressionBuilderModule: create_expression
 
     struct WrappedExpression{T,N<:AbstractExpressionNode{T},D} <:

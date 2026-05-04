@@ -23,6 +23,15 @@ using DynamicExpressions.ValueInterfaceModule: is_valid_array
 using ..ConstantOptimizationModule: ConstantOptimizationModule as CO
 using ..CoreModule: get_safe_op
 
+"""
+    AbstractComposableExpression{T,N} <: AbstractExpression{T,N}
+
+Abstract supertype for expression wrappers that store an expression tree and
+metadata separately. Plugin authors may subtype this for custom composable
+expression wrappers, provided the subtype exposes `tree` and `metadata` fields
+compatible with `DynamicExpressions.get_contents` and `get_metadata`, and
+defines `DynamicExpressions.constructorof` so the wrapper can be rebuilt.
+"""
 abstract type AbstractComposableExpression{T,N} <: AbstractExpression{T,N} end
 
 """

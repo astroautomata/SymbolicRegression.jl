@@ -9,6 +9,7 @@ using SymbolicRegression:
     update_baseline_loss!,
     AbstractMutationWeights,
     AbstractOptions,
+    AbstractComposableExpression,
     mutate!,
     condition_mutation_weights!,
     sample_mutation,
@@ -24,6 +25,11 @@ using SymbolicRegression:
     on_search_end!,
     on_generation_complete!,
     on_population_evaluated!,
+    on_mutation_evaluated!,
+    optimize_constants,
+    get_optimizable_parameters,
+    set_optimizable_parameters!,
+    extract_optimizable_gradient,
     init_member
 using DynamicExpressions
 

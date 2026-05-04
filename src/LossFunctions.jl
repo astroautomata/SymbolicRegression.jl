@@ -201,7 +201,7 @@ a custom scoring scheme (e.g., multi-objective cost, custom regularization):
 
 ```julia
 function SymbolicRegression.eval_cost(dataset, member, opts::MyOptions; kws...)
-    cost, loss = invoke(SymbolicRegression.eval_cost, Tuple{Any,Any,AbstractOptions}, dataset, member, opts; kws...)
+    cost, loss = invoke(SymbolicRegression.eval_cost, Tuple{Dataset,Any,AbstractOptions}, dataset, member, opts; kws...)
     return cost + my_extra_penalty(member.tree), loss
 end
 ```

@@ -88,7 +88,7 @@ See [`compute_complexity`](@ref) for the default implementation.
 function SymbolicRegression.eval_cost(dataset, member, opts::MyOptions; kws...)
     cost, loss = invoke(
         SymbolicRegression.eval_cost,
-        Tuple{Any,Any,AbstractOptions},
+        Tuple{Dataset,Any,AbstractOptions},
         dataset, member, opts; kws...
     )
     # Add a custom structural penalty
@@ -111,6 +111,16 @@ These hooks flatten extra expression state into the same vector as ordinary tree
 constants, so the default [`optimize_constants`](@ref) loop can optimize both.
 Only override `optimize_constants` when you need a custom optimization algorithm,
 explicit constraints, or custom restart behavior.
+
+!!! note "Autodiff backend support"
+    Custom optimizable metadata works with the default `autodiff_backend=nothing`
+    path and generic DifferentiationInterface backends. The Enzyme extension
+    currently handles ordinary scalar constants only.
+
+This assumes your custom expression type is already used in the search, typically
+by passing it through an `expression_spec`. See
+[Custom expression wrappers](customization.md#custom-expression-wrappers) for the
+full setup.
 
 For example, a mutable expression wrapper with ordinary tree constants and one
 extra metadata scalar, `scale`, can expose both in one optimizable vector:
@@ -154,6 +164,10 @@ function SymbolicRegression.extract_optimizable_gradient(
     return vcat(tree_gradient, T[get_metadata(grad).scale])
 end
 ```
+
+The gradient object supplied by the autodiff backend must expose the same
+differentiable metadata fields that your hook reads, such as
+`get_metadata(grad).scale` above.
 
 ### Overriding `optimize_constants`
 
@@ -342,6 +356,10 @@ result = equation_search(X, y; options=opts, niterations=10, parallelism=:serial
 
 A complete, runnable Layer 2 example (operator frequency reporter) is in
 [`examples/plugin_operator_stats.jl`](https://github.com/MilesCranmer/SymbolicRegression.jl/blob/master/examples/plugin_operator_stats.jl).
+
+For a complete example of `on_mutation_evaluated!` driving adaptive mutation
+weights, see
+[`examples/plugin_adaptive_weights.jl`](https://github.com/MilesCranmer/SymbolicRegression.jl/blob/master/examples/plugin_adaptive_weights.jl).
 
 ---
 

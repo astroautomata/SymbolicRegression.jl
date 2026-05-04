@@ -46,7 +46,7 @@ end
         extract_gradient
     using Optim: Optim
     using SymbolicRegression
-    using SymbolicRegression.ComposableExpressionModule: AbstractComposableExpression
+    using SymbolicRegression: AbstractComposableExpression
 
     mutable struct WrappedExpression{T,N<:AbstractExpressionNode{T},D} <:
                    AbstractComposableExpression{T,N}

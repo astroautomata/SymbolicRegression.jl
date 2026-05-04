@@ -181,6 +181,7 @@ using Compat: @compat, Fix
         AbstractMutationWeights, mutate!, condition_mutation_weights!,
         sample_mutation, MutationResult, AbstractPopMember, AbstractSearchState, SearchState,
         LOSS_TYPE, DATA_TYPE, node_type,
+        AbstractComposableExpression,
         optimize_constants, get_optimizable_parameters,
         set_optimizable_parameters!, extract_optimizable_gradient,
         AbstractPluginState, NoPluginState,
@@ -371,7 +372,10 @@ using .TemplateExpressionModule:
     TemplateExpression, TemplateStructure, TemplateExpressionSpec, ParamVector, has_params
 using .TemplateExpressionModule: ValidVector, TemplateReturnError
 using .ComposableExpressionModule:
-    ComposableExpression, ValidVectorMixError, ValidVectorAccessError
+    AbstractComposableExpression,
+    ComposableExpression,
+    ValidVectorMixError,
+    ValidVectorAccessError
 using .ExpressionBuilderModule: embed_metadata, strip_metadata
 using .ParametricExpressionModule: ParametricExpressionSpec
 using .TemplateExpressionMacroModule: @template_spec
