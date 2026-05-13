@@ -113,9 +113,9 @@ Only override `optimize_constants` when you need a custom optimization algorithm
 explicit constraints, or custom restart behavior.
 
 !!! note "Autodiff backend support"
-    Custom optimizable metadata works with the default `autodiff_backend=nothing`
-    path and generic DifferentiationInterface backends. The Enzyme extension
-    currently handles ordinary scalar constants only.
+Custom optimizable metadata works with the default `autodiff_backend=nothing`
+path and generic DifferentiationInterface backends. The Enzyme extension
+currently handles ordinary scalar constants only.
 
 This assumes your custom expression type is already used in the search, typically
 by passing it through an `expression_spec`. See
