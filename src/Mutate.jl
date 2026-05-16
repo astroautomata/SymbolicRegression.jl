@@ -570,7 +570,7 @@ end
 function mutate!(
     tree::N,
     member::P,
-    ::Val{:backsolve_rewrite},
+    ::Val{:backsolve},
     ::AbstractMutationWeights,
     options::AbstractOptions;
     recorder::RecordType,
@@ -581,7 +581,7 @@ function mutate!(
     tree = backsolve_rewrite_random_node(
         tree, dataset, options; population_for_backsolve=population_for_backsolve
     )
-    @recorder recorder["type"] = "backsolve_rewrite"
+    @recorder recorder["type"] = "backsolve"
     return MutationResult{N,P}(; tree=tree)
 end
 

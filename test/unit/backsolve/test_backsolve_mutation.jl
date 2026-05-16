@@ -23,7 +23,7 @@
         randomize::Float64
         do_nothing::Float64
         optimize::Float64
-        backsolve_rewrite::Float64
+        backsolve::Float64
         form_connection::Float64
         break_connection::Float64
     end
@@ -53,7 +53,7 @@
 
     function sample_mutation(weights::BacksolveOnlyWeights)
         weights.counter[] += 1
-        return :backsolve_rewrite
+        return :backsolve
     end
 
     rng = StableRNG(0)
@@ -255,13 +255,13 @@
         @test mutated_tree !== nothing
     end
 
-    @testset "MutationWeights - backsolve_rewrite field" begin
+    @testset "MutationWeights - backsolve field" begin
         weights = MutationWeights()
-        @test hasfield(typeof(weights), :backsolve_rewrite)
-        @test weights.backsolve_rewrite == 0.0
+        @test hasfield(typeof(weights), :backsolve)
+        @test weights.backsolve == 0.0
 
-        weights_on = MutationWeights(; backsolve_rewrite=0.5)
-        @test weights_on.backsolve_rewrite == 0.5
+        weights_on = MutationWeights(; backsolve=0.5)
+        @test weights_on.backsolve == 0.5
     end
 
     @testset "Helpful errors" begin
@@ -368,7 +368,7 @@
         )
     end
 
-    @testset "Integration - backsolve_rewrite in mutation pipeline" begin
+    @testset "Integration - backsolve in mutation pipeline" begin
         using SymbolicRegression.MutateModule: mutate!
 
         X = reshape(Float64[1.0, 2.0, 3.0], 1, 3)
@@ -387,7 +387,7 @@
         result = mutate!(
             ex,
             member,
-            Val(:backsolve_rewrite),
+            Val(:backsolve),
             options.mutation_weights,
             options;
             recorder=Dict{String,Any}(),
@@ -398,7 +398,7 @@
         @test result.tree !== nothing || result.member !== nothing
     end
 
-    @testset "Integration - backsolve_rewrite in equation_search" begin
+    @testset "Integration - backsolve in equation_search" begin
         counter = Ref(0)
         X = reshape(Float64[1.0, 2.0, 3.0, 4.0], 1, 4)
         y = 2 .* vec(X) .+ 1

@@ -11,10 +11,10 @@ import ..MutationWeightsModule: AbstractMutationWeights
 """
     BacksolveOptions(;kws...)
 
-Options for the `backsolve_rewrite` mutation sparse-expression fit.
+Options for the `backsolve` mutation sparse-expression fit.
 
 !!! warning
-    This option controls an experimental feature. The `backsolve_rewrite`
+    This option controls an experimental feature. The `backsolve`
     mutation and `BacksolveOptions` will change in minor version increments.
 
 # Arguments
