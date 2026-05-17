@@ -25,7 +25,6 @@ jobs:
     name: u/${{ matrix.group }}-${{ matrix.julia-version }}-${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -90,7 +89,6 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     continue-on-error: ${{ matrix.group == 'ad/enzyme' }}
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     strategy:
       fail-fast: false
       matrix:
@@ -149,7 +147,6 @@ jobs:
     name: Upload Coverage to Codecov
     needs: [unit, integration]
     runs-on: ubuntu-latest
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name != github.repository
     steps:
       - uses: actions/checkout@v5
       - name: Download all coverage artifacts
