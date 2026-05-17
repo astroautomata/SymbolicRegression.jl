@@ -2,15 +2,13 @@
 
 ## [2.0.0-alpha.11](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.10...v2.0.0-alpha.11) (2026-05-17)
 
-
 ### Features
 
-* add backsolve mutation ([de86fef](https://github.com/astroautomata/SymbolicRegression.jl/commit/de86fef0dc6e99cee05d2e80969ab0d0e0016907))
-
+- add backsolve mutation ([de86fef](https://github.com/astroautomata/SymbolicRegression.jl/commit/de86fef0dc6e99cee05d2e80969ab0d0e0016907))
 
 ### Bug Fixes
 
-* harden sparse regression library ([46a1ad2](https://github.com/astroautomata/SymbolicRegression.jl/commit/46a1ad2972c11f00969139c1b687a26ff976907a))
+- harden sparse regression library ([46a1ad2](https://github.com/astroautomata/SymbolicRegression.jl/commit/46a1ad2972c11f00969139c1b687a26ff976907a))
 
 ## [2.0.0-alpha.10](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.9...v2.0.0-alpha.10) (2026-03-23)
 
