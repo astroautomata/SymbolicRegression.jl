@@ -163,7 +163,7 @@ function build_basis_library(
 
     all_subtrees = sizehint!(Vector{typeof(tree_prototype)}(), max_library_size)
     if population !== nothing
-        sorted_members = sort(population.members[1:population.n]; by=m -> m.loss)
+        sorted_members = sort(population.members[1:(population.n)]; by=m -> m.loss)
         top_members = sorted_members[1:min(top_k, length(sorted_members))]
         all_subtrees = mapreduce(
             member -> collect(get_tree(member.tree)), vcat, top_members; init=all_subtrees
