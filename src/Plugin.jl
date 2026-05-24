@@ -368,7 +368,7 @@ function default_adaptive_parsimony_plugins end
 # skipping any default whose type is already represented in the user tuple
 # (so a user-passed instance takes precedence over the auto-default).
 @unstable function _merge_with_default_plugins(
-    user_plugins::Tuple, default_plugins::Tuple
+    @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins::Tuple)
 )
     out = user_plugins
     for dp in default_plugins

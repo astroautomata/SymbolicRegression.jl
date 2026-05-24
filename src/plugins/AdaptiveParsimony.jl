@@ -1,6 +1,6 @@
 module AdaptiveParsimonyPluginModule
 
-using DispatchDoctor: @unstable
+using DispatchDoctor: @stable
 using ..CoreModule: AbstractPlugin, AbstractPluginState, AbstractOptions
 using ..ComplexityModule: compute_complexity
 using ..AdaptiveParsimonyModule:
@@ -65,13 +65,13 @@ function init_plugin_state(::AdaptiveParsimonyPlugin, options, datasets)
     ])
 end
 
-@unstable function prepare_dispatch_state(
+function prepare_dispatch_state(
     ::AdaptiveParsimonyPlugin,
     head_state::AdaptiveParsimonyState,
     output_index::Int,
     dataset,
 )
-    snapshot = deepcopy(head_state.rss[output_index])
+    snapshot = deepcopy(head_state.rss[output_index])::RunningSearchStatistics
     normalize_frequencies!(snapshot)
     return AdaptiveParsimonyState([snapshot])
 end
@@ -138,17 +138,18 @@ function on_generation_end!(
     return nothing
 end
 
-@unstable function default_adaptive_parsimony_plugins(;
-    use_frequency::Bool, use_frequency_in_tournament::Bool
-)
-    (use_frequency || use_frequency_in_tournament) || return ()
-    return (
-        AdaptiveParsimonyPlugin(;
-            tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency
-        ),
+@stable(
+    default_union_limit = 2,
+    function default_adaptive_parsimony_plugins(;
+        use_frequency::Bool, use_frequency_in_tournament::Bool
     )
-end
-
-export AdaptiveParsimonyPlugin
+        (use_frequency || use_frequency_in_tournament) || return ()
+        return (
+            AdaptiveParsimonyPlugin(;
+                tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency,
+            ),
+        )
+    end
+)
 
 end  # module AdaptiveParsimonyPluginModule

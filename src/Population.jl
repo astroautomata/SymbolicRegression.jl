@@ -54,15 +54,15 @@ function _init_tree(
 ) where {T}
     return gen_random_tree(nlength, options, nfeatures, T)
 end
-@unstable function _init_tree(
+function _init_tree(
     plugin_states::Tuple, dataset, options, nlength::Int, nfeatures::Int, ::Type{T}
 ) where {T}
+    # Build the random-tree fallback eagerly so its type defines the
+    # concrete return type; the plugin's candidate is type-asserted to
+    # match, both stabilising inference and validating the plugin output.
+    fallback = gen_random_tree(nlength, options, nfeatures, T)
     candidate = invoke_init_member(options.plugins, plugin_states, dataset, options)
-    return if isnothing(candidate)
-        gen_random_tree(nlength, options, nfeatures, T)
-    else
-        candidate
-    end
+    return isnothing(candidate) ? fallback : candidate::typeof(fallback)
 end
 
 """
