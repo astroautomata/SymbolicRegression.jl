@@ -6,7 +6,7 @@
     variable_names = ["x1"]
 
     expr = parse_expression("x1 + 2.0"; operators, variable_names)
-    flat = SymbolicRegression.get_optimizable_parameters(expr)[1]
+    flat = SymbolicRegression.get_constants_for_optimization(expr)[1]
     @test flat == [2.0]
     @test length(flat) == 1
 
@@ -21,12 +21,12 @@
         parameters=(; p=[2.0]),
     )
 
-    params, refs = SymbolicRegression.get_optimizable_parameters(template)
+    params, refs = SymbolicRegression.get_constants_for_optimization(template)
     @test params == [3.0, 2.0]
     @test length(params) == 2
 
-    SymbolicRegression.set_optimizable_parameters!(template, [4.0, 5.0], refs)
-    @test SymbolicRegression.get_optimizable_parameters(template)[1] == [4.0, 5.0]
+    SymbolicRegression.set_constants_for_optimization!(template, [4.0, 5.0], refs)
+    @test SymbolicRegression.get_constants_for_optimization(template)[1] == [4.0, 5.0]
 end
 
 @testitem "Default optimize_constants handles custom optimizable expression state" begin
@@ -76,7 +76,7 @@ end
     DynamicExpressions.get_contents(grad::WrappedGradient) = grad.tree
     DynamicExpressions.get_metadata(grad::WrappedGradient) = grad.metadata
 
-    function SymbolicRegression.get_optimizable_parameters(
+    function SymbolicRegression.get_constants_for_optimization(
         ex::WrappedExpression{T}
     ) where {T}
         tree_params, tree_refs = get_scalar_constants(get_contents(ex))
@@ -84,7 +84,7 @@ end
         (; tree_refs, n_tree=length(tree_params))
     end
 
-    function SymbolicRegression.set_optimizable_parameters!(
+    function SymbolicRegression.set_constants_for_optimization!(
         ex::WrappedExpression{T}, x, refs
     ) where {T}
         set_scalar_constants!(get_contents(ex), x[1:(refs.n_tree)], refs.tree_refs)
@@ -99,7 +99,7 @@ end
         return ex
     end
 
-    function SymbolicRegression.extract_optimizable_gradient(
+    function SymbolicRegression.extract_gradient_for_optimization(
         grad, ex::WrappedExpression{T}
     ) where {T}
         tree_grad = extract_gradient(get_contents(grad), get_contents(ex))
@@ -115,13 +115,13 @@ end
         scale=-1.0,
     )
 
-    initial_params, _ = SymbolicRegression.get_optimizable_parameters(wrapped)
+    initial_params, _ = SymbolicRegression.get_constants_for_optimization(wrapped)
     @test initial_params == [1.0, -1.0]
 
     gradient = WrappedGradient(
         NodeTangent(get_contents(wrapped), [-0.5]), Metadata((; scale=0.75))
     )
-    @test SymbolicRegression.extract_optimizable_gradient(gradient, wrapped) == [-0.5, 0.75]
+    @test SymbolicRegression.extract_gradient_for_optimization(gradient, wrapped) == [-0.5, 0.75]
 
     function loss(
         ex::WrappedExpression{Float64}, _dataset::Dataset{Float64,Float64}, _options
@@ -148,7 +148,7 @@ end
 
     new_member, _ = SymbolicRegression.optimize_constants(dataset, member, options)
     final_loss = loss(new_member.tree, dataset, options)
-    final_params = SymbolicRegression.get_optimizable_parameters(new_member.tree)[1]
+    final_params = SymbolicRegression.get_constants_for_optimization(new_member.tree)[1]
 
     @test final_loss < initial_loss
     @test final_params != initial_params

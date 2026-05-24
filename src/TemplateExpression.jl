@@ -446,8 +446,8 @@ end
 _parameter_data(x::ParamVector) = x._data
 _parameter_data(x) = x
 
-function CO.get_optimizable_parameters(e::TemplateExpression{T}) where {T}
-    inner_params_and_refs = map(CO.get_optimizable_parameters, values(get_contents(e)))
+function CO.get_constants_for_optimization(e::TemplateExpression{T}) where {T}
+    inner_params_and_refs = map(CO.get_constants_for_optimization, values(get_contents(e)))
     inner_chunks = first.(inner_params_and_refs)
     parameter_chunks = if has_params(e)
         map(_parameter_data, values(get_metadata(e).parameters))
@@ -465,12 +465,12 @@ function CO.get_optimizable_parameters(e::TemplateExpression{T}) where {T}
     )
     return flat, refs
 end
-function CO.set_optimizable_parameters!(e::TemplateExpression, constants, refs)
+function CO.set_constants_for_optimization!(e::TemplateExpression, constants, refs)
     cursor = Ref(1)
     foreach(values(get_contents(e)), refs.inner) do tree, r
         n = r.n
         i = cursor[]
-        CO.set_optimizable_parameters!(tree, constants[i:(i + n - 1)], r.ref)
+        CO.set_constants_for_optimization!(tree, constants[i:(i + n - 1)], r.ref)
         cursor[] = i + n
     end
     if has_params(e)
@@ -484,9 +484,9 @@ function CO.set_optimizable_parameters!(e::TemplateExpression, constants, refs)
     end
     return e
 end
-function CO.extract_optimizable_gradient(grad, ex::TemplateExpression{T}) where {T}
+function CO.extract_gradient_for_optimization(grad, ex::TemplateExpression{T}) where {T}
     inner_grad = map(
-        CO.extract_optimizable_gradient,
+        CO.extract_gradient_for_optimization,
         values(get_contents(grad)),
         values(get_contents(ex)),
     )
