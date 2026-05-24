@@ -161,6 +161,28 @@ function condition_mutation_weights!(
 end
 
 """
+    condition_mutation_weights!(plugin, state, weights, member, options, curmaxsize, nfeatures)
+
+Plugin-dispatched method: called once per plugin in tuple order after the
+engine's legality conditioning. Plugins compose by sequential in-place
+mutation of `weights` (e.g. multiplicative adaptive multipliers, curriculum
+biases). Default is a no-op.
+
+!!! warning "Experimental"
+"""
+function condition_mutation_weights!(
+    ::AbstractPlugin,
+    ::AbstractPluginState,
+    weights::AbstractMutationWeights,
+    member,
+    options,
+    curmaxsize,
+    nfeatures,
+)
+    return nothing
+end
+
+"""
 Use this to modify how `mutate_constant` changes for an expression type.
 """
 function condition_mutate_constant!(
@@ -210,6 +232,11 @@ end
     weights = copy(options.mutation_weights)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
+    for (plugin, pstate) in zip(options.plugins, plugin_states)
+        condition_mutation_weights!(
+            plugin, pstate, weights, member, options, curmaxsize, nfeatures
+        )
+    end
 
     mutation_choice = sample_mutation(weights)
 

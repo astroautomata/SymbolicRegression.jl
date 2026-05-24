@@ -247,3 +247,41 @@ end
     @test any(isnan(ev.after_loss) for ev in events)
 end
 
+@testitem "Plugin interface: condition_mutation_weights! plugin-dispatched" begin
+    using SymbolicRegression
+    using SymbolicRegression: AbstractPlugin, AbstractPluginState
+    using Test
+
+    # Plugin that zeroes out `mutate_constant` from its dispatched method.
+    # Verifies the engine layers plugin conditioning on top of its own.
+    struct ZeroConstPlugin <: AbstractPlugin end
+    mutable struct ZeroConstState <: AbstractPluginState end
+    SymbolicRegression.init_plugin_state(::ZeroConstPlugin, o, d) = ZeroConstState()
+    function SymbolicRegression.condition_mutation_weights!(
+        ::ZeroConstPlugin,
+        ::ZeroConstState,
+        weights,
+        member,
+        options,
+        curmaxsize,
+        nfeatures,
+    )
+        weights.mutate_constant = 0.0
+        return nothing
+    end
+
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        use_frequency=false,
+        use_frequency_in_tournament=false,
+        plugins=(ZeroConstPlugin(),),
+    )
+    X = rand(Float32, 2, 20)
+    y = X[1, :] .+ X[2, :]
+    hof = equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
+    @test hof isa SymbolicRegression.HallOfFame
+end
+

@@ -89,6 +89,6 @@ using .PluginModule:
     mutation_acceptance_multiplier,
     prepare_dispatch_state,
     invoke_init_member,
-    _inject_adaptive_parsimony_plugin
+    default_adaptive_parsimony_plugins
 
 end

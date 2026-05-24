@@ -2,6 +2,46 @@ module PluginModule
 
 using DispatchDoctor: @unstable
 
+# ────────────────────────────────────────────────────────────────────────────
+# Hook naming taxonomy
+# ────────────────────────────────────────────────────────────────────────────
+#
+# All plugin hooks belong to one of six categories. The name's verb/suffix
+# tells you the contract; the docstring tells you the semantics.
+#
+#   `on_X_start!` / `on_X_end!`   — Observer. Engine fires; plugin reacts.
+#                                   Return value ignored. `!` because state
+#                                   may mutate. Composes by iteration.
+#
+#   `X_multiplier`                — Multiplier. Returns a `Real` the engine
+#                                   multiplies into a base value. Reads like
+#                                   a Julia getter (`length`, `size`). Plugins
+#                                   compose multiplicatively in tuple order.
+#
+#   `condition_X!`                — Conditioner. Mutates a passed struct in
+#                                   place. Engine layers plugin conditioning
+#                                   on top of its own. Composes by sequential
+#                                   in-place mutation in tuple order.
+#
+#   `decide_X`                    — Decider. Returns a `Symbol` / enum the
+#                                   engine acts on. Composes by precedence:
+#                                   first non-default response in tuple order
+#                                   wins. Use for control-flow forks.
+#
+#   `init_X`                      — Factory (one-time). Called once per
+#                                   (plugin, worker) at startup. Returns a
+#                                   new instance.
+#
+#   `prepare_X`                   — Factory (per-context). Called per dispatch
+#                                   with context (output index, dataset).
+#                                   Returns a new instance for the worker.
+#
+# When adding a new hook: pick a category, follow the verb shape. If the name
+# feels ambiguous, the contract probably isn't one of these six — rethink
+# whether you need a new category or are forcing the feature into the wrong
+# shape.
+# ────────────────────────────────────────────────────────────────────────────
+
 """
     AbstractPlugin
 
@@ -316,11 +356,26 @@ end
     end
 end
 
-# Each kwarg → plugin migration gets one forward-declared injector here.
-# The plugin module that owns the migration provides the only method
-# (necessary because plugin modules live above Core in the include order, so
-# Options.jl can't name their plugin types directly). The plugin module
-# always loads before any Options is constructed at runtime.
-function _inject_adaptive_parsimony_plugin end
+# Each kwarg → plugin migration gets a forward-declared "default plugin
+# builder" here. The plugin module that owns the migration provides the only
+# method (plugin modules live above Core in the include order, so Options.jl
+# can't name their plugin types directly). Each builder returns `Tuple` of
+# plugin instances to append (or `()` to skip). Options.jl composes the
+# builders' outputs with the user-supplied `plugins` tuple.
+function default_adaptive_parsimony_plugins end
+
+# Merge a user-supplied `plugins::Tuple` with a tuple of default plugins,
+# skipping any default whose type is already represented in the user tuple
+# (so a user-passed instance takes precedence over the auto-default).
+@unstable function _merge_with_default_plugins(
+    user_plugins::Tuple, default_plugins::Tuple
+)
+    out = user_plugins
+    for dp in default_plugins
+        any(p -> typeof(p) === typeof(dp), out) && continue
+        out = (out..., dp)
+    end
+    return out
+end
 
 end  # module PluginModule

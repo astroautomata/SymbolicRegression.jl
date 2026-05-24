@@ -902,7 +902,6 @@ function _warmup_search!(
             options.plugins,
             state.plugin_states,
         )
-        c_plugin_states_ref = Ref{Union{Nothing,Tuple}}(c_plugin_states)
         updated_pop = @sr_spawner(
             begin
                 in_pop = first(extract_from_worker(last_pop, PopType, HallType))
@@ -915,7 +914,7 @@ function _warmup_search!(
                     iteration=0,
                     ropt.verbosity,
                     cur_maxsize,
-                    plugin_states_ref=c_plugin_states_ref,
+                    plugin_states=c_plugin_states,
                 )::DefaultWorkerOutputType{Population{T,L,N},HallOfFame{T,L,N}}
             end,
             parallelism = ropt.parallelism,
@@ -933,13 +932,6 @@ function _main_search_loop!(
 ) where {T,L,N}
     ropt.verbosity > 0 && @info "Started!"
     nout = length(datasets)
-
-    # Allocated outside the loop so state persists across iterations under
-    # `:multithreading`. `nothing` triggers lazy init on first cycle.
-    worker_plugin_states_refs = [
-        [Ref{Union{Nothing,Tuple}}(nothing) for i in 1:(options.populations)] for
-        j in 1:nout
-    ]
 
     start_time = time()
     progress_bar = if ropt.progress
@@ -1083,8 +1075,6 @@ function _main_search_loop!(
                 options.plugins,
                 state.plugin_states,
             )
-            c_plugin_states_ref = worker_plugin_states_refs[j][i]
-            c_plugin_states_ref[] = c_plugin_states
             state.worker_output[j][i] = @sr_spawner(
                 begin
                     _dispatch_s_r_cycle(
@@ -1096,7 +1086,7 @@ function _main_search_loop!(
                         iteration,
                         ropt.verbosity,
                         cur_maxsize,
-                        plugin_states_ref=c_plugin_states_ref,
+                        plugin_states=c_plugin_states,
                     )
                 end,
                 parallelism = ropt.parallelism,
@@ -1242,14 +1232,11 @@ end
     iteration::Int,
     verbosity,
     cur_maxsize::Int,
-    plugin_states_ref::Ref{Union{Nothing,Tuple}}=Ref{Union{Nothing,Tuple}}(nothing),
+    plugin_states::Tuple=map(
+        p -> init_plugin_state(p, options, (dataset,)), options.plugins
+    ),
 ) where {T,L,N}
-    if isnothing(plugin_states_ref[])
-        plugin_states_ref[] = map(
-            p -> init_plugin_state(p, options, (dataset,)), options.plugins
-        )
-    end
-    worker_plugin_states = plugin_states_ref[]::Tuple
+    worker_plugin_states = plugin_states
 
     record = RecordType()
     @recorder record["out$(out)_pop$(pop)"] = RecordType(

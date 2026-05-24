@@ -39,7 +39,7 @@ using ..OperatorsModule:
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
-using ..PluginModule: _inject_adaptive_parsimony_plugin
+using ..PluginModule: default_adaptive_parsimony_plugins, _merge_with_default_plugins
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -1013,8 +1013,9 @@ $(OPTION_DESCRIPTIONS)
     set_mutation_weights = create_mutation_weights(mutation_weights)
     backsolve = something(backsolve, BacksolveOptions())
 
-    plugin_tuple = _inject_adaptive_parsimony_plugin(
-        plugins, use_frequency, use_frequency_in_tournament
+    plugin_tuple = _merge_with_default_plugins(
+        plugins,
+        default_adaptive_parsimony_plugins(; use_frequency, use_frequency_in_tournament),
     )
 
     @assert print_precision > 0

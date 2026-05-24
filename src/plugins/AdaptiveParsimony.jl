@@ -14,7 +14,7 @@ import ..CoreModule:
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     on_generation_end!,
-    _inject_adaptive_parsimony_plugin
+    default_adaptive_parsimony_plugins
 
 """
     AdaptiveParsimonyPlugin <: AbstractPlugin
@@ -138,13 +138,11 @@ function on_generation_end!(
     return nothing
 end
 
-@unstable function _inject_adaptive_parsimony_plugin(
-    plugins::Tuple, use_frequency::Bool, use_frequency_in_tournament::Bool
+@unstable function default_adaptive_parsimony_plugins(;
+    use_frequency::Bool, use_frequency_in_tournament::Bool
 )
-    (use_frequency || use_frequency_in_tournament) || return plugins
-    any(p -> p isa AdaptiveParsimonyPlugin, plugins) && return plugins
+    (use_frequency || use_frequency_in_tournament) || return ()
     return (
-        plugins...,
         AdaptiveParsimonyPlugin(;
             tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency
         ),
