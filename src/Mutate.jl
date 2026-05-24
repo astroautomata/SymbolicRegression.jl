@@ -22,7 +22,7 @@ using ..CoreModule:
     AbstractPluginState,
     NoPluginState,
     MutationEvent,
-    on_mutation_evaluated!,
+    on_mutation_end!,
     mutation_acceptance_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
@@ -178,11 +178,11 @@ function condition_mutate_constant!(
 end
 
 # Go through one simulated options.annealing mutation cycle
-@inline function _fire_on_mutation_evaluated!(
+@inline function _fire_on_mutation_end!(
     options::AbstractOptions, plugin_states::Tuple, event::MutationEvent, dataset
 )
     for (plugin, pstate) in zip(options.plugins, plugin_states)
-        on_mutation_evaluated!(plugin, pstate, event, dataset, options)
+        on_mutation_end!(plugin, pstate, event, dataset, options)
     end
     return nothing
 end
@@ -253,7 +253,7 @@ end
                 mutation_result.member isa P,
                 "Mutation result must return a `PopMember` if `return_immediately` is true"
             )
-            _fire_on_mutation_evaluated!(
+            _fire_on_mutation_end!(
                 options,
                 plugin_states,
                 MutationEvent(
@@ -284,7 +284,7 @@ end
             tmp_recorder["reason"] = "failed_constraint_check"
         end
         mutation_accepted = false
-        _fire_on_mutation_evaluated!(
+        _fire_on_mutation_end!(
             options,
             plugin_states,
             MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
@@ -314,7 +314,7 @@ end
             tmp_recorder["reason"] = "nan_loss"
         end
         mutation_accepted = false
-        _fire_on_mutation_evaluated!(
+        _fire_on_mutation_end!(
             options,
             plugin_states,
             MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
@@ -353,7 +353,7 @@ end
             tmp_recorder["reason"] = "annealing_or_frequency"
         end
         mutation_accepted = false
-        _fire_on_mutation_evaluated!(
+        _fire_on_mutation_end!(
             options,
             plugin_states,
             MutationEvent(
@@ -387,7 +387,7 @@ end
             options;
             parent_ref=parent_ref,
         )
-        _fire_on_mutation_evaluated!(
+        _fire_on_mutation_end!(
             options,
             plugin_states,
             MutationEvent(mutation_choice, true, Float64(before_loss), Float64(after_loss)),

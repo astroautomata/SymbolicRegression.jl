@@ -31,8 +31,8 @@ States hold the mutable runtime data the engine doesn't need to know about
 (counters, channels, concept databases, etc.).
 
 **Thread / Multiprocessing Safety**:
-- `on_generation_complete!` runs serially on the head node — safe to mutate.
-- `on_population_evaluated!` and `on_mutation_evaluated!` run on workers
+- `on_generation_end!` runs serially on the head node — safe to mutate.
+- `on_cycle_end!` and `on_mutation_end!` run on workers
   concurrently in multithreading mode. Each `(plugin, worker)` slot has its
   own state, so no cross-slot races occur. Cross-worker communication must
   use `Channel` / `RemoteChannel`.
@@ -134,7 +134,7 @@ function on_search_end!(
 end
 
 """
-    on_generation_complete!(plugin, state, search_state, datasets, options, ropt)
+    on_generation_end!(plugin, state, search_state, datasets, options, ropt)
 
 Lifecycle hook called on the HEAD NODE after each generation completes
 (after HoF update + migration). Runs serially; safe to mutate plugin state,
@@ -145,14 +145,14 @@ Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_generation_complete!(
+function on_generation_end!(
     ::AbstractPlugin, ::AbstractPluginState, search_state, datasets, options, ropt
 )
     return nothing
 end
 
 """
-    on_population_evaluated!(plugin, state, pop, dataset, hof, options)
+    on_cycle_end!(plugin, state, pop, dataset, hof, options)
 
 Lifecycle hook called on the WORKER after each s_r_cycle finishes. May run
 concurrently across workers. Use only worker-local state, or use `Channel` /
@@ -163,7 +163,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_population_evaluated!(
+function on_cycle_end!(
     ::AbstractPlugin, ::AbstractPluginState, pop, dataset, hof, options
 )
     return nothing
@@ -172,7 +172,7 @@ end
 """
     MutationEvent
 
-Bundle of per-mutation observations passed to [`on_mutation_evaluated!`](@ref)
+Bundle of per-mutation observations passed to [`on_mutation_end!`](@ref)
 once the accept/reject decision has been made inside `next_generation`.
 
 # Fields
@@ -207,7 +207,7 @@ struct MutationEvent
 end
 
 """
-    on_mutation_evaluated!(plugin, state, event::MutationEvent, dataset, options)
+    on_mutation_end!(plugin, state, event::MutationEvent, dataset, options)
 
 Lifecycle hook called on the WORKER immediately before each return from
 `next_generation`, after the final accept/reject decision for a mutation.
@@ -219,7 +219,7 @@ weights, or log mutation outcomes.
 Override by dispatching on your plugin type:
 
 ```julia
-SymbolicRegression.on_mutation_evaluated!(
+SymbolicRegression.on_mutation_end!(
     p::MyPlugin, s::MyPluginState, ev::MutationEvent, dataset, opts,
 ) = ...
 ```
@@ -228,7 +228,7 @@ Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_mutation_evaluated!(
+function on_mutation_end!(
     ::AbstractPlugin, ::AbstractPluginState, ::MutationEvent, dataset, options
 )
     return nothing

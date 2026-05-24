@@ -8,8 +8,8 @@
         init_plugin_states,
         on_search_start!,
         on_search_end!,
-        on_generation_complete!,
-        on_population_evaluated!,
+        on_generation_end!,
+        on_cycle_end!,
         init_member
     using Test
 
@@ -31,8 +31,8 @@
     s = NoPluginState()
     @test on_search_start!(p, s, [], opts, nothing) === nothing
     @test on_search_end!(p, s, nothing, [], opts, nothing) === nothing
-    @test on_generation_complete!(p, s, nothing, [], opts, nothing) === nothing
-    @test on_population_evaluated!(p, s, nothing, nothing, nothing, opts) === nothing
+    @test on_generation_end!(p, s, nothing, [], opts, nothing) === nothing
+    @test on_cycle_end!(p, s, nothing, nothing, nothing, opts) === nothing
     @test init_member(p, s, nothing, opts) === nothing
 end
 
@@ -44,8 +44,8 @@ end
         init_plugin_state,
         on_search_start!,
         on_search_end!,
-        on_generation_complete!,
-        on_population_evaluated!
+        on_generation_end!,
+        on_cycle_end!
     using Test
 
     # Use a channel to safely count from multiple threads/tasks.
@@ -67,10 +67,10 @@ end
     SymbolicRegression.on_search_end!(
         ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
     ) = (put!(s.counter_ch, :end); nothing)
-    SymbolicRegression.on_generation_complete!(
+    SymbolicRegression.on_generation_end!(
         ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
     ) = (put!(s.counter_ch, :gen); nothing)
-    SymbolicRegression.on_population_evaluated!(
+    SymbolicRegression.on_cycle_end!(
         ::LifecyclePlugin, s::LifecyclePluginState, pop, d, h, o
     ) = (put!(s.counter_ch, :pop); nothing)
 
@@ -121,9 +121,9 @@ end
 
     SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
     SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
-    SymbolicRegression.on_generation_complete!(::PluginA, s::PluginAState, ss, d, o, r) =
+    SymbolicRegression.on_generation_end!(::PluginA, s::PluginAState, ss, d, o, r) =
         (s.calls[] += 1; nothing)
-    SymbolicRegression.on_generation_complete!(::PluginB, s::PluginBState, ss, d, o, r) =
+    SymbolicRegression.on_generation_end!(::PluginB, s::PluginBState, ss, d, o, r) =
         (s.calls[] += 1; nothing)
 
     opts = Options(;
@@ -178,10 +178,10 @@ end
     @test init_count[] > 0
 end
 
-@testitem "Plugin interface: on_mutation_evaluated! fires with correct args" begin
+@testitem "Plugin interface: on_mutation_end! fires with correct args" begin
     using SymbolicRegression
     import SymbolicRegression:
-        AbstractPlugin, AbstractPluginState, MutationEvent, on_mutation_evaluated!
+        AbstractPlugin, AbstractPluginState, MutationEvent, on_mutation_end!
     using Test
 
     # Collect MutationEvent values via a Channel
@@ -196,7 +196,7 @@ end
     SymbolicRegression.init_plugin_state(p::MutEvalPlugin, o, d) = MutEvalPluginState(
         p.events_ch
     )
-    function SymbolicRegression.on_mutation_evaluated!(
+    function SymbolicRegression.on_mutation_end!(
         ::MutEvalPlugin, state::MutEvalPluginState, event::MutationEvent, dataset, opts
     )
         put!(state.events_ch, event)

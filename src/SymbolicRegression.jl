@@ -188,7 +188,7 @@ using Compat: @compat, Fix
         AbstractPlugin, AbstractPluginState, NoPluginState, MutationEvent,
         init_plugin_state, init_plugin_states,
         on_search_start!, on_search_end!,
-        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member,
+        on_generation_end!, on_cycle_end!, on_mutation_end!, init_member,
         tournament_cost_multiplier, mutation_acceptance_multiplier,
     )
 )
@@ -312,9 +312,9 @@ using .CoreModule:
     init_plugin_states,
     on_search_start!,
     on_search_end!,
-    on_generation_complete!,
-    on_population_evaluated!,
-    on_mutation_evaluated!,
+    on_generation_end!,
+    on_cycle_end!,
+    on_mutation_end!,
     init_member,
     invoke_init_member,
     tournament_cost_multiplier,
@@ -1067,7 +1067,7 @@ function _main_search_loop!(
             ###################################################################
 
             for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-                on_generation_complete!(plugin, pstate, state, datasets, options, ropt)
+                on_generation_end!(plugin, pstate, state, datasets, options, ropt)
             end
 
             state.cycles_remaining[j] -= 1
@@ -1291,7 +1291,7 @@ end
         end
     end
     for (plugin, pstate) in zip(options.plugins, worker_plugin_states)
-        on_population_evaluated!(plugin, pstate, out_pop, dataset, best_seen, options)
+        on_cycle_end!(plugin, pstate, out_pop, dataset, best_seen, options)
     end
     return (out_pop, best_seen, record, num_evals)
 end
