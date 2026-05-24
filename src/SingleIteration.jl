@@ -4,7 +4,13 @@ using ADTypes: AutoEnzyme
 using DynamicExpressions: AbstractExpression, string_tree, simplify_tree!, combine_operators
 using ..UtilsModule: @threads_if
 using ..CoreModule:
-    AbstractOptions, Dataset, RecordType, create_expression, batch, AbstractPluginState, NoPluginState
+    AbstractOptions,
+    Dataset,
+    RecordType,
+    create_expression,
+    batch,
+    AbstractPluginState,
+    NoPluginState
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: generate_reference
 using ..PopulationModule: Population, finalize_costs
@@ -26,7 +32,7 @@ function s_r_cycle(
     verbosity::Int=0,
     options::AbstractOptions,
     record::RecordType,
-    plugin_state::AbstractPluginState=NoPluginState(),
+    plugin_states::Tuple=(),
 )::Tuple{
     P,HallOfFame{T,L,N},Float64
 } where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:Population{T,L,N}}
@@ -50,7 +56,7 @@ function s_r_cycle(
             running_search_statistics,
             options,
             record;
-            plugin_state,
+            plugin_states,
         )
         num_evals += tmp_num_evals
         for member in pop.members

@@ -80,9 +80,8 @@ end
         ex::WrappedExpression{T}
     ) where {T}
         tree_params, tree_refs = get_scalar_constants(get_contents(ex))
-        return vcat(tree_params, T[get_metadata(ex).scale]), (;
-            tree_refs, n_tree=length(tree_params)
-        )
+        return vcat(tree_params, T[get_metadata(ex).scale]),
+        (; tree_refs, n_tree=length(tree_params))
     end
 
     function SymbolicRegression.set_optimizable_parameters!(
@@ -122,10 +121,11 @@ end
     gradient = WrappedGradient(
         NodeTangent(get_contents(wrapped), [-0.5]), Metadata((; scale=0.75))
     )
-    @test SymbolicRegression.extract_optimizable_gradient(gradient, wrapped) ==
-        [-0.5, 0.75]
+    @test SymbolicRegression.extract_optimizable_gradient(gradient, wrapped) == [-0.5, 0.75]
 
-    function loss(ex::WrappedExpression{Float64}, _dataset::Dataset{Float64,Float64}, _options)
+    function loss(
+        ex::WrappedExpression{Float64}, _dataset::Dataset{Float64,Float64}, _options
+    )
         c = get_contents(ex).val
         s = get_metadata(ex).scale
         return (c - 2.0)^2 + (s - 3.0)^2

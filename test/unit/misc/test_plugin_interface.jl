@@ -1,9 +1,11 @@
 @testitem "Plugin interface: types and defaults" begin
     using SymbolicRegression
     import SymbolicRegression:
+        AbstractPlugin,
         AbstractPluginState,
         NoPluginState,
         init_plugin_state,
+        init_plugin_states,
         on_search_start!,
         on_search_end!,
         on_generation_complete!,
@@ -14,24 +16,31 @@
     # Default types exist
     @test NoPluginState() isa AbstractPluginState
 
-    # Default init_plugin_state returns NoPluginState
-    opts = Options(binary_operators=[+, *])
-    state = init_plugin_state(opts, [])
-    @test state isa NoPluginState
+    # An options with no plugins (and the legacy `use_frequency_in_tournament`
+    # auto-injection disabled) has an empty tuple.
+    opts = Options(binary_operators=[+, *], use_frequency_in_tournament=false)
+    @test opts.plugins isa Tuple{}
+    @test init_plugin_states(opts.plugins, opts, []) isa Tuple{}
+
+    # A dummy plugin's default init returns NoPluginState
+    struct DummyPlugin <: AbstractPlugin end
+    p = DummyPlugin()
+    @test init_plugin_state(p, opts, []) isa NoPluginState
 
     # Default hooks return nothing
-    @test on_search_start!(state, [], opts, nothing) === nothing
-    @test on_search_end!(state, nothing, [], opts, nothing) === nothing
-    @test on_generation_complete!(state, nothing, [], opts, nothing) === nothing
-    @test on_population_evaluated!(state, nothing, nothing, nothing, opts) === nothing
-    @test init_member(state, nothing, opts) === nothing
+    s = NoPluginState()
+    @test on_search_start!(p, s, [], opts, nothing) === nothing
+    @test on_search_end!(p, s, nothing, [], opts, nothing) === nothing
+    @test on_generation_complete!(p, s, nothing, [], opts, nothing) === nothing
+    @test on_population_evaluated!(p, s, nothing, nothing, nothing, opts) === nothing
+    @test init_member(p, s, nothing, opts) === nothing
 end
 
-@testitem "Plugin interface: lifecycle hooks called" begin
+@testitem "Plugin interface: lifecycle hooks called for each plugin" begin
     using SymbolicRegression
     import SymbolicRegression:
+        AbstractPlugin,
         AbstractPluginState,
-        AbstractOptions,
         init_plugin_state,
         on_search_start!,
         on_search_end!,
@@ -39,33 +48,41 @@ end
         on_population_evaluated!
     using Test
 
-    # Use a channel to safely count from multiple threads/tasks
+    # Use a channel to safely count from multiple threads/tasks.
     counter_ch = Channel{Symbol}(1000)
 
+    struct LifecyclePlugin <: AbstractPlugin
+        counter_ch::Channel{Symbol}
+    end
     mutable struct LifecyclePluginState <: AbstractPluginState
         counter_ch::Channel{Symbol}
     end
-    struct LifecycleOptions{O} <: AbstractOptions
-        base::O
-        counter_ch::Channel{Symbol}
-    end
-    Base.getproperty(o::LifecycleOptions, k::Symbol) =
-        k === :counter_ch ? getfield(o, :counter_ch) : getproperty(getfield(o, :base), k)
-    SymbolicRegression.init_plugin_state(opts::LifecycleOptions, datasets) =
-        LifecyclePluginState(opts.counter_ch)
-    SymbolicRegression.on_search_start!(s::LifecyclePluginState, d, o, r) =
-        (put!(s.counter_ch, :start); nothing)
-    SymbolicRegression.on_search_end!(s::LifecyclePluginState, ss, d, o, r) =
-        (put!(s.counter_ch, :end); nothing)
-    SymbolicRegression.on_generation_complete!(s::LifecyclePluginState, ss, d, o, r) =
-        (put!(s.counter_ch, :gen); nothing)
-    SymbolicRegression.on_population_evaluated!(s::LifecyclePluginState, pop, d, h, o) =
-        (put!(s.counter_ch, :pop); nothing)
 
-    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
-    opts = LifecycleOptions(base_opts, counter_ch)
+    SymbolicRegression.init_plugin_state(p::LifecyclePlugin, options, datasets) = LifecyclePluginState(
+        p.counter_ch
+    )
+    SymbolicRegression.on_search_start!(
+        ::LifecyclePlugin, s::LifecyclePluginState, d, o, r
+    ) = (put!(s.counter_ch, :start); nothing)
+    SymbolicRegression.on_search_end!(
+        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
+    ) = (put!(s.counter_ch, :end); nothing)
+    SymbolicRegression.on_generation_complete!(
+        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
+    ) = (put!(s.counter_ch, :gen); nothing)
+    SymbolicRegression.on_population_evaluated!(
+        ::LifecyclePlugin, s::LifecyclePluginState, pop, d, h, o
+    ) = (put!(s.counter_ch, :pop); nothing)
+
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        plugins=(LifecyclePlugin(counter_ch),),
+    )
     X = rand(Float32, 2, 30)
-    y = 2f0 .* X[1, :] .+ X[2, :]
+    y = 2.0f0 .* X[1, :] .+ X[2, :]
 
     equation_search(X, y; options=opts, niterations=3, parallelism=:serial)
 
@@ -81,28 +98,78 @@ end
     @test get(counts, :pop, 0) > 0
 end
 
+@testitem "Plugin interface: multiple plugins all fire" begin
+    using SymbolicRegression
+    import SymbolicRegression: AbstractPlugin, AbstractPluginState
+    using Test
+
+    a_calls = Ref(0)
+    b_calls = Ref(0)
+
+    struct PluginA <: AbstractPlugin
+        calls::Base.RefValue{Int}
+    end
+    struct PluginB <: AbstractPlugin
+        calls::Base.RefValue{Int}
+    end
+    mutable struct PluginAState <: AbstractPluginState
+        calls::Base.RefValue{Int}
+    end
+    mutable struct PluginBState <: AbstractPluginState
+        calls::Base.RefValue{Int}
+    end
+
+    SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
+    SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
+    SymbolicRegression.on_generation_complete!(::PluginA, s::PluginAState, ss, d, o, r) =
+        (s.calls[] += 1; nothing)
+    SymbolicRegression.on_generation_complete!(::PluginB, s::PluginBState, ss, d, o, r) =
+        (s.calls[] += 1; nothing)
+
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        plugins=(PluginA(a_calls), PluginB(b_calls)),
+    )
+    X = rand(Float32, 2, 30)
+    y = 2.0f0 .* X[1, :] .+ X[2, :]
+    equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
+
+    @test a_calls[] > 0
+    @test b_calls[] > 0
+end
+
 @testitem "Plugin interface: init_member hook" begin
     using SymbolicRegression
-    import SymbolicRegression:
-        AbstractPluginState, AbstractOptions, init_plugin_state, init_member
+    import SymbolicRegression: AbstractPlugin, AbstractPluginState, init_member
     using Test
 
     init_count = Ref(0)
 
-    mutable struct InitMemberPluginState <: AbstractPluginState end
-    struct InitMemberOptions{O} <: AbstractOptions
-        base::O
+    struct InitMemberPlugin <: AbstractPlugin
+        calls::Base.RefValue{Int}
     end
-    Base.getproperty(o::InitMemberOptions, k::Symbol) =
-        getproperty(getfield(o, :base), k)
-    SymbolicRegression.init_plugin_state(::InitMemberOptions, datasets) =
-        InitMemberPluginState()
-    # Return nothing to fall through to gen_random_tree, but count calls
-    SymbolicRegression.init_member(::InitMemberPluginState, dataset, options) =
-        (init_count[] += 1; nothing)
+    mutable struct InitMemberPluginState <: AbstractPluginState
+        calls::Base.RefValue{Int}
+    end
 
-    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false)
-    opts = InitMemberOptions(base_opts)
+    SymbolicRegression.init_plugin_state(p::InitMemberPlugin, o, d) = InitMemberPluginState(
+        p.calls
+    )
+    # Return nothing to fall through to gen_random_tree, but count calls
+    SymbolicRegression.init_member(
+        ::InitMemberPlugin, s::InitMemberPluginState, dataset, options
+    ) = (s.calls[] += 1; nothing)
+
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        plugins=(InitMemberPlugin(init_count),),
+    )
     X = rand(Float32, 2, 30)
     y = X[1, :] .+ X[2, :]
 
@@ -114,36 +181,38 @@ end
 @testitem "Plugin interface: on_mutation_evaluated! fires with correct args" begin
     using SymbolicRegression
     import SymbolicRegression:
-        AbstractPluginState, AbstractOptions,
-        init_plugin_state, on_mutation_evaluated!
+        AbstractPlugin, AbstractPluginState, MutationEvent, on_mutation_evaluated!
     using Test
 
-    # Collect (mutation_type, accepted, before_loss, after_loss) tuples via a Channel
-    events_ch = Channel{Tuple{Symbol,Bool,Float64,Float64}}(10_000)
+    # Collect MutationEvent values via a Channel
+    events_ch = Channel{MutationEvent}(10_000)
 
+    struct MutEvalPlugin <: AbstractPlugin
+        events_ch::Channel{MutationEvent}
+    end
     mutable struct MutEvalPluginState <: AbstractPluginState
-        events_ch::Channel{Tuple{Symbol,Bool,Float64,Float64}}
+        events_ch::Channel{MutationEvent}
     end
-    struct MutEvalOptions{O} <: AbstractOptions
-        base::O
-        events_ch::Channel{Tuple{Symbol,Bool,Float64,Float64}}
-    end
-    Base.getproperty(o::MutEvalOptions, k::Symbol) =
-        k === :events_ch ? getfield(o, :events_ch) : getproperty(getfield(o, :base), k)
-    SymbolicRegression.init_plugin_state(opts::MutEvalOptions, datasets) =
-        MutEvalPluginState(opts.events_ch)
-    function SymbolicRegression.on_mutation_evaluated!(
-        state::MutEvalPluginState, mutation_type::Symbol, accepted::Bool,
-        before_loss::Float64, after_loss::Float64, dataset, opts::MutEvalOptions
+    SymbolicRegression.init_plugin_state(p::MutEvalPlugin, o, d) = MutEvalPluginState(
+        p.events_ch
     )
-        put!(state.events_ch, (mutation_type, accepted, before_loss, after_loss))
+    function SymbolicRegression.on_mutation_evaluated!(
+        ::MutEvalPlugin, state::MutEvalPluginState, event::MutationEvent, dataset, opts
+    )
+        put!(state.events_ch, event)
         return nothing
     end
 
     # maxsize=5 ensures add_node frequently hits the constraint limit,
     # producing NaN after_loss events reliably.
-    base_opts = Options(binary_operators=[+, *], populations=2, verbosity=0, progress=false, maxsize=5)
-    opts = MutEvalOptions(base_opts, events_ch)
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        maxsize=5,
+        plugins=(MutEvalPlugin(events_ch),),
+    )
     X = rand(Float32, 2, 30)
     y = X[1, :] .+ X[2, :]
 
@@ -157,24 +226,24 @@ end
 
     # All mutation types are valid Symbols (fields of MutationWeights)
     valid_mutations = Set(fieldnames(MutationWeights))
-    for (mt, acc, bl, al) in events
-        @test mt isa Symbol
-        @test mt in valid_mutations
-        @test acc isa Bool
-        @test bl isa Float64
-        @test al isa Float64
-        @test isfinite(bl)
+    for ev in events
+        @test ev isa MutationEvent
+        @test ev.mutation_type in valid_mutations
+        @test ev.accepted isa Bool
+        @test ev.before_loss isa Float64
+        @test ev.after_loss isa Float64
+        @test isfinite(ev.before_loss)
     end
 
     # Both accepted and rejected mutations should appear (over many calls)
-    @test any(acc for (_, acc, _, _) in events)
-    @test any(!acc for (_, acc, _, _) in events)
+    @test any(ev.accepted for ev in events)
+    @test any(!ev.accepted for ev in events)
 
     # Some events should have finite after_loss (valid evaluations occurred)
-    @test any(isfinite(al) for (_, _, _, al) in events)
+    @test any(isfinite(ev.after_loss) for ev in events)
 
     # Some events should have NaN after_loss (constraint failure or NaN eval)
-    @test any(isnan(al) for (_, _, _, al) in events)
+    @test any(isnan(ev.after_loss) for ev in events)
 end
 
 @testitem "Plugin interface: @extend_mutation_weights macro" begin
@@ -207,10 +276,20 @@ end
 
     # With all weight on my_mutation, it should always be sampled
     w_biased = TestWeights(;
-        mutate_constant=0.0, mutate_operator=0.0, mutate_feature=0.0,
-        swap_operands=0.0, rotate_tree=0.0, add_node=0.0, insert_node=0.0,
-        delete_node=0.0, simplify=0.0, randomize=0.0, do_nothing=0.0,
-        optimize=0.0, form_connection=0.0, break_connection=0.0,
+        mutate_constant=0.0,
+        mutate_operator=0.0,
+        mutate_feature=0.0,
+        swap_operands=0.0,
+        rotate_tree=0.0,
+        add_node=0.0,
+        insert_node=0.0,
+        delete_node=0.0,
+        simplify=0.0,
+        randomize=0.0,
+        do_nothing=0.0,
+        optimize=0.0,
+        form_connection=0.0,
+        break_connection=0.0,
         my_mutation=1.0,
     )
     @test all(sample_mutation(w_biased) === :my_mutation for _ in 1:20)

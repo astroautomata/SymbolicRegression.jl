@@ -20,8 +20,12 @@ Run with:
 
 using SymbolicRegression
 import SymbolicRegression:
-    AbstractOptions, AbstractPluginState,
-    init_plugin_state, on_mutation_evaluated!, on_population_evaluated!, on_generation_complete!
+    AbstractOptions,
+    AbstractPluginState,
+    init_plugin_state,
+    on_mutation_evaluated!,
+    on_population_evaluated!,
+    on_generation_complete!
 using Printf
 
 # ============================================================
@@ -50,10 +54,15 @@ struct AdaptiveOptions{O<:AbstractOptions} <: AbstractOptions
     log_every::Int                            # print weights every N generations
 end
 
-Base.getproperty(o::AdaptiveOptions, k::Symbol) =
-    k === :mutation_weights ? getfield(o, :adaptive_weights) :
-    k in (:adaptive_weights, :stats_channel, :smoothing, :min_weight, :log_every) ? getfield(o, k) :
-    getproperty(getfield(o, :base), k)
+function Base.getproperty(o::AdaptiveOptions, k::Symbol)
+    if k === :mutation_weights
+        getfield(o, :adaptive_weights)
+    elseif k in (:adaptive_weights, :stats_channel, :smoothing, :min_weight, :log_every)
+        getfield(o, k)
+    else
+        getproperty(getfield(o, :base), k)
+    end
+end
 
 # ============================================================
 # Step 3: Plugin state (one instance per worker + one on head)
@@ -66,8 +75,9 @@ mutable struct AdaptiveState <: AbstractPluginState
     generation::Int   # head-node generation counter (workers ignore this)
 end
 
-SymbolicRegression.init_plugin_state(opts::AdaptiveOptions, datasets) =
+function SymbolicRegression.init_plugin_state(opts::AdaptiveOptions, datasets)
     AdaptiveState(Dict(), Dict(), opts.stats_channel, 0)
+end
 
 # ============================================================
 # Step 4: Worker hook — record mean relative improvement per mutation type
@@ -79,16 +89,19 @@ SymbolicRegression.init_plugin_state(opts::AdaptiveOptions, datasets) =
 # (denominator guard).
 
 function SymbolicRegression.on_mutation_evaluated!(
-    state::AdaptiveState, mutation_type::Symbol, accepted::Bool,
-    before_loss::Float64, after_loss::Float64, dataset, opts::AdaptiveOptions
+    state::AdaptiveState,
+    event::SymbolicRegression.MutationEvent,
+    dataset,
+    opts::AdaptiveOptions,
 )
-    mutation_type === :do_nothing && return
-    mutation_type === :simplify   && return  # EMA would penalize simplify for not improving loss; skip it
-    isnan(after_loss)             && return
-    before_loss == 0.0            && return
-    signal = max(0.0, (before_loss - after_loss) / before_loss)
-    state.attempts[mutation_type] = get(state.attempts, mutation_type, 0) + 1
-    state.sum_signal[mutation_type] = get(state.sum_signal, mutation_type, 0.0) + signal
+    event.mutation_type === :do_nothing && return nothing
+    event.mutation_type === :simplify && return nothing  # EMA would penalize simplify for not improving loss; skip it
+    isnan(event.after_loss) && return nothing
+    event.before_loss == 0.0 && return nothing
+    signal = max(0.0, (event.before_loss - event.after_loss) / event.before_loss)
+    state.attempts[event.mutation_type] = get(state.attempts, event.mutation_type, 0) + 1
+    state.sum_signal[event.mutation_type] =
+        get(state.sum_signal, event.mutation_type, 0.0) + signal
     return nothing
 end
 
@@ -99,10 +112,10 @@ end
 function SymbolicRegression.on_population_evaluated!(
     state::AdaptiveState, pop, dataset, hof, opts::AdaptiveOptions
 )
-    isempty(state.attempts) && return
+    isempty(state.attempts) && return nothing
     batch = Dict(
-        k => (state.attempts[k], get(state.sum_signal, k, 0.0))
-        for k in keys(state.attempts)
+        k => (state.attempts[k], get(state.sum_signal, k, 0.0)) for
+        k in keys(state.attempts)
     )
     put!(opts.stats_channel, batch)
     empty!(state.attempts)
@@ -121,15 +134,15 @@ end
 function SymbolicRegression.on_generation_complete!(
     state::AdaptiveState, search_state, datasets, opts::AdaptiveOptions, ropt
 )
-    totals_attempts    = Dict{Symbol,Int}()
-    totals_sum_signal  = Dict{Symbol,Float64}()
+    totals_attempts = Dict{Symbol,Int}()
+    totals_sum_signal = Dict{Symbol,Float64}()
     while isready(opts.stats_channel)
         for (m, (a, s)) in take!(opts.stats_channel)
-            totals_attempts[m]   = get(totals_attempts,   m, 0)   + a
+            totals_attempts[m] = get(totals_attempts, m, 0) + a
             totals_sum_signal[m] = get(totals_sum_signal, m, 0.0) + s
         end
     end
-    isempty(totals_attempts) && return
+    isempty(totals_attempts) && return nothing
 
     w = opts.adaptive_weights
     prev = copy(w)
@@ -148,10 +161,16 @@ function SymbolicRegression.on_generation_complete!(
     # Normalize: scale observed mutations so the total weight mass stays at initial_total.
     # Unobserved mutations keep their current weights (never touched by EMA), so we subtract
     # their actual current weights — not defaults — to get the correct target for observed ones.
-    initial_total    = sum(getfield(defaults, m) for m in fieldnames(AdaptiveWeights))
-    unobserved_sum   = sum(getfield(w, m) for m in fieldnames(AdaptiveWeights) if get(totals_attempts, m, 0) == 0)
-    observed_target  = initial_total - unobserved_sum
-    observed_current = sum(getfield(w, m) for m in fieldnames(AdaptiveWeights) if get(totals_attempts, m, 0) > 0)
+    initial_total = sum(getfield(defaults, m) for m in fieldnames(AdaptiveWeights))
+    unobserved_sum = sum(
+        getfield(w, m) for
+        m in fieldnames(AdaptiveWeights) if get(totals_attempts, m, 0) == 0
+    )
+    observed_target = initial_total - unobserved_sum
+    observed_current = sum(
+        getfield(w, m) for
+        m in fieldnames(AdaptiveWeights) if get(totals_attempts, m, 0) > 0
+    )
     if observed_current > 0 && observed_target > 0
         scale = observed_target / observed_current
         for m in fieldnames(AdaptiveWeights)
@@ -162,14 +181,23 @@ function SymbolicRegression.on_generation_complete!(
 
     state.generation += 1
     if state.generation % opts.log_every == 0
-        _print_weights(opts.adaptive_weights, prev, state.generation, totals_attempts, totals_sum_signal)
+        _print_weights(
+            opts.adaptive_weights,
+            prev,
+            state.generation,
+            totals_attempts,
+            totals_sum_signal,
+        )
     end
     return nothing
 end
 
 function _print_weights(
-    w::AdaptiveWeights, prev::AdaptiveWeights, gen::Int,
-    attempts::Dict{Symbol,Int}, sum_signal::Dict{Symbol,Float64}
+    w::AdaptiveWeights,
+    prev::AdaptiveWeights,
+    gen::Int,
+    attempts::Dict{Symbol,Int},
+    sum_signal::Dict{Symbol,Float64},
 )
     defaults = AdaptiveWeights()
     println("\n--- Generation $gen: adaptive weights (mean rel. improvement → weight) ---")
@@ -191,7 +219,7 @@ end
 # ============================================================
 
 function _run_adaptive_example()
-    base = Options(
+    base = Options(;
         binary_operators=[+, *, -, /],
         unary_operators=[sin, exp],
         populations=4,
@@ -204,14 +232,16 @@ function _run_adaptive_example()
 
     # Target: y = 2x₁·sin(x₂) + x₃²
     X = rand(Float32, 3, 100)
-    y = @. 2f0 * X[1, :] * sin(X[2, :]) + X[3, :]^2
+    y = @. 2.0f0 * X[1, :] * sin(X[2, :]) + X[3, :]^2
 
     println("Running equation_search with adaptive mutation weights …")
     equation_search(X, y; options=opts, niterations=30, parallelism=:serial)
 
     # Print final weights vs defaults for comparison
     println("\n=== Final adaptive weights ===")
-    println("  (weights > default → higher mean relative improvement; near min_weight → low improvement signal)\n")
+    println(
+        "  (weights > default → higher mean relative improvement; near min_weight → low improvement signal)\n",
+    )
     defaults = AdaptiveWeights()
     @printf "  %-25s %8s  %8s\n" "mutation" "default" "adapted"
     println("  ", "-"^44)

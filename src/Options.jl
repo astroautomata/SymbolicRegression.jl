@@ -39,6 +39,7 @@ using ..OperatorsModule:
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
+using ..PluginModule: flatten_plugins, maybe_append_legacy_plugin
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -656,6 +657,7 @@ $(OPTION_DESCRIPTIONS)
     use_recorder::Bool=false,
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
+    plugins=(),
     ### Not search options; just construction options:
     define_helper_functions::Bool=true,
     #########################################
@@ -1008,6 +1010,20 @@ $(OPTION_DESCRIPTIONS)
 
     set_mutation_weights = create_mutation_weights(mutation_weights)
 
+    # Flatten `plugins` to a heterogeneous tuple — accepts a single plugin
+    # instance, a tuple/vector of plugins, or nothing (skipped). See
+    # `flatten_plugins` in src/Plugin.jl. Pattern adapted from SciMLBase's
+    # `CallbackSet`.
+    plugin_tuple = flatten_plugins(plugins)
+    # Backwards compat: legacy Options kwargs (e.g. `use_frequency_in_tournament`)
+    # are mapped to plugin instances via `_legacy_plugin_for(Val(name))`, which
+    # plugin modules overload on the kwarg symbol. If the user passes the
+    # legacy kwarg AND doesn't already have an equivalent plugin in `plugins`,
+    # we append the legacy plugin here.
+    plugin_tuple = maybe_append_legacy_plugin(
+        plugin_tuple, :use_frequency_in_tournament, use_frequency_in_tournament
+    )
+
     @assert print_precision > 0
 
     _autodiff_backend = if autodiff_backend isa Union{Nothing,AbstractADType}
@@ -1035,6 +1051,7 @@ $(OPTION_DESCRIPTIONS)
         expression_type,
         typeof(expression_options),
         typeof(set_mutation_weights),
+        typeof(plugin_tuple),
         popmember_type,
         turbo,
         bumper,
@@ -1110,6 +1127,7 @@ $(OPTION_DESCRIPTIONS)
         define_helper_functions,
         use_recorder,
         popmember_type,
+        plugin_tuple,
     )
 
     return options

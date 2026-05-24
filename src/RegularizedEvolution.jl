@@ -2,7 +2,13 @@ module RegularizedEvolutionModule
 
 using DynamicExpressions: string_tree
 using ..CoreModule:
-    AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE, AbstractPluginState, NoPluginState
+    AbstractOptions,
+    Dataset,
+    RecordType,
+    DATA_TYPE,
+    LOSS_TYPE,
+    AbstractPluginState,
+    NoPluginState
 using ..PopulationModule: Population, best_of_sample
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..MutateModule: next_generation, crossover_generation
@@ -19,14 +25,14 @@ function reg_evol_cycle(
     running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions,
     record::RecordType;
-    plugin_state::AbstractPluginState=NoPluginState(),
+    plugin_states::Tuple=(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,P<:Population{T,L}}
     num_evals = 0.0
     n_evol_cycles = ceil(Int, pop.n / options.tournament_selection_n)
 
     for i in 1:n_evol_cycles
         if rand() > options.crossover_probability
-            allstar = best_of_sample(pop, running_search_statistics, options)
+            allstar = best_of_sample(pop, running_search_statistics, options; plugin_states)
             mutation_recorder = RecordType()
             baby, mutation_accepted, tmp_num_evals = next_generation(
                 dataset,
@@ -36,7 +42,7 @@ function reg_evol_cycle(
                 running_search_statistics,
                 options;
                 tmp_recorder=mutation_recorder,
-                plugin_state,
+                plugin_states,
             )
             num_evals += tmp_num_evals
 
@@ -80,8 +86,12 @@ function reg_evol_cycle(
             pop.members[oldest] = baby
 
         else # Crossover
-            allstar1 = best_of_sample(pop, running_search_statistics, options)
-            allstar2 = best_of_sample(pop, running_search_statistics, options)
+            allstar1 = best_of_sample(
+                pop, running_search_statistics, options; plugin_states
+            )
+            allstar2 = best_of_sample(
+                pop, running_search_statistics, options; plugin_states
+            )
 
             crossover_recorder = RecordType()
             baby1, baby2, crossover_accepted, tmp_num_evals = crossover_generation(

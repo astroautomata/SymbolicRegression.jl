@@ -18,8 +18,11 @@ Run with:
 
 using SymbolicRegression
 import SymbolicRegression:
-    AbstractOptions, AbstractPluginState,
-    init_plugin_state, on_population_evaluated!, on_search_end!
+    AbstractOptions,
+    AbstractPluginState,
+    init_plugin_state,
+    on_population_evaluated!,
+    on_search_end!
 using DynamicExpressions: get_tree
 
 # ============================================================
@@ -35,9 +38,9 @@ struct OpStatsOptions{O<:AbstractOptions} <: AbstractOptions
     op_channel::Channel{Dict{String,Int}}
 end
 
-Base.getproperty(o::OpStatsOptions, k::Symbol) =
-    k === :op_channel ? getfield(o, :op_channel) :
-    getproperty(getfield(o, :base), k)
+function Base.getproperty(o::OpStatsOptions, k::Symbol)
+    k === :op_channel ? getfield(o, :op_channel) : getproperty(getfield(o, :base), k)
+end
 
 # ============================================================
 # Step 2: Plugin state (one instance per worker + one on head)
@@ -50,8 +53,9 @@ mutable struct OpStatsState <: AbstractPluginState
     op_channel::Channel{Dict{String,Int}}
 end
 
-SymbolicRegression.init_plugin_state(opts::OpStatsOptions, datasets) =
+function SymbolicRegression.init_plugin_state(opts::OpStatsOptions, datasets)
     OpStatsState(opts.op_channel)
+end
 
 # ============================================================
 # Step 3: Worker hook — count operators after each cycle
@@ -71,7 +75,7 @@ end
 # (tree_mapreduce is designed for functional aggregation; a simple
 # recursive walk is clearer for side-effectful counting.)
 function _count_ops!(counts::Dict{String,Int}, node, opts)
-    node.degree == 0 && return
+    node.degree == 0 && return nothing
     name = if node.degree == 1
         string(opts.operators.unaops[node.op])
     else
@@ -105,12 +109,12 @@ end
 # Step 5: Run equation_search with the plugin options
 # ============================================================
 
-base = Options(binary_operators=[+, *, -], unary_operators=[sin])
+base = Options(; binary_operators=[+, *, -], unary_operators=[sin])
 channel = Channel{Dict{String,Int}}(Inf)
 opts = OpStatsOptions(base, channel)
 
 # Target: y = 2x₁·sin(x₂) + x₃
 X = rand(Float32, 3, 100)
-y = @. 2f0 * X[1, :] * sin(X[2, :]) + X[3, :]
+y = @. 2.0f0 * X[1, :] * sin(X[2, :]) + X[3, :]
 
 equation_search(X, y; options=opts, niterations=10, parallelism=:serial)

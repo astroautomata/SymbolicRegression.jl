@@ -12,7 +12,9 @@ using ..CoreModule:
     LOSS_TYPE,
     AbstractPluginState,
     NoPluginState,
-    init_member
+    init_member,
+    invoke_init_member,
+    tournament_cost_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, update_baseline_loss!
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
@@ -38,20 +40,25 @@ function Population(pop::Vector{<:AbstractPopMember})
 end
 
 """
-    _init_tree(plugin_state, dataset, options, nlength, nfeatures, ::Type{T})
+    _init_tree(plugin_states, dataset, options, nlength, nfeatures, ::Type{T})
 
-Initialize a tree for a new population member. If `init_member` returns
-a non-nothing expression, use that. Otherwise, fall back to `gen_random_tree`.
+Initialize a tree for a new population member. Walks `options.plugins` in
+order via [`invoke_init_member`](@ref); the first plugin that returns a
+non-`nothing` expression wins. If all plugins return `nothing` (the common
+case — no plugin overrides `init_member`), falls back to `gen_random_tree`.
+
+A dedicated `()` overload for the empty `plugin_states` tuple keeps the
+no-plugin path fully type-stable (no `Union{Nothing, Expression}` widening).
 """
 function _init_tree(
-    plugin_state::AbstractPluginState,
-    dataset,
-    options,
-    nlength::Int,
-    nfeatures::Int,
-    ::Type{T},
+    ::Tuple{}, dataset, options, nlength::Int, nfeatures::Int, ::Type{T}
 ) where {T}
-    candidate = init_member(plugin_state, dataset, options)
+    return gen_random_tree(nlength, options, nfeatures, T)
+end
+@unstable function _init_tree(
+    plugin_states::Tuple, dataset, options, nlength::Int, nfeatures::Int, ::Type{T}
+) where {T}
+    candidate = invoke_init_member(options.plugins, plugin_states, dataset, options)
     return if isnothing(candidate)
         gen_random_tree(nlength, options, nfeatures, T)
     else
@@ -62,7 +69,7 @@ end
 """
     Population(dataset::Dataset{T,L};
                population_size, nlength::Int=3, options::AbstractOptions,
-               nfeatures::Int, plugin_state=NoPluginState())
+               nfeatures::Int, plugin_states=())
 
 Create random population and evaluate them on the dataset.
 """
@@ -73,7 +80,7 @@ function Population(
     nlength::Int=3,
     nfeatures::Int,
     npop=nothing,
-    plugin_state::AbstractPluginState=NoPluginState(),
+    plugin_states::Tuple=(),
 ) where {T,L}
     @assert (population_size !== nothing) ⊻ (npop !== nothing)
     population_size = something(population_size, npop)
@@ -82,7 +89,7 @@ function Population(
     # Create first member to get concrete type
     first_member = constructorof(PM)(
         dataset,
-        _init_tree(plugin_state, dataset, options, nlength, nfeatures, T),
+        _init_tree(plugin_states, dataset, options, nlength, nfeatures, T),
         options;
         parent=-1,
         deterministic=options.deterministic,
@@ -95,7 +102,7 @@ function Population(
         else
             constructorof(PM)(
                 dataset,
-                _init_tree(plugin_state, dataset, options, nlength, nfeatures, T),
+                _init_tree(plugin_states, dataset, options, nlength, nfeatures, T),
                 options;
                 parent=-1,
                 deterministic=options.deterministic,
@@ -155,37 +162,37 @@ end
 function best_of_sample(
     pop::Population{T,L,N},
     running_search_statistics::RunningSearchStatistics,
-    options::AbstractOptions,
+    options::AbstractOptions;
+    plugin_states::Tuple=(),
 ) where {T,L,N}
     sample = sample_pop(pop, options)
-    return copy(_best_of_sample(sample.members, running_search_statistics, options))
+    return copy(
+        _best_of_sample(sample.members, running_search_statistics, options; plugin_states)
+    )
 end
 function _best_of_sample(
     members::Vector{P},
     running_search_statistics::RunningSearchStatistics,
-    options::AbstractOptions,
+    options::AbstractOptions;
+    plugin_states::Tuple=(),
 ) where {T,L,N,P<:AbstractPopMember{T,L,N}}
     p = options.tournament_selection_p
     n = length(members)  # == tournament_selection_n
+    # Adjusted cost = member.cost * ∏ plugin multipliers. Plugins that don't
+    # override `tournament_cost_multiplier` return 1.0 (no-op). The empty-
+    # tuple loop unrolls to nothing when no plugins are active.
     adjusted_costs = Vector{L}(undef, n)
-    if options.use_frequency_in_tournament
-        # Score based on frequency of that size occurring.
-        # In the end, all sizes should be just as common in the population.
-        adaptive_parsimony_scaling = L(options.adaptive_parsimony_scaling)
-        # e.g., for 100% occupied at one size, exp(-20*1) = 2.061153622438558e-9; which seems like a good punishment for dominating the population.
-
-        for i in 1:n
-            member = members[i]
-            size = compute_complexity(member, options)
-            frequency = if (0 < size <= options.maxsize)
-                L(running_search_statistics.normalized_frequencies[size])
-            else
-                L(0)
-            end
-            adjusted_costs[i] = member.cost * exp(adaptive_parsimony_scaling * frequency)
+    for i in 1:n
+        member = members[i]
+        cost = L(member.cost)
+        for (plugin, pstate) in zip(options.plugins, plugin_states)
+            cost *= L(
+                tournament_cost_multiplier(
+                    plugin, pstate, member, running_search_statistics, options
+                ),
+            )
         end
-    else
-        map!(_get_cost, adjusted_costs, members)
+        adjusted_costs[i] = cost
     end
 
     chosen_idx = if p == 1.0

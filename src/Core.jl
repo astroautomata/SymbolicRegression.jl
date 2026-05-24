@@ -9,9 +9,9 @@ include("MutationWeights.jl")
 include("OptionsStruct.jl")
 include("Operators.jl")
 include("ExpressionSpec.jl")
+include("Plugin.jl")          # before Options so Options can use flatten_plugins
 include("Options.jl")
 include("InterfaceDataTypes.jl")
-include("Plugin.jl")
 
 using .ProgramConstantsModule: RecordType, DATA_TYPE, LOSS_TYPE
 using .DatasetModule:
@@ -74,14 +74,22 @@ using .ExpressionSpecModule:
     get_node_type
 using .InterfaceDataTypesModule: init_value, sample_value, mutate_value
 using .PluginModule:
+    AbstractPlugin,
     AbstractPluginState,
     NoPluginState,
+    MutationEvent,
     init_plugin_state,
+    init_plugin_states,
     on_search_start!,
     on_search_end!,
     on_generation_complete!,
     on_population_evaluated!,
     on_mutation_evaluated!,
-    init_member
+    init_member,
+    tournament_cost_multiplier,
+    flatten_plugins,
+    invoke_init_member,
+    _legacy_plugin_for,
+    maybe_append_legacy_plugin
 
 end

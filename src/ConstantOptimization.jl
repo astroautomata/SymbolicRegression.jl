@@ -44,8 +44,9 @@ returned by [`get_optimizable_parameters`](@ref).
 
 By default this forwards to `set_scalar_constants!`.
 """
-set_optimizable_parameters!(ex::AbstractExpression, x, refs) =
+function set_optimizable_parameters!(ex::AbstractExpression, x, refs)
     set_scalar_constants!(ex, x, refs)
+end
 
 """
     extract_optimizable_gradient(grad, ex)

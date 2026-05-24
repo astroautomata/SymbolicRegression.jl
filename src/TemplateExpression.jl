@@ -496,9 +496,11 @@ function CO.extract_optimizable_gradient(grad, ex::TemplateExpression{T}) where 
     else
         ()
     end
-    return isempty(inner_grad) && isempty(parameter_pieces) ?
-           T[] :
-           vcat(inner_grad..., parameter_pieces...)
+    return if isempty(inner_grad) && isempty(parameter_pieces)
+        T[]
+    else
+        vcat(inner_grad..., parameter_pieces...)
+    end
 end
 
 Base.@kwdef struct PreallocatedTemplateExpression{A,B}
@@ -556,7 +558,32 @@ function DE.get_tree(ex::TemplateExpression{<:Any,<:Any,<:Any,E}) where {E}
     )
 end
 
-@unstable function EB.create_expression(
+# `Core._typeof_captured_variable` stores a `Type{X}` capture as the abstract
+# `DataType`. Routing the inner-expression construction through `::Type{IET}`
+# dispatch keeps IET as a static parameter inside the helper, so its
+# `ntuple(...)` closure sees a concrete IET.
+@inline function _build_inner_template_expressions(
+    ::Type{IET},
+    t,
+    operators,
+    variable_names,
+    eval_options,
+    inner_expression_options::NamedTuple,
+    ::Val{N},
+) where {IET,N}
+    return ntuple(
+        _ -> IET(
+            copy(t);
+            operators,
+            variable_names,
+            eval_options,
+            inner_expression_options...,
+        ),
+        Val(N),
+    )
+end
+
+function EB.create_expression(
     t::AbstractExpressionNode{T},
     options::AbstractOptions,
     dataset::Dataset{T,L},
@@ -565,25 +592,23 @@ end
     (::Val{embed})=Val(false),
 ) where {T,L,embed,E<:TemplateExpression}
     function_keys = get_function_keys(options.expression_options.structure)
-    inner_expression_type = if hasproperty(options.expression_options, :inner_expression_type)
-        options.expression_options.inner_expression_type
-    else
-        ComposableExpression
-    end
-    inner_expression_options = if hasproperty(options.expression_options, :inner_expression_options)
-        options.expression_options.inner_expression_options
-    else
-        NamedTuple()
-    end
+    inner_expression_type = options.expression_options.inner_expression_type
+    inner_expression_options = options.expression_options.inner_expression_options
 
-    # NOTE: We need to copy over the operators so we can call the structure function
     operators = options.operators
     variable_names = embed ? dataset.variable_names : nothing
     eval_options = EvalOptions(; turbo=options.turbo, bumper=options.bumper)
-    inner_expressions = ntuple(
-        _ -> inner_expression_type(
-            copy(t); operators, variable_names, eval_options, inner_expression_options...
-        ),
+    # Build the inner-expression tuple via a `::Type{IET}` dispatch barrier so
+    # that the inner expression type is bound as a `where`-variable inside the
+    # closure body, not captured as a runtime `Type` value (which Julia stores
+    # as the abstract `DataType` in closure fields, killing inference).
+    inner_expressions = _build_inner_template_expressions(
+        inner_expression_type,
+        t,
+        operators,
+        variable_names,
+        eval_options,
+        inner_expression_options,
         Val(length(function_keys)),
     )
     # TODO: Generalize to other inner expression types
@@ -1039,21 +1064,56 @@ end
 
 (Experimental) Specification for template expressions with pre-defined structure.
 """
-Base.@kwdef struct TemplateExpressionSpec{
-    ST<:TemplateStructure,IET<:Type,IEO<:NamedTuple
-} <: AbstractExpressionSpec
+struct TemplateExpressionSpec{ST<:TemplateStructure,IET,IEO<:NamedTuple} <:
+       AbstractExpressionSpec
     structure::ST
-    inner_expression_type::IET = ComposableExpression
-    inner_expression_options::IEO = NamedTuple()
+    inner_expression_type::Type{IET}
+    inner_expression_options::IEO
+    function TemplateExpressionSpec{ST,IET,IEO}(
+        structure, inner_expression_type, inner_expression_options
+    ) where {ST<:TemplateStructure,IET,IEO<:NamedTuple}
+        return new{ST,IET,IEO}(structure, inner_expression_type, inner_expression_options)
+    end
+end
+# Positional constructor — `::Type{IET}` binds IET from the value, and Julia
+# positional defaults DO propagate the binding (unlike kwarg defaults).
+function TemplateExpressionSpec(
+    structure::TemplateStructure,
+    (::Type{IET})=ComposableExpression,
+    inner_expression_options::NamedTuple=NamedTuple(),
+) where {IET}
+    return TemplateExpressionSpec{typeof(structure),IET,typeof(inner_expression_options)}(
+        structure, IET, inner_expression_options
+    )
+end
+# Keyword-friendly form forwarding to positional. Marked `@unstable` to match
+# `Options(; ...)` — the user-facing kwarg constructor pattern in this
+# codebase. Kwarg defaults don't bind `where`-variables so the kwarg method's
+# inferred return is `TemplateExpressionSpec{..., _A, ...} where _A`, but
+# downstream consumers (which call the positional `::Type{IET}` method via
+# `@template_spec` or via this method's body at runtime) see a concrete
+# `Type{IET}`, so the cascade through `create_expression`,
+# `infer_popmember_type`, and `SearchState` remains type-stable.
+@unstable function TemplateExpressionSpec(;
+    structure::TemplateStructure,
+    inner_expression_type::Type=ComposableExpression,
+    inner_expression_options::NamedTuple=NamedTuple(),
+)
+    return TemplateExpressionSpec(
+        structure, inner_expression_type, inner_expression_options
+    )
 end
 
 # COV_EXCL_START
 ES.get_expression_type(::TemplateExpressionSpec) = TemplateExpression
-ES.get_expression_options(spec::TemplateExpressionSpec) = (;
-    structure=spec.structure,
-    inner_expression_type=spec.inner_expression_type,
-    inner_expression_options=spec.inner_expression_options,
-)
+function ES.get_expression_options(
+    spec::TemplateExpressionSpec{ST,IET,IEO}
+) where {ST,IET,IEO}
+    return NamedTuple{
+        (:structure, :inner_expression_type, :inner_expression_options),
+        Tuple{ST,Type{IET},IEO},
+    }((spec.structure, spec.inner_expression_type, spec.inner_expression_options))
+end
 ES.get_node_type(::TemplateExpressionSpec) = Node
 # COV_EXCL_STOP
 
@@ -1127,16 +1187,18 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
     else
         NamedTuple()
     end
-    inner_expression_type = if hasproperty(actual_expression_options, :inner_expression_type)
-        actual_expression_options.inner_expression_type
-    else
-        ComposableExpression
-    end
-    inner_expression_options = if hasproperty(actual_expression_options, :inner_expression_options)
-        actual_expression_options.inner_expression_options
-    else
-        NamedTuple()
-    end
+    inner_expression_type =
+        if hasproperty(actual_expression_options, :inner_expression_type)
+            actual_expression_options.inner_expression_type
+        else
+            ComposableExpression
+        end
+    inner_expression_options =
+        if hasproperty(actual_expression_options, :inner_expression_options)
+            actual_expression_options.inner_expression_options
+        else
+            NamedTuple()
+        end
 
     inner_expressions = NamedTuple{keys(ex)}(
         map(values(ex)) do expr_str

@@ -115,6 +115,16 @@ end
         ...
     end
 
+!!! warning "Deprecated"
+    `@extend_mutation_weights` is scheduled for removal. A forthcoming
+    release replaces the `MutationWeights`-field/`Symbol`-dispatch model
+    with first-class `AbstractMutation` singletons and a
+    `mutations = (MyMutation() => weight, ...)` kwarg on `Options`. The
+    new interface lets you add a mutation by defining a singleton and a
+    `mutate!(::MyMutation, ...)` method, without subtyping
+    `AbstractMutationWeights` or invoking any macro. Existing uses of
+    `@extend_mutation_weights` continue to work in this release.
+
 Define a new `AbstractMutationWeights` subtype with all standard
 [`MutationWeights`](@ref) fields (with their default values) pre-populated,
 plus any extra fields you declare in the block.
@@ -161,8 +171,7 @@ macro extend_mutation_weights(name, block)
     std_names = fieldnames(MutationWeights)
     defaults = MutationWeights()
     std_fields = [
-        Expr(:(=), Expr(:(::), f, :Float64), getfield(defaults, f))
-        for f in std_names
+        Expr(:(=), Expr(:(::), f, :Float64), getfield(defaults, f)) for f in std_names
     ]
     extra_fields = filter(e -> !(e isa LineNumberNode), block.args)
     # Validate that every extra field is annotated ::Float64.

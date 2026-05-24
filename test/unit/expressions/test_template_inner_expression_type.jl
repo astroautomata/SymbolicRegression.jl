@@ -1,5 +1,14 @@
 @testitem "TemplateExpressionSpec supports custom inner expression types" begin
-    using DynamicExpressions: DynamicExpressions, AbstractExpressionNode, AbstractOperatorEnum, EvalOptions, Metadata, Node, OperatorEnum, get_contents, get_metadata
+    using DynamicExpressions:
+        DynamicExpressions,
+        AbstractExpressionNode,
+        AbstractOperatorEnum,
+        EvalOptions,
+        Metadata,
+        Node,
+        OperatorEnum,
+        get_contents,
+        get_metadata
     using SymbolicRegression
     using SymbolicRegression: AbstractComposableExpression
     using SymbolicRegression.ExpressionBuilderModule: create_expression
@@ -17,7 +26,9 @@
         eval_options::Union{EvalOptions,Nothing}=nothing,
         tag::Symbol=:wrapped,
     ) where {T}
-        return WrappedExpression(tree, Metadata((; operators, variable_names, eval_options, tag)))
+        return WrappedExpression(
+            tree, Metadata((; operators, variable_names, eval_options, tag))
+        )
     end
 
     DynamicExpressions.constructorof(::Type{<:WrappedExpression}) = WrappedExpression

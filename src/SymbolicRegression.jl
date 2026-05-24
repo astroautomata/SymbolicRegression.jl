@@ -8,6 +8,7 @@ export Population,
     OperatorEnum,
     Dataset,
     MutationWeights,
+    FrequencyWeightedTournamentPlugin,
     Node,
     GraphNode,
     ParametricNode,
@@ -184,9 +185,11 @@ using Compat: @compat, Fix
         AbstractComposableExpression,
         optimize_constants, get_optimizable_parameters,
         set_optimizable_parameters!, extract_optimizable_gradient,
-        AbstractPluginState, NoPluginState,
-        init_plugin_state, on_search_start!, on_search_end!,
-        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member
+        AbstractPlugin, AbstractPluginState, NoPluginState, MutationEvent,
+        init_plugin_state, init_plugin_states,
+        on_search_start!, on_search_end!,
+        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member,
+        tournament_cost_multiplier,
     )
 )
 #! format: on
@@ -208,7 +211,7 @@ catch
     VersionNumber(0, 0, 0)
 end
 
-using DispatchDoctor: @stable
+using DispatchDoctor: @stable, @unstable
 
 @stable default_mode = "disable" begin
     include("Utils.jl")
@@ -239,6 +242,7 @@ using DispatchDoctor: @stable
     include("TemplateExpression.jl")
     include("TemplateExpressionMacro.jl")
     include("ParametricExpression.jl")
+    include("plugins/FrequencyWeightedTournament.jl")
 
     __dispatch_doctor_unsable_test() = Val(rand(1:10))
 end
@@ -298,15 +302,20 @@ using .CoreModule:
     atanh_clip,
     create_expression,
     has_units,
+    AbstractPlugin,
     AbstractPluginState,
     NoPluginState,
+    MutationEvent,
     init_plugin_state,
+    init_plugin_states,
     on_search_start!,
     on_search_end!,
     on_generation_complete!,
     on_population_evaluated!,
     on_mutation_evaluated!,
-    init_member
+    init_member,
+    invoke_init_member,
+    tournament_cost_multiplier
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity
 using .CheckConstraintsModule: check_constraints
@@ -379,6 +388,7 @@ using .ComposableExpressionModule:
 using .ExpressionBuilderModule: embed_metadata, strip_metadata
 using .ParametricExpressionModule: ParametricExpressionSpec
 using .TemplateExpressionMacroModule: @template_spec
+using .FrequencyWeightedTournamentModule: FrequencyWeightedTournamentPlugin
 
 @stable default_mode = "disable" begin
     include("deprecates.jl")
@@ -724,9 +734,10 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    plugin_state = init_plugin_state(options, datasets)
+    # One state instance per plugin, allocated on the head node.
+    plugin_states = init_plugin_states(options.plugins, options, datasets)
 
-    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType}(;
+    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,typeof(plugin_states)}(;
         procs=procs,
         we_created_procs=we_created_procs,
         worker_output=worker_output,
@@ -744,7 +755,7 @@ end
         stdin_reader=stdin_reader,
         record=Ref(record),
         seed_members=seed_members,
-        plugin_state=plugin_state,
+        plugin_states=plugin_states,
     )
 end
 function _initialize_search!(
@@ -812,33 +823,35 @@ function _initialize_search!(
                 if saved_pop !== nothing && ropt.verbosity > 0
                     @warn "Recreating population (output=$(j), population=$(i)), as the saved one doesn't have the correct number of members."
                 end
-                let _plugin_state = state.plugin_state,
-                    _dataset = datasets[j]
-                @sr_spawner(
-                    begin
-                        (
-                            Population(
-                                _dataset;
-                                population_size=options.population_size,
-                                nlength=3,
-                                options=options,
-                                nfeatures=max_features(_dataset, options),
-                                plugin_state=_plugin_state,
-                            ),
-                            HallOfFame(options, _dataset),
-                            RecordType(),
-                            Float64(options.population_size),
-                        )
-                    end,
-                    parallelism = ropt.parallelism,
-                    worker_idx = worker_idx
-                )
-                end  # let _plugin_state, _dataset
+                let _plugin_states = state.plugin_states, _dataset = datasets[j]
+                    @sr_spawner(
+                        begin
+                            (
+                                Population(
+                                    _dataset;
+                                    population_size=options.population_size,
+                                    nlength=3,
+                                    options=options,
+                                    nfeatures=max_features(_dataset, options),
+                                    plugin_states=_plugin_states,
+                                ),
+                                HallOfFame(options, _dataset),
+                                RecordType(),
+                                Float64(options.population_size),
+                            )
+                        end,
+                        parallelism = ropt.parallelism,
+                        worker_idx = worker_idx
+                    )
+                end  # let _plugin_states, _dataset
                 # This involves population_size evaluations, on the full dataset:
             end
         push!(state.worker_output[j], new_pop)
     end
-    on_search_start!(state.plugin_state, datasets, options, ropt)
+    # Fire `on_search_start!` for each active plugin in tuple order.
+    for (plugin, pstate) in zip(options.plugins, state.plugin_states)
+        on_search_start!(plugin, pstate, datasets, options, ropt)
+    end
     return nothing
 end
 
@@ -892,11 +905,14 @@ function _warmup_search!(
         PM = popmember_type(PopType)
         HallType = HallOfFame{T,L,N,PM}
 
-        # Use a pre-populated NoPluginState ref so that init_plugin_state is not
-        # called during warmup — worker state is initialized lazily on the first
-        # real iteration in _main_search_loop!. (nothing would trigger lazy init;
+        # Use a pre-populated tuple of NoPluginState refs so that
+        # init_plugin_states is not called during warmup — worker states are
+        # initialized lazily on the first real iteration in _main_search_loop!.
+        # (`nothing` would trigger lazy init; an already-populated tuple of
         # NoPluginState() suppresses it intentionally.)
-        c_plugin_state_ref = Ref{Union{Nothing,AbstractPluginState}}(NoPluginState())
+        c_plugin_states_ref = Ref{Union{Nothing,Tuple}}(
+            ntuple(_ -> NoPluginState(), length(options.plugins))
+        )
         updated_pop = @sr_spawner(
             begin
                 in_pop = first(extract_from_worker(last_pop, PopType, HallType))
@@ -910,7 +926,7 @@ function _warmup_search!(
                     ropt.verbosity,
                     cur_maxsize,
                     running_search_statistics=c_rss,
-                    plugin_state_ref=c_plugin_state_ref,
+                    plugin_states_ref=c_plugin_states_ref,
                 )::DefaultWorkerOutputType{Population{T,L,N},HallOfFame{T,L,N}}
             end,
             parallelism = ropt.parallelism,
@@ -929,10 +945,12 @@ function _main_search_loop!(
     ropt.verbosity > 0 && @info "Started!"
     nout = length(datasets)
 
-    # Allocate per-(output, population) worker plugin state refs outside the loop
-    # so state persists across iterations (important for multithreading mode).
-    worker_plugin_state_refs = [
-        [Ref{Union{Nothing,AbstractPluginState}}(nothing) for i in 1:(options.populations)] for
+    # Allocate per-(output, population) worker plugin-states refs outside the
+    # loop so state persists across iterations (important for multithreading
+    # mode). Each ref holds either `nothing` (will lazy-init via
+    # `init_plugin_states` on first iteration) or a tuple of per-plugin states.
+    worker_plugin_states_refs = [
+        [Ref{Union{Nothing,Tuple}}(nothing) for i in 1:(options.populations)] for
         j in 1:nout
     ]
 
@@ -1052,7 +1070,10 @@ function _main_search_loop!(
             end
             ###################################################################
 
-            on_generation_complete!(state.plugin_state, state, datasets, options, ropt)
+            # Fire `on_generation_complete!` for each plugin in tuple order.
+            for (plugin, pstate) in zip(options.plugins, state.plugin_states)
+                on_generation_complete!(plugin, pstate, state, datasets, options, ropt)
+            end
 
             state.cycles_remaining[j] -= 1
             if state.cycles_remaining[j] == 0
@@ -1074,7 +1095,7 @@ function _main_search_loop!(
 
             c_rss = deepcopy(state.all_running_search_statistics[j])
             in_pop = copy(cur_pop::Population{T,L,N})
-            c_plugin_state_ref = worker_plugin_state_refs[j][i]
+            c_plugin_states_ref = worker_plugin_states_refs[j][i]
             state.worker_output[j][i] = @sr_spawner(
                 begin
                     _dispatch_s_r_cycle(
@@ -1087,7 +1108,7 @@ function _main_search_loop!(
                         ropt.verbosity,
                         cur_maxsize,
                         running_search_statistics=c_rss,
-                        plugin_state_ref=c_plugin_state_ref,
+                        plugin_states_ref=c_plugin_states_ref,
                     )
                 end,
                 parallelism = ropt.parallelism,
@@ -1200,7 +1221,10 @@ function _tear_down!(
             wait(state.worker_output[j][i])
         end
     end
-    on_search_end!(state.plugin_state, state, datasets, options, ropt)
+    # Fire `on_search_end!` for each plugin in tuple order.
+    for (plugin, pstate) in zip(options.plugins, state.plugin_states)
+        on_search_end!(plugin, pstate, state, datasets, options, ropt)
+    end
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
 end
@@ -1233,13 +1257,14 @@ end
     verbosity,
     cur_maxsize::Int,
     running_search_statistics,
-    plugin_state_ref::Ref{Union{Nothing,AbstractPluginState}}=Ref{Union{Nothing,AbstractPluginState}}(nothing),
+    plugin_states_ref::Ref{Union{Nothing,Tuple}}=Ref{Union{Nothing,Tuple}}(nothing),
 ) where {T,L,N}
-    # Lazily initialize per-worker plugin state on first call
-    if isnothing(plugin_state_ref[])
-        plugin_state_ref[] = init_plugin_state(options, (dataset,))
+    # Lazily initialize per-worker plugin states on first call. Returns a tuple
+    # aligned with `options.plugins`.
+    if isnothing(plugin_states_ref[])
+        plugin_states_ref[] = init_plugin_states(options.plugins, options, (dataset,))
     end
-    worker_plugin_state = plugin_state_ref[]::AbstractPluginState
+    worker_plugin_states = plugin_states_ref[]::Tuple
 
     record = RecordType()
     @recorder record["out$(out)_pop$(pop)"] = RecordType(
@@ -1256,7 +1281,7 @@ end
         verbosity=verbosity,
         options=options,
         record=record,
-        plugin_state=worker_plugin_state,
+        plugin_states=worker_plugin_states,
     )
     num_evals += evals_from_cycle
     out_pop, evals_from_optimize = optimize_and_simplify_population(
@@ -1273,7 +1298,10 @@ end
             end
         end
     end
-    on_population_evaluated!(worker_plugin_state, out_pop, dataset, best_seen, options)
+    # Fire `on_population_evaluated!` for each plugin in tuple order.
+    for (plugin, pstate) in zip(options.plugins, worker_plugin_states)
+        on_population_evaluated!(plugin, pstate, out_pop, dataset, best_seen, options)
+    end
     return (out_pop, best_seen, record, num_evals)
 end
 function _info_dump(

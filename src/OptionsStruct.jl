@@ -183,6 +183,7 @@ struct Options{
     E<:AbstractExpression,
     EO<:NamedTuple,
     MW<:AbstractMutationWeights,
+    PT<:Tuple,
     PM,
     _turbo,
     _bumper,
@@ -258,6 +259,7 @@ struct Options{
     define_helper_functions::Bool
     use_recorder::Bool
     popmember_type::Type{PM}
+    plugins::PT
 end
 
 function Base.print(io::IO, @nospecialize(options::Options))
@@ -270,7 +272,7 @@ function Base.print(io::IO, @nospecialize(options::Options))
         join(
             [
                 if fieldname in
-                    (:optimizer_algorithm, :optimizer_options, :mutation_weights)
+                    (:optimizer_algorithm, :optimizer_options, :mutation_weights, :plugins)
                     "$(fieldname)=..."
                 else
                     "$(fieldname)=$(getfield(options, fieldname))"

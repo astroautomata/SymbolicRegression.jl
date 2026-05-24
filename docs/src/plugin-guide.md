@@ -1,6 +1,12 @@
 # Plugin Development Guide
 
-> **Experimental**: The plugin interface is experimental. Design may change until validated by multiple plugin packages.
+!!! warning "Experimental — not for external dependencies"
+    The plugin interface is experimental. Hook signatures, the
+    [`MutationEvent`](@ref) layout, and the `AbstractPluginState` /
+    `init_plugin_state` contract may change in minor releases until the
+    design has been validated by multiple in-tree plugins. External packages
+    should not depend on this surface yet — pin a specific
+    `SymbolicRegression.jl` version or vendor the relevant code.
 
 SymbolicRegression.jl provides two complementary layers of extension. This guide walks through both, when to use each, and how to combine them for real-world plugins.
 
@@ -14,6 +20,31 @@ SymbolicRegression.jl provides two complementary layers of extension. This guide
 | **Layer 2** | Lifecycle hooks + per-worker `AbstractPluginState` | Cross-generation state, concept databases, logging, steering     |
 
 These layers are independent and composable — most plugins will use both.
+
+---
+
+## Current Limitations
+
+The plugin interface is observation- and configuration-only. In particular,
+the following deliberate gaps exist; file an issue with a concrete use case
+if you need any of them lifted:
+
+- **Hooks cannot influence the engine's accept/reject decisions.**
+  `on_mutation_evaluated!` fires *after* `next_generation` has already made
+  its call. There is no hook that lets a plugin request a retry, override a
+  rejection, or veto an accepted mutation. Knobs like a fixed mutation-retry
+  count belong on `Options`, not in a plugin.
+- **Channel-based aggregation is process-local.** The patterns demonstrated
+  in `examples/plugin_adaptive_weights.jl` use `Channel{T}`, which only
+  works within a single process — so they support `:serial` and
+  `:multithreading` but not `:multiprocessing`. Use `RemoteChannel` if you
+  need multi-process aggregation.
+- **Extending hooks requires `import`, not `using`.** Julia only treats a
+  method as extending an existing generic function if the name was brought
+  in via `import`. If you write `using SymbolicRegression:
+  on_mutation_evaluated!` and then define a new method, you will get
+  `function ... must be explicitly imported to be extended`. Always
+  `import SymbolicRegression: on_mutation_evaluated!`, etc.
 
 ---
 

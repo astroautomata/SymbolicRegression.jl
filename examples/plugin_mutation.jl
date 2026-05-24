@@ -43,8 +43,8 @@ end
 
 # Forward all property accesses to base, except our own fields
 function Base.getproperty(o::PerturbOptions, k::Symbol)
-    k === :perturb_strength  && return getfield(o, :perturb_strength)
-    k === :mutation_weights  && return getfield(o, :mutation_weights)
+    k === :perturb_strength && return getfield(o, :perturb_strength)
+    k === :mutation_weights && return getfield(o, :mutation_weights)
     return getproperty(getfield(o, :base), k)
 end
 
@@ -59,7 +59,7 @@ function mutate!(
     weights::PerturbWeights,
     opts::PerturbOptions;
     kws...,
-) where {N<:AbstractExpression, P<:AbstractPopMember}
+) where {N<:AbstractExpression,P<:AbstractPopMember}
     x, refs = get_scalar_constants(tree)
     if isempty(x)
         # No constants to perturb — return tree unchanged
@@ -74,11 +74,11 @@ end
 # Step 4: Run equation_search with the custom options
 # ============================================================
 
-base = Options(binary_operators=[+, *, -], unary_operators=[sin])
+base = Options(; binary_operators=[+, *, -], unary_operators=[sin])
 opts = PerturbOptions(base, 0.1, PerturbWeights())
 
 # Target: y = 2x₁ + 3x₂ - 1
 X = rand(Float32, 2, 100)
-y = @. 2f0 * X[1, :] + 3f0 * X[2, :] - 1f0
+y = @. 2.0f0 * X[1, :] + 3.0f0 * X[2, :] - 1.0f0
 
 equation_search(X, y; options=opts, niterations=10, parallelism=:serial)
