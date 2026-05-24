@@ -3,6 +3,7 @@ module AdaptiveParsimonyModule
 using DispatchDoctor: @stable
 using ..CoreModule: AbstractPlugin, AbstractPluginState, AbstractOptions
 using ..ComplexityModule: compute_complexity
+using ..PopMemberModule: AbstractPopMember
 import ..CoreModule:
     init_plugin_state,
     prepare_dispatch_state,
@@ -164,18 +165,18 @@ end
 function tournament_cost_multiplier(
     s::AdaptiveParsimonyState,
     p::AdaptiveParsimonyPlugin,
-    member,
+    member::AbstractPopMember{T,L,N},
     options::AbstractOptions,
-)
-    p.tournament || return 1.0
+) where {T,L,N}
+    p.tournament || return one(L)
     rss = s.rss[1]
     sz = compute_complexity(member, options)
     frequency = if (0 < sz <= options.maxsize)
-        Float64(rss.normalized_frequencies[sz])
+        L(rss.normalized_frequencies[sz])
     else
-        0.0
+        zero(L)
     end
-    return exp(Float64(options.adaptive_parsimony_scaling) * frequency)
+    return exp(L(options.adaptive_parsimony_scaling) * frequency)
 end
 
 function mutation_acceptance_multiplier(
