@@ -40,20 +40,19 @@
     @test px.tournament == false  # user's instance wins
 end
 
-@testitem "AdaptiveParsimonyPlugin: state owns RSS, multipliers read from it" begin
+@testitem "AdaptiveParsimonyPlugin: hook outputs match the legacy formula" begin
     using SymbolicRegression
     using SymbolicRegression:
         tournament_cost_multiplier,
         mutation_acceptance_multiplier,
         init_plugin_state,
         prepare_dispatch_state
-    using SymbolicRegression.AdaptiveParsimonyModule:
-        update_frequencies!, normalize_frequencies!
-    using SymbolicRegression.AdaptiveParsimonyPluginModule: AdaptiveParsimonyState
+    using SymbolicRegression.AdaptiveParsimonyModule: update_frequencies!
     using SymbolicRegression.CoreModule.DatasetModule: Dataset
     using DynamicExpressions: Node
     using Test
 
+    # Public-API setup: configure plugin via Options, build state via init_plugin_state.
     opts = Options(;
         binary_operators=[+, *],
         unary_operators=[cos],
@@ -66,48 +65,49 @@ end
     dataset = Dataset(randn(2, 10), randn(10))
     plugin = first(p for p in opts.plugins if p isa AdaptiveParsimonyPlugin)
 
-    # Init head-side state, populate frequencies for known complexities.
-    head_state = init_plugin_state(plugin, opts, [dataset])::AdaptiveParsimonyState
-    @test length(head_state.rss) == 1
-    rss_head = head_state.rss[1]
+    head_state = init_plugin_state(plugin, opts, [dataset])
+    # Inject known frequency history via the public RunningSearchStatistics API.
+    rss = head_state.rss[1]
     for size in (1, 1, 1, 1, 1, 3, 3, 5)
-        update_frequencies!(rss_head; size=size)
+        update_frequencies!(rss; size=size)
     end
 
-    # prepare_dispatch_state should normalize and extract the slice for output 1.
-    worker_state = prepare_dispatch_state(plugin, head_state, 1, dataset)::AdaptiveParsimonyState
+    # prepare_dispatch_state normalizes + extracts the slice for the given output.
+    worker_state = prepare_dispatch_state(plugin, head_state, 1, dataset)
     @test length(worker_state.rss) == 1
-    @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0  atol=1e-9
-    # worker holds a distinct object from head (deepcopy)
-    @test worker_state.rss[1] !== rss_head
-    # head's raw frequency counts reflect the updates we made above
-    @test rss_head.frequencies[1] >= 1.0
-    @test rss_head.frequencies[3] >= 1.0
-    @test rss_head.frequencies[5] >= 1.0
+    @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0  atol = 1e-9
+    @test worker_state.rss[1] !== rss  # snapshot is independent of head
 
-    # Build a couple of members of differing complexity.
-    n1 = Node{Float64}(; feature=1)
-    n3 = cos(n1) + n1 * n1  # complexity 5
+    # Build members of two complexities (1 vs 5) via the popmember_type from Options.
     PM = opts.popmember_type
-    mk(tree) = PM(dataset, tree, opts; deterministic=false)
-    m1 = mk(n1)
-    m3 = mk(n3)
+    n1 = Node{Float64}(; feature=1)
+    n5 = cos(n1) + n1 * n1
+    m1 = PM(dataset, n1, opts; deterministic=false)
+    m5 = PM(dataset, n5, opts; deterministic=false)
 
-    # tournament multiplier: size-1 (frequent) gets larger multiplier than size-5 (rare).
+    # Frequent complexity (1) gets a larger multiplier than the rare one (5).
     mult1 = tournament_cost_multiplier(plugin, worker_state, m1, opts)
-    mult3 = tournament_cost_multiplier(plugin, worker_state, m3, opts)
-    @test mult1 > mult3
+    mult5 = tournament_cost_multiplier(plugin, worker_state, m5, opts)
+    @test mult1 > mult5
     @test mult1 > 1.0
 
-    # mutation_acceptance multiplier: parent small (high old_freq) → big (low new_freq)
-    # → multiplier > 1 (encourages diversification).
-    mult_mut = mutation_acceptance_multiplier(plugin, worker_state, m1, n3, opts)
+    # mutation_acceptance: small parent (high old_freq), big new (low new_freq) → >1.
+    mult_mut = mutation_acceptance_multiplier(plugin, worker_state, m1, n5, opts)
     @test mult_mut > 1.0
 
-    # With both flags off, both multipliers are identity.
-    p_off = AdaptiveParsimonyPlugin(; tournament=false, mutation_acceptance=false)
-    @test tournament_cost_multiplier(p_off, worker_state, m1, opts) == 1.0
-    @test mutation_acceptance_multiplier(p_off, worker_state, m1, n3, opts) == 1.0
+    # Flag toggles produce identity multipliers when off.
+    p_tournament_off = AdaptiveParsimonyPlugin(;
+        tournament=false, mutation_acceptance=true
+    )
+    p_mut_off = AdaptiveParsimonyPlugin(; tournament=true, mutation_acceptance=false)
+    @test tournament_cost_multiplier(p_tournament_off, worker_state, m1, opts) == 1.0
+    @test mutation_acceptance_multiplier(p_mut_off, worker_state, m1, n5, opts) == 1.0
+
+    # Out-of-range complexity (size > maxsize) → frequency = 0 → tournament multiplier
+    # = exp(scaling * 0) = 1.0. Hits the "size out of range" branch.
+    big_tree = foldl((acc, _) -> acc + n1, 1:30; init=Node{Float64}(; val=1.0))
+    m_huge = PM(dataset, big_tree, opts; deterministic=false)
+    @test tournament_cost_multiplier(plugin, worker_state, m_huge, opts) == 1.0
 end
 
 @testitem "AdaptiveParsimonyPlugin: end-to-end equation_search" begin

@@ -5,34 +5,60 @@
         AbstractPluginState,
         NoPluginState,
         init_plugin_state,
+        prepare_dispatch_state,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
         on_cycle_end!,
-        init_member
+        on_mutation_end!,
+        init_member,
+        tournament_cost_multiplier,
+        mutation_acceptance_multiplier,
+        condition_mutation_weights!,
+        MutationEvent,
+        MutationWeights
     using Test
 
-    # Default types exist
     @test NoPluginState() isa AbstractPluginState
 
-    # An options with no plugins (and the legacy `use_frequency_in_tournament`
-    # auto-injection disabled) has an empty tuple.
-    opts = Options(binary_operators=[+, *], use_frequency_in_tournament=false)
+    # No-plugin Options (legacy adaptive parsimony off, no auto-inject).
+    opts = Options(;
+        binary_operators=[+, *], use_frequency=false, use_frequency_in_tournament=false
+    )
     @test opts.plugins isa Tuple{}
-    @test map(p -> init_plugin_state(p, opts, []), opts.plugins) isa Tuple{}
 
-    # A dummy plugin's default init returns NoPluginState
+    # Dummy plugin exercises every default hook contract.
     struct DummyPlugin <: AbstractPlugin end
     p = DummyPlugin()
     @test init_plugin_state(p, opts, []) isa NoPluginState
-
-    # Default hooks return nothing
     s = NoPluginState()
+
+    # Observers default to no-op (return nothing).
     @test on_search_start!(p, s, [], opts, nothing) === nothing
     @test on_search_end!(p, s, nothing, [], opts, nothing) === nothing
     @test on_generation_end!(p, s, nothing, [], opts, nothing, 1, nothing) === nothing
     @test on_cycle_end!(p, s, nothing, nothing, nothing, opts) === nothing
+    @test on_mutation_end!(
+        p, s, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
+    ) === nothing
+
+    # Factory defaults: init_member returns nothing, prepare_dispatch_state
+    # deepcopies the head state.
     @test init_member(p, s, nothing, opts) === nothing
+    head = NoPluginState()
+    snap = prepare_dispatch_state(p, head, 1, nothing)
+    @test snap isa NoPluginState
+    @test snap !== head  # default = deepcopy
+
+    # Modifier defaults return 1.0 (multiplicative identity).
+    @test tournament_cost_multiplier(p, s, nothing, opts) == 1.0
+    @test mutation_acceptance_multiplier(p, s, nothing, nothing, opts) == 1.0
+
+    # Conditioner default leaves weights untouched.
+    w = MutationWeights()
+    before = (w.mutate_constant, w.add_node, w.delete_node)
+    @test condition_mutation_weights!(p, s, w, nothing, opts, 20, 2) === nothing
+    @test (w.mutate_constant, w.add_node, w.delete_node) == before
 end
 
 @testitem "Plugin interface: lifecycle hooks called for each plugin" begin
