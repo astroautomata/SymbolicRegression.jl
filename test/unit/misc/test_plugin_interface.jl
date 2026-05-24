@@ -171,6 +171,7 @@ end
 @testitem "Plugin interface: init_member hook" begin
     using SymbolicRegression
     import SymbolicRegression: AbstractPlugin, AbstractPluginState, init_member
+    using SymbolicRegression.MutationFunctionsModule: gen_random_tree
     using Test
 
     init_count = Ref(0)
@@ -203,6 +204,50 @@ end
     equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
 
     @test init_count[] > 0
+end
+
+@testitem "Plugin interface: init_member that returns a tree is consumed" begin
+    using SymbolicRegression
+    import SymbolicRegression: AbstractPlugin, AbstractPluginState
+    using SymbolicRegression.MutationFunctionsModule: gen_random_tree
+    using Test
+
+    # Plugin always returns a real tree of the canonical type via gen_random_tree.
+    # Exercises the non-nothing branch of `invoke_init_member` AND the
+    # `candidate::typeof(fallback)` type assertion in `_init_tree`.
+    seeded_calls = Ref(0)
+
+    struct SeedingPlugin <: AbstractPlugin
+        calls::Base.RefValue{Int}
+    end
+    mutable struct SeedingPluginState <: AbstractPluginState
+        calls::Base.RefValue{Int}
+    end
+    SymbolicRegression.init_plugin_state(p::SeedingPlugin, o, d) =
+        SeedingPluginState(p.calls)
+    function SymbolicRegression.init_member(
+        ::SeedingPlugin, s::SeedingPluginState, dataset, options
+    )
+        s.calls[] += 1
+        nlength = 3
+        nfeatures = size(dataset.X, 1)
+        T = eltype(dataset.X)
+        return gen_random_tree(nlength, options, nfeatures, T)
+    end
+
+    opts = Options(;
+        binary_operators=[+, *],
+        populations=2,
+        verbosity=0,
+        progress=false,
+        plugins=(SeedingPlugin(seeded_calls),),
+    )
+    X = rand(Float32, 2, 30)
+    y = X[1, :] .+ X[2, :]
+
+    hof = equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
+    @test seeded_calls[] > 0
+    @test hof isa SymbolicRegression.HallOfFame
 end
 
 @testitem "Plugin interface: on_mutation_end! fires with correct args" begin
