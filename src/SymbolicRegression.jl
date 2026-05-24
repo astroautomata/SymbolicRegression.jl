@@ -9,6 +9,7 @@ export Population,
     Dataset,
     MutationWeights,
     FrequencyWeightedTournamentPlugin,
+    BacksolveOptions,
     Node,
     GraphNode,
     ParametricNode,
@@ -224,6 +225,9 @@ using DispatchDoctor: @stable, @unstable
     include("DimensionalAnalysis.jl")
     include("CheckConstraints.jl")
     include("AdaptiveParsimony.jl")
+    include("InverseFunctions.jl")
+    include("EvaluateInverse.jl")
+    include("Backsolve.jl")
     include("MutationFunctions.jl")
     include("LossFunctions.jl")
     include("PopMember.jl")
@@ -257,6 +261,7 @@ using .CoreModule:
     AbstractOptions,
     Options,
     ComplexityMapping,
+    BacksolveOptions,
     WarmStartIncompatibleError,
     AbstractMutationWeights,
     MutationWeights,

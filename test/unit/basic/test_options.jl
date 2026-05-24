@@ -27,6 +27,14 @@
     @test_throws AssertionError Options(; loss_scale=:cubic)
 end
 
+@testitem "Test backsolve options" begin
+    using SymbolicRegression
+
+    @test Options().backsolve == BacksolveOptions()
+    @test Options(; backsolve=nothing).backsolve == BacksolveOptions()
+    @test Options(; backsolve=BacksolveOptions(; lambda=0.2)).backsolve.lambda == 0.2
+end
+
 @testitem "Test operators parameter conflicts" begin
     using SymbolicRegression
     using DynamicExpressions: OperatorEnum

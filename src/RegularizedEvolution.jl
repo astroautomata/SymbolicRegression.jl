@@ -43,6 +43,7 @@ function reg_evol_cycle(
                 options;
                 tmp_recorder=mutation_recorder,
                 plugin_states,
+                population_for_backsolve=pop,
             )
             num_evals += tmp_num_evals
 

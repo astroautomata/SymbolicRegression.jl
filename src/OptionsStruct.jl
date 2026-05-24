@@ -9,6 +9,27 @@ using LossFunctions: SupervisedLoss
 import ..MutationWeightsModule: AbstractMutationWeights
 
 """
+    BacksolveOptions(;kws...)
+
+Options for the `backsolve` mutation sparse-expression fit.
+
+!!! warning
+    This option controls an experimental feature. The `backsolve`
+    mutation and `BacksolveOptions` will change in minor version increments.
+
+# Arguments
+
+- `max_library_size::Int`: Maximum number of candidate library terms. Default: `500`.
+- `lambda::Float64`: STLSQ sparsity threshold. Default: `0.01`.
+- `max_iter::Int`: Maximum STLSQ iterations. Default: `10`.
+"""
+Base.@kwdef struct BacksolveOptions
+    max_library_size::Int = 500
+    lambda::Float64 = 0.01
+    max_iter::Int = 10
+end
+
+"""
 This struct defines how complexity is calculated.
 
 # Fields
@@ -260,6 +281,7 @@ struct Options{
     use_recorder::Bool
     popmember_type::Type{PM}
     plugins::PT
+    backsolve::BacksolveOptions
 end
 
 function Base.print(io::IO, @nospecialize(options::Options))
@@ -271,8 +293,13 @@ function Base.print(io::IO, @nospecialize(options::Options))
         *
         join(
             [
-                if fieldname in
-                    (:optimizer_algorithm, :optimizer_options, :mutation_weights, :plugins)
+                if fieldname in (
+                    :optimizer_algorithm,
+                    :optimizer_options,
+                    :mutation_weights,
+                    :plugins,
+                    :backsolve,
+                )
                     "$(fieldname)=..."
                 else
                     "$(fieldname)=$(getfield(options, fieldname))"

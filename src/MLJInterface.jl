@@ -35,6 +35,7 @@ using ..CoreModule:
     MutationWeights,
     LOSS_TYPE,
     ComplexityMapping,
+    BacksolveOptions,
     AbstractExpressionSpec,
     ExpressionSpec,
     get_expression_type,
