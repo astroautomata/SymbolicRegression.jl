@@ -73,7 +73,6 @@ You can use the `@template_spec` macro as an easy way to create a `TemplateExpre
 Composable expressions are used internally by `TemplateExpression` and allow you to combine multiple expressions together.
 
 ```@docs
-AbstractComposableExpression
 ComposableExpression
 ```
 
@@ -87,9 +86,7 @@ ParametricNode
 ParametricExpressionSpec
 ```
 
-These types allow you to define expressions with parameters that can be tuned to
-fit the data better. For new code, prefer `TemplateExpressionSpec` via the
-`@template_spec` macro; `ParametricExpressionSpec` is retained for compatibility.
+These types allow you to define expressions with parameters that can be tuned to fit the data better. You can specify the maximum number of parameters using the `expression_options` argument in `SRRegressor`.
 
 ## Population
 

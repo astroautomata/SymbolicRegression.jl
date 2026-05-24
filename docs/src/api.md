@@ -26,15 +26,6 @@ Options
 MutationWeights
 ```
 
-## Constant Optimization
-
-```@docs
-optimize_constants
-get_optimizable_parameters
-set_optimizable_parameters!
-extract_optimizable_gradient
-```
-
 ## Printing
 
 ```@docs

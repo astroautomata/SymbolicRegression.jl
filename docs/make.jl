@@ -9,28 +9,13 @@ using SymbolicRegression:
     update_baseline_loss!,
     AbstractMutationWeights,
     AbstractOptions,
-    AbstractComposableExpression,
     mutate!,
     condition_mutation_weights!,
     sample_mutation,
     MutationResult,
     AbstractRuntimeOptions,
     AbstractSearchState,
-    @extend_operators,
-    @extend_mutation_weights,
-    AbstractPluginState,
-    NoPluginState,
-    init_plugin_state,
-    on_search_start!,
-    on_search_end!,
-    on_generation_complete!,
-    on_population_evaluated!,
-    on_mutation_evaluated!,
-    optimize_constants,
-    get_optimizable_parameters,
-    set_optimizable_parameters!,
-    extract_optimizable_gradient,
-    init_member
+    @extend_operators
 using DynamicExpressions
 
 include("utils.jl")
@@ -363,7 +348,6 @@ makedocs(;
         "Losses" => "losses.md",
         "Types" => "types.md",
         "Customization" => "customization.md",
-        "Plugin Guide" => "plugin-guide.md",
     ],
 )
 
