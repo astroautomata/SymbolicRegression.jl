@@ -468,18 +468,18 @@ end
 function CO.set_constants_for_optimization!(e::TemplateExpression, constants, refs)
     cursor = Ref(1)
     foreach(values(get_contents(e)), refs.inner) do tree, r
-        n = r.n
-        i = cursor[]
-        CO.set_constants_for_optimization!(tree, constants[i:(i + n - 1)], r.ref)
-        cursor[] = i + n
+        let n = r.n, i = cursor[]
+            CO.set_constants_for_optimization!(tree, constants[i:(i + n - 1)], r.ref)
+            cursor[] = i + n
+        end
     end
     if has_params(e)
         parameters = get_metadata(e).parameters
         for k in refs.parameter_keys
-            n = length(parameters[k])
-            i = cursor[]
-            parameters[k]._data[:] = constants[i:(i + n - 1)]
-            cursor[] = i + n
+            let n = length(parameters[k]), i = cursor[]
+                parameters[k]._data[:] = constants[i:(i + n - 1)]
+                cursor[] = i + n
+            end
         end
     end
     return e

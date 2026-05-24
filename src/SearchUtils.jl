@@ -34,7 +34,6 @@ using ..PopMemberModule: PopMember, AbstractPopMember
 using ..HallOfFameModule: HallOfFame, string_dominating_pareto_curve
 using ..ConstantOptimizationModule: optimize_constants
 using ..ProgressBarsModule: WrappedProgressBar, manually_iterate!, barlen
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..ExpressionBuilderModule: strip_metadata
 using ..InterfaceDynamicExpressionsModule: takes_eval_options
 using ..CheckConstraintsModule: check_constraints
@@ -622,7 +621,6 @@ Base.@kwdef struct SearchState{
     halls_of_fame::Vector{HallOfFame{T,L,N,PM}}
     last_pops::Vector{Vector{Population{T,L,N,PM}}}
     best_sub_pops::Vector{Vector{Population{T,L,N,PM}}}
-    all_running_search_statistics::Vector{RunningSearchStatistics}
     num_evals::Vector{Vector{Float64}}
     cycles_remaining::Vector{Int}
     cur_maxsizes::Vector{Int}

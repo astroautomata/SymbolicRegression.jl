@@ -17,7 +17,6 @@ using ..CoreModule:
     tournament_cost_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, update_baseline_loss!
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..MutationFunctionsModule: gen_random_tree
 using ..PopMemberModule: AbstractPopMember, PopMember
 import ..PopMemberModule: popmember_type
@@ -161,20 +160,14 @@ end
 # Sample the population, and get the best member from that sample
 function best_of_sample(
     pop::Population{T,L,N},
-    running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions;
     plugin_states::Tuple=(),
 ) where {T,L,N}
     sample = sample_pop(pop, options)
-    return copy(
-        _best_of_sample(sample.members, running_search_statistics, options; plugin_states)
-    )
+    return copy(_best_of_sample(sample.members, options; plugin_states))
 end
 function _best_of_sample(
-    members::Vector{P},
-    running_search_statistics::RunningSearchStatistics,
-    options::AbstractOptions;
-    plugin_states::Tuple=(),
+    members::Vector{P}, options::AbstractOptions; plugin_states::Tuple=()
 ) where {T,L,N,P<:AbstractPopMember{T,L,N}}
     p = options.tournament_selection_p
     n = length(members)  # == tournament_selection_n
@@ -183,11 +176,7 @@ function _best_of_sample(
         member = members[i]
         cost = L(member.cost)
         for (plugin, pstate) in zip(options.plugins, plugin_states)
-            cost *= L(
-                tournament_cost_multiplier(
-                    plugin, pstate, member, running_search_statistics, options
-                ),
-            )
+            cost *= L(tournament_cost_multiplier(plugin, pstate, member, options))
         end
         adjusted_costs[i] = cost
     end

@@ -5,7 +5,6 @@
         AbstractPluginState,
         NoPluginState,
         init_plugin_state,
-        init_plugin_states,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
@@ -20,7 +19,7 @@
     # auto-injection disabled) has an empty tuple.
     opts = Options(binary_operators=[+, *], use_frequency_in_tournament=false)
     @test opts.plugins isa Tuple{}
-    @test init_plugin_states(opts.plugins, opts, []) isa Tuple{}
+    @test map(p -> init_plugin_state(p, opts, []), opts.plugins) isa Tuple{}
 
     # A dummy plugin's default init returns NoPluginState
     struct DummyPlugin <: AbstractPlugin end
@@ -31,7 +30,7 @@
     s = NoPluginState()
     @test on_search_start!(p, s, [], opts, nothing) === nothing
     @test on_search_end!(p, s, nothing, [], opts, nothing) === nothing
-    @test on_generation_end!(p, s, nothing, [], opts, nothing) === nothing
+    @test on_generation_end!(p, s, nothing, [], opts, nothing, 1, nothing) === nothing
     @test on_cycle_end!(p, s, nothing, nothing, nothing, opts) === nothing
     @test init_member(p, s, nothing, opts) === nothing
 end
@@ -68,7 +67,7 @@ end
         ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
     ) = (put!(s.counter_ch, :end); nothing)
     SymbolicRegression.on_generation_end!(
-        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
+        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r, oi, rp
     ) = (put!(s.counter_ch, :gen); nothing)
     SymbolicRegression.on_cycle_end!(
         ::LifecyclePlugin, s::LifecyclePluginState, pop, d, h, o
@@ -121,10 +120,12 @@ end
 
     SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
     SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
-    SymbolicRegression.on_generation_end!(::PluginA, s::PluginAState, ss, d, o, r) =
-        (s.calls[] += 1; nothing)
-    SymbolicRegression.on_generation_end!(::PluginB, s::PluginBState, ss, d, o, r) =
-        (s.calls[] += 1; nothing)
+    SymbolicRegression.on_generation_end!(
+        ::PluginA, s::PluginAState, ss, d, o, r, oi, rp
+    ) = (s.calls[] += 1; nothing)
+    SymbolicRegression.on_generation_end!(
+        ::PluginB, s::PluginBState, ss, d, o, r, oi, rp
+    ) = (s.calls[] += 1; nothing)
 
     opts = Options(;
         binary_operators=[+, *],

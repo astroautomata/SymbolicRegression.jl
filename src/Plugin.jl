@@ -83,20 +83,6 @@ function init_plugin_state(::AbstractPlugin, options, datasets)
 end
 
 """
-    init_plugin_states(plugins::Tuple, options, datasets) -> Tuple
-
-Build the parallel tuple of plugin states matching `options.plugins`. The
-returned tuple has one entry per plugin, in the same order as
-`options.plugins`. Type-stable when the plugin tuple is concretely typed.
-
-Override this only if you need bulk initialization logic that can't be
-expressed by per-plugin `init_plugin_state` methods.
-"""
-@inline function init_plugin_states(plugins::Tuple, options, datasets)
-    return map(p -> init_plugin_state(p, options, datasets), plugins)
-end
-
-"""
     on_search_start!(plugin, state, datasets, options, ropt)
 
 Lifecycle hook called on the head node after initialization, before warmup
@@ -134,19 +120,29 @@ function on_search_end!(
 end
 
 """
-    on_generation_end!(plugin, state, search_state, datasets, options, ropt)
+    on_generation_end!(plugin, state, search_state, datasets, options, ropt, output_index, returned_pop)
 
-Lifecycle hook called on the HEAD NODE after each generation completes
-(after HoF update + migration). Runs serially; safe to mutate plugin state,
-update concept databases, drain feedback channels, etc. Called once per
-plugin per generation.
+Lifecycle hook called on the HEAD NODE after each cycle's result has been
+received from a worker (after HoF update + migration). Runs serially; safe
+to mutate plugin state, update concept databases, drain feedback channels,
+etc. Called once per plugin per cycle.
+
+`output_index` is the `1:nout` index of the dataset whose cycle just
+returned. `returned_pop` is the population the worker produced.
 
 Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
 function on_generation_end!(
-    ::AbstractPlugin, ::AbstractPluginState, search_state, datasets, options, ropt
+    ::AbstractPlugin,
+    ::AbstractPluginState,
+    search_state,
+    datasets,
+    options,
+    ropt,
+    output_index::Int,
+    returned_pop,
 )
     return nothing
 end
@@ -235,25 +231,26 @@ function on_mutation_end!(
 end
 
 """
-    tournament_cost_multiplier(plugin, state, member, running_search_statistics, options) -> Real
+    tournament_cost_multiplier(plugin, state, member, options) -> Real
 
 Per-plugin multiplier applied to a candidate's `member.cost` during tournament
 selection in `_best_of_sample`. Plugins compose multiplicatively: the
 adjusted cost is `member.cost * ∏ tournament_cost_multiplier(p, s, ...)`
 across all plugins in tuple order. Default returns `1.0` (no adjustment).
 
-The shipped `AdaptiveParsimonyPlugin` is the canonical example.
+The shipped `AdaptiveParsimonyPlugin` is the canonical example; it reads
+frequency statistics from its own state, not from an engine-passed arg.
 
 !!! warning "Experimental"
 """
 function tournament_cost_multiplier(
-    ::AbstractPlugin, ::AbstractPluginState, member, running_search_statistics, options
+    ::AbstractPlugin, ::AbstractPluginState, member, options
 )
     return 1.0
 end
 
 """
-    mutation_acceptance_multiplier(plugin, state, parent_member, new_tree, running_search_statistics, options) -> Real
+    mutation_acceptance_multiplier(plugin, state, parent_member, new_tree, options) -> Real
 
 Per-plugin multiplier applied to `probChange` inside `next_generation`, after
 the annealing factor (if any) is folded in. Plugins compose multiplicatively;
@@ -262,14 +259,29 @@ defaults to `1.0` (no adjustment).
 !!! warning "Experimental"
 """
 function mutation_acceptance_multiplier(
-    ::AbstractPlugin,
-    ::AbstractPluginState,
-    parent_member,
-    new_tree,
-    running_search_statistics,
-    options,
+    ::AbstractPlugin, ::AbstractPluginState, parent_member, new_tree, options
 )
     return 1.0
+end
+
+"""
+    prepare_dispatch_state(plugin, head_state, output_index::Int, dataset) -> AbstractPluginState
+
+Build the worker-side plugin state for one cycle's dispatch, given the head
+node's current plugin state, the output index (`1:nout` in multi-target
+regression), and the dataset the worker will operate on. Called once per
+plugin per cycle dispatch.
+
+Default returns `deepcopy(head_state)` (full snapshot). Plugins that
+maintain per-output state should override to extract only the relevant
+slice for `output_index` so per-output independence is preserved.
+
+!!! warning "Experimental"
+"""
+function prepare_dispatch_state(
+    ::AbstractPlugin, head_state::AbstractPluginState, output_index::Int, dataset
+)
+    return deepcopy(head_state)
 end
 
 """

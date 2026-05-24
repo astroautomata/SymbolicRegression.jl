@@ -27,7 +27,6 @@ using ..CoreModule:
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..PopMemberModule: AbstractPopMember, PopMember, create_child
 using ..MutationFunctionsModule:
     mutate_constant,
@@ -193,7 +192,6 @@ end
     member::P,
     temperature,
     curmaxsize::Int,
-    running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions;
     tmp_recorder::RecordType,
     plugin_states::Tuple=(),
@@ -343,7 +341,7 @@ end
     end
     for (plugin, pstate) in zip(options.plugins, plugin_states)
         probChange *= mutation_acceptance_multiplier(
-            plugin, pstate, member, tree, running_search_statistics, options
+            plugin, pstate, member, tree, options
         )
     end
 

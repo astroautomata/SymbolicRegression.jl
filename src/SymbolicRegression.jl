@@ -186,10 +186,11 @@ using Compat: @compat, Fix
         optimize_constants, get_constants_for_optimization,
         set_constants_for_optimization!, extract_gradient_for_optimization,
         AbstractPlugin, AbstractPluginState, NoPluginState, MutationEvent,
-        init_plugin_state, init_plugin_states,
+        init_plugin_state,
         on_search_start!, on_search_end!,
         on_generation_end!, on_cycle_end!, on_mutation_end!, init_member,
         tournament_cost_multiplier, mutation_acceptance_multiplier,
+        prepare_dispatch_state,
     )
 )
 #! format: on
@@ -309,7 +310,6 @@ using .CoreModule:
     NoPluginState,
     MutationEvent,
     init_plugin_state,
-    init_plugin_states,
     on_search_start!,
     on_search_end!,
     on_generation_end!,
@@ -318,12 +318,11 @@ using .CoreModule:
     init_member,
     invoke_init_member,
     tournament_cost_multiplier,
-    mutation_acceptance_multiplier
+    mutation_acceptance_multiplier,
+    prepare_dispatch_state
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity
 using .CheckConstraintsModule: check_constraints
-using .AdaptiveParsimonyModule:
-    RunningSearchStatistics, update_frequencies!, move_window!, normalize_frequencies!
 using .MutationFunctionsModule:
     gen_random_tree, gen_random_tree_fixed_size, random_node, crossover_trees
 using .InterfaceDynamicExpressionsModule:
@@ -718,10 +717,6 @@ end
     last_pops = init_dummy_pops(options.populations, datasets, options)
     # Best 10 members from each population for migration:
     best_sub_pops = init_dummy_pops(options.populations, datasets, options)
-    # TODO: Should really be one per population too.
-    all_running_search_statistics = [
-        RunningSearchStatistics(; options=options) for j in 1:nout
-    ]
     # Records the number of evaluations:
     # Real numbers indicate use of batching.
     num_evals = [[0.0 for i in 1:(options.populations)] for j in 1:nout]
@@ -737,7 +732,7 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    plugin_states = init_plugin_states(options.plugins, options, datasets)
+    plugin_states = map(p -> init_plugin_state(p, options, datasets), options.plugins)
 
     return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,typeof(plugin_states)}(;
         procs=procs,
@@ -750,7 +745,6 @@ end
         halls_of_fame=halls_of_fame,
         last_pops=last_pops,
         best_sub_pops=best_sub_pops,
-        all_running_search_statistics=all_running_search_statistics,
         num_evals=num_evals,
         cycles_remaining=cycles_remaining,
         cur_maxsizes=cur_maxsizes,
@@ -888,16 +882,12 @@ function _warmup_search!(
     nout = length(datasets)
     for j in 1:nout, i in 1:(options.populations)
         dataset = datasets[j]
-        running_search_statistics = state.all_running_search_statistics[j]
         cur_maxsize = state.cur_maxsizes[j]
         @recorder state.record[]["out$(j)_pop$(i)"] = RecordType()
         worker_idx = assign_next_worker!(
             state.worker_assignment; out=j, pop=i, parallelism=ropt.parallelism, state.procs
         )
 
-        # TODO - why is this needed??
-        # Multi-threaded doesn't like to fetch within a new task:
-        c_rss = deepcopy(running_search_statistics)
         last_pop = state.worker_output[j][i]
 
         # Get the prototype to extract types
@@ -906,11 +896,13 @@ function _warmup_search!(
         PM = popmember_type(PopType)
         HallType = HallOfFame{T,L,N,PM}
 
-        # Pre-populated (not `nothing`) so warmup skips lazy init; real states
-        # are allocated in `_main_search_loop!`.
-        c_plugin_states_ref = Ref{Union{Nothing,Tuple}}(
-            ntuple(_ -> NoPluginState(), length(options.plugins))
+        # Snapshot each plugin's head-side state for this worker dispatch.
+        c_plugin_states = map(
+            (p, hs) -> prepare_dispatch_state(p, hs, j, dataset),
+            options.plugins,
+            state.plugin_states,
         )
+        c_plugin_states_ref = Ref{Union{Nothing,Tuple}}(c_plugin_states)
         updated_pop = @sr_spawner(
             begin
                 in_pop = first(extract_from_worker(last_pop, PopType, HallType))
@@ -923,7 +915,6 @@ function _warmup_search!(
                     iteration=0,
                     ropt.verbosity,
                     cur_maxsize,
-                    running_search_statistics=c_rss,
                     plugin_states_ref=c_plugin_states_ref,
                 )::DefaultWorkerOutputType{Population{T,L,N},HallOfFame{T,L,N}}
             end,
@@ -1029,10 +1020,6 @@ function _main_search_loop!(
             dataset = datasets[j]
             cur_maxsize = state.cur_maxsizes[j]
 
-            for member in cur_pop.members
-                size = compute_complexity(member, options)
-                update_frequencies!(state.all_running_search_statistics[j]; size)
-            end
             #! format: off
             update_hall_of_fame!(state.halls_of_fame[j], cur_pop.members, options)
             update_hall_of_fame!(state.halls_of_fame[j], best_seen.members[best_seen.exists], options)
@@ -1067,7 +1054,9 @@ function _main_search_loop!(
             ###################################################################
 
             for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-                on_generation_end!(plugin, pstate, state, datasets, options, ropt)
+                on_generation_end!(
+                    plugin, pstate, state, datasets, options, ropt, j, cur_pop
+                )
             end
 
             state.cycles_remaining[j] -= 1
@@ -1088,9 +1077,14 @@ function _main_search_loop!(
                 0
             end
 
-            c_rss = deepcopy(state.all_running_search_statistics[j])
             in_pop = copy(cur_pop::Population{T,L,N})
+            c_plugin_states = map(
+                (p, hs) -> prepare_dispatch_state(p, hs, j, dataset),
+                options.plugins,
+                state.plugin_states,
+            )
             c_plugin_states_ref = worker_plugin_states_refs[j][i]
+            c_plugin_states_ref[] = c_plugin_states
             state.worker_output[j][i] = @sr_spawner(
                 begin
                     _dispatch_s_r_cycle(
@@ -1102,7 +1096,6 @@ function _main_search_loop!(
                         iteration,
                         ropt.verbosity,
                         cur_maxsize,
-                        running_search_statistics=c_rss,
                         plugin_states_ref=c_plugin_states_ref,
                     )
                 end,
@@ -1119,7 +1112,6 @@ function _main_search_loop!(
             state.cur_maxsizes[j] = get_cur_maxsize(;
                 options, total_cycles, cycles_remaining=state.cycles_remaining[j]
             )
-            move_window!(state.all_running_search_statistics[j])
             if !isnothing(progress_bar)
                 head_node_occupation = estimate_work_fraction(resource_monitor)
                 update_progress_bar!(
@@ -1250,11 +1242,12 @@ end
     iteration::Int,
     verbosity,
     cur_maxsize::Int,
-    running_search_statistics,
     plugin_states_ref::Ref{Union{Nothing,Tuple}}=Ref{Union{Nothing,Tuple}}(nothing),
 ) where {T,L,N}
     if isnothing(plugin_states_ref[])
-        plugin_states_ref[] = init_plugin_states(options.plugins, options, (dataset,))
+        plugin_states_ref[] = map(
+            p -> init_plugin_state(p, options, (dataset,)), options.plugins
+        )
     end
     worker_plugin_states = plugin_states_ref[]::Tuple
 
@@ -1263,13 +1256,11 @@ end
         "iteration$(iteration)" => record_population(in_pop, options)
     )
     num_evals = 0.0
-    normalize_frequencies!(running_search_statistics)
     out_pop, best_seen, evals_from_cycle = s_r_cycle(
         dataset,
         in_pop,
         options.ncycles_per_iteration,
-        cur_maxsize,
-        running_search_statistics;
+        cur_maxsize;
         verbosity=verbosity,
         options=options,
         record=record,

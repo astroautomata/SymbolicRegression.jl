@@ -79,7 +79,6 @@ using .PluginModule:
     NoPluginState,
     MutationEvent,
     init_plugin_state,
-    init_plugin_states,
     on_search_start!,
     on_search_end!,
     on_generation_end!,
@@ -88,6 +87,7 @@ using .PluginModule:
     init_member,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
+    prepare_dispatch_state,
     invoke_init_member,
     _inject_adaptive_parsimony_plugin
 

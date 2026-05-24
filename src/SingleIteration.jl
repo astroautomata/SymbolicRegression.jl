@@ -15,7 +15,6 @@ using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: generate_reference
 using ..PopulationModule: Population, finalize_costs
 using ..HallOfFameModule: HallOfFame
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..RegularizedEvolutionModule: reg_evol_cycle
 using ..LossFunctionsModule: eval_cost
 using ..ConstantOptimizationModule: optimize_constants
@@ -27,8 +26,7 @@ function s_r_cycle(
     dataset::D,
     pop::P,
     ncycles::Int,
-    curmaxsize::Int,
-    running_search_statistics::RunningSearchStatistics;
+    curmaxsize::Int;
     verbosity::Int=0,
     options::AbstractOptions,
     record::RecordType,
@@ -49,14 +47,7 @@ function s_r_cycle(
 
     for temperature in all_temperatures
         pop, tmp_num_evals = reg_evol_cycle(
-            batched_dataset,
-            pop,
-            temperature,
-            curmaxsize,
-            running_search_statistics,
-            options,
-            record;
-            plugin_states,
+            batched_dataset, pop, temperature, curmaxsize, options, record; plugin_states
         )
         num_evals += tmp_num_evals
         for member in pop.members
