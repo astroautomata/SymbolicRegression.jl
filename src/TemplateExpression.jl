@@ -558,10 +558,8 @@ function DE.get_tree(ex::TemplateExpression{<:Any,<:Any,<:Any,E}) where {E}
     )
 end
 
-# `Core._typeof_captured_variable` stores a `Type{X}` capture as the abstract
-# `DataType`. Routing the inner-expression construction through `::Type{IET}`
-# dispatch keeps IET as a static parameter inside the helper, so its
-# `ntuple(...)` closure sees a concrete IET.
+# `::Type{IET}` keeps IET as a static parameter inside the closure; a runtime
+# `Type` capture widens to `DataType` (see `Core._typeof_captured_variable`).
 @inline function _build_inner_template_expressions(
     ::Type{IET},
     t,
@@ -598,10 +596,6 @@ function EB.create_expression(
     operators = options.operators
     variable_names = embed ? dataset.variable_names : nothing
     eval_options = EvalOptions(; turbo=options.turbo, bumper=options.bumper)
-    # Build the inner-expression tuple via a `::Type{IET}` dispatch barrier so
-    # that the inner expression type is bound as a `where`-variable inside the
-    # closure body, not captured as a runtime `Type` value (which Julia stores
-    # as the abstract `DataType` in closure fields, killing inference).
     inner_expressions = _build_inner_template_expressions(
         inner_expression_type,
         t,
@@ -1075,8 +1069,9 @@ struct TemplateExpressionSpec{ST<:TemplateStructure,IET,IEO<:NamedTuple} <:
         return new{ST,IET,IEO}(structure, inner_expression_type, inner_expression_options)
     end
 end
-# Positional constructor — `::Type{IET}` binds IET from the value, and Julia
-# positional defaults DO propagate the binding (unlike kwarg defaults).
+# Positional form. `::Type{IET}` with a positional default binds IET in the
+# `where` clause (kwarg defaults don't), so the inferred return type stays
+# concrete for downstream consumers.
 function TemplateExpressionSpec(
     structure::TemplateStructure,
     (::Type{IET})=ComposableExpression,
@@ -1086,14 +1081,6 @@ function TemplateExpressionSpec(
         structure, IET, inner_expression_options
     )
 end
-# Keyword-friendly form forwarding to positional. Marked `@unstable` to match
-# `Options(; ...)` — the user-facing kwarg constructor pattern in this
-# codebase. Kwarg defaults don't bind `where`-variables so the kwarg method's
-# inferred return is `TemplateExpressionSpec{..., _A, ...} where _A`, but
-# downstream consumers (which call the positional `::Type{IET}` method via
-# `@template_spec` or via this method's body at runtime) see a concrete
-# `Type{IET}`, so the cascade through `create_expression`,
-# `infer_popmember_type`, and `SearchState` remains type-stable.
 @unstable function TemplateExpressionSpec(;
     structure::TemplateStructure,
     inner_expression_type::Type=ComposableExpression,

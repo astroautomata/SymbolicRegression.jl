@@ -178,9 +178,6 @@ macro extend_mutation_weights(name, block)
         Expr(:(=), Expr(:(::), f, :Float64), getfield(defaults, f)) for f in std_names
     ]
     extra_fields = filter(e -> !(e isa LineNumberNode), block.args)
-    # Validate that every extra field is annotated ::Float64.
-    # Required because _dispatch_mutations! treats every fieldname as a mutation
-    # type, and the generated sample_mutation/copy collect field values as Float64.
     for ex in extra_fields
         type_ann = ex isa Expr && ex.head == :(=) ? ex.args[1] : ex
         if !(type_ann isa Expr && type_ann.head == :(::) && type_ann.args[2] == :Float64)
@@ -191,11 +188,7 @@ macro extend_mutation_weights(name, block)
             )
         end
     end
-    # GlobalRef ensures the generated method extends *this* module's sample_mutation,
-    # not accidentally creating a new function in the calling module.
     sample_mutation_ref = GlobalRef(@__MODULE__, :sample_mutation)
-    # Module-level const avoids allocating a new Vector{Symbol} on every
-    # sample_mutation call — consistent with how v_mutations works for MutationWeights.
     mutations_const = esc(Symbol(:_, name, :_mutations))
     return quote
         Base.@kwdef mutable struct $(esc(name)) <: AbstractMutationWeights

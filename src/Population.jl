@@ -178,9 +178,6 @@ function _best_of_sample(
 ) where {T,L,N,P<:AbstractPopMember{T,L,N}}
     p = options.tournament_selection_p
     n = length(members)  # == tournament_selection_n
-    # Adjusted cost = member.cost * ∏ plugin multipliers. Plugins that don't
-    # override `tournament_cost_multiplier` return 1.0 (no-op). The empty-
-    # tuple loop unrolls to nothing when no plugins are active.
     adjusted_costs = Vector{L}(undef, n)
     for i in 1:n
         member = members[i]

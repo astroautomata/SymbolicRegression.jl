@@ -47,9 +47,6 @@ function tournament_cost_multiplier(
     return exp(Float64(options.adaptive_parsimony_scaling) * frequency)
 end
 
-# Legacy kwarg auto-mapping: `Options(; use_frequency_in_tournament=true)`
-# appends `FrequencyWeightedTournamentPlugin()` to `options.plugins` unless
-# the user already supplied one.
 function _legacy_plugin_for(::Val{:use_frequency_in_tournament})
     FrequencyWeightedTournamentPlugin()
 end

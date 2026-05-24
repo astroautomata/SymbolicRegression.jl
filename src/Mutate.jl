@@ -177,9 +177,6 @@ function condition_mutate_constant!(
 end
 
 # Go through one simulated options.annealing mutation cycle
-# Helper: fire `on_mutation_evaluated!` for every active plugin in tuple order.
-# The compiler unrolls this over heterogeneous tuples, giving zero-overhead
-# dispatch per plugin.
 @inline function _fire_on_mutation_evaluated!(
     options::AbstractOptions, plugin_states::Tuple, event::MutationEvent, dataset
 )

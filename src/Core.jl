@@ -9,7 +9,7 @@ include("MutationWeights.jl")
 include("OptionsStruct.jl")
 include("Operators.jl")
 include("ExpressionSpec.jl")
-include("Plugin.jl")          # before Options so Options can use flatten_plugins
+include("Plugin.jl")
 include("Options.jl")
 include("InterfaceDataTypes.jl")
 

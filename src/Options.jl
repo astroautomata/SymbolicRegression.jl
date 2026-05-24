@@ -1013,16 +1013,7 @@ $(OPTION_DESCRIPTIONS)
     set_mutation_weights = create_mutation_weights(mutation_weights)
     backsolve = something(backsolve, BacksolveOptions())
 
-    # Flatten `plugins` to a heterogeneous tuple — accepts a single plugin
-    # instance, a tuple/vector of plugins, or nothing (skipped). See
-    # `flatten_plugins` in src/Plugin.jl. Pattern adapted from SciMLBase's
-    # `CallbackSet`.
     plugin_tuple = flatten_plugins(plugins)
-    # Backwards compat: legacy Options kwargs (e.g. `use_frequency_in_tournament`)
-    # are mapped to plugin instances via `_legacy_plugin_for(Val(name))`, which
-    # plugin modules overload on the kwarg symbol. If the user passes the
-    # legacy kwarg AND doesn't already have an equivalent plugin in `plugins`,
-    # we append the legacy plugin here.
     plugin_tuple = maybe_append_legacy_plugin(
         plugin_tuple, :use_frequency_in_tournament, use_frequency_in_tournament
     )

@@ -273,10 +273,6 @@ for member in dominating
 end
 ```
 
-## Plugin Interface
-
-SymbolicRegression.jl provides an experimental plugin interface for extending the search with custom algorithms and cross-generation state. See the [Plugin Development Guide](https://ai.damtp.cam.ac.uk/symbolicregression/dev/plugin-guide/) for details.
-
 ## Contributors ✨
 
 We are eager to welcome new contributors!

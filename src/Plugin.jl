@@ -2,11 +2,6 @@ module PluginModule
 
 using DispatchDoctor: @unstable
 
-# Note: this module is intentionally free of dependencies on `AbstractOptions`
-# (or any other Core sub-module) so it can be `include`d before `Options.jl`
-# and re-exported back into `Options`. Hook signatures accept `options`
-# untyped; concrete plugin types specialise the dispatch.
-
 """
     AbstractPlugin
 
@@ -282,8 +277,6 @@ function init_member(::AbstractPlugin, ::AbstractPluginState, dataset, options)
     return nothing
 end
 
-# ── Legacy kwarg → plugin mapping ────────────────────────────────────────────
-
 """
     _legacy_plugin_for(::Val{kwarg_name}) -> Union{Nothing,AbstractPlugin}
 
@@ -319,8 +312,6 @@ it's only called from within `Options(; ...)`, which is itself `@unstable`.
     any(p -> typeof(p) === typeof(legacy), plugins) && return plugins
     return (plugins..., legacy)
 end
-
-# ── Tuple-of-plugins helpers ─────────────────────────────────────────────────
 
 """
     flatten_plugins(plugins...) -> Tuple

@@ -219,7 +219,6 @@ using DispatchDoctor: @stable, @unstable
     include("InterfaceDynamicQuantities.jl")
     include("Core.jl")
     include("InterfaceDynamicExpressions.jl")
-    # Note: Plugin.jl is included inside Core.jl → CoreModule
     include("Recorder.jl")
     include("Complexity.jl")
     include("DimensionalAnalysis.jl")
@@ -739,7 +738,6 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    # One state instance per plugin, allocated on the head node.
     plugin_states = init_plugin_states(options.plugins, options, datasets)
 
     return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,typeof(plugin_states)}(;
@@ -853,7 +851,6 @@ function _initialize_search!(
             end
         push!(state.worker_output[j], new_pop)
     end
-    # Fire `on_search_start!` for each active plugin in tuple order.
     for (plugin, pstate) in zip(options.plugins, state.plugin_states)
         on_search_start!(plugin, pstate, datasets, options, ropt)
     end
@@ -910,11 +907,8 @@ function _warmup_search!(
         PM = popmember_type(PopType)
         HallType = HallOfFame{T,L,N,PM}
 
-        # Use a pre-populated tuple of NoPluginState refs so that
-        # init_plugin_states is not called during warmup — worker states are
-        # initialized lazily on the first real iteration in _main_search_loop!.
-        # (`nothing` would trigger lazy init; an already-populated tuple of
-        # NoPluginState() suppresses it intentionally.)
+        # Pre-populated (not `nothing`) so warmup skips lazy init; real states
+        # are allocated in `_main_search_loop!`.
         c_plugin_states_ref = Ref{Union{Nothing,Tuple}}(
             ntuple(_ -> NoPluginState(), length(options.plugins))
         )
@@ -950,10 +944,8 @@ function _main_search_loop!(
     ropt.verbosity > 0 && @info "Started!"
     nout = length(datasets)
 
-    # Allocate per-(output, population) worker plugin-states refs outside the
-    # loop so state persists across iterations (important for multithreading
-    # mode). Each ref holds either `nothing` (will lazy-init via
-    # `init_plugin_states` on first iteration) or a tuple of per-plugin states.
+    # Allocated outside the loop so state persists across iterations under
+    # `:multithreading`. `nothing` triggers lazy init on first cycle.
     worker_plugin_states_refs = [
         [Ref{Union{Nothing,Tuple}}(nothing) for i in 1:(options.populations)] for
         j in 1:nout
@@ -1075,7 +1067,6 @@ function _main_search_loop!(
             end
             ###################################################################
 
-            # Fire `on_generation_complete!` for each plugin in tuple order.
             for (plugin, pstate) in zip(options.plugins, state.plugin_states)
                 on_generation_complete!(plugin, pstate, state, datasets, options, ropt)
             end
@@ -1215,8 +1206,8 @@ function _tear_down!(
     options::AbstractOptions,
 )
     close_reader!(state.stdin_reader)
-    # Wait for all in-flight workers before calling on_search_end!, so the hook
-    # sees all worker output (e.g., can fully drain Channels written by workers).
+    # Drain in-flight workers so `on_search_end!` sees the full worker output
+    # (e.g. so plugins can `take!` from worker-written Channels).
     if ropt.parallelism == :multiprocessing
         # TODO: We should unwrap the error monitors here
         state.we_created_procs && rmprocs(state.procs)
@@ -1226,7 +1217,6 @@ function _tear_down!(
             wait(state.worker_output[j][i])
         end
     end
-    # Fire `on_search_end!` for each plugin in tuple order.
     for (plugin, pstate) in zip(options.plugins, state.plugin_states)
         on_search_end!(plugin, pstate, state, datasets, options, ropt)
     end
@@ -1264,8 +1254,6 @@ end
     running_search_statistics,
     plugin_states_ref::Ref{Union{Nothing,Tuple}}=Ref{Union{Nothing,Tuple}}(nothing),
 ) where {T,L,N}
-    # Lazily initialize per-worker plugin states on first call. Returns a tuple
-    # aligned with `options.plugins`.
     if isnothing(plugin_states_ref[])
         plugin_states_ref[] = init_plugin_states(options.plugins, options, (dataset,))
     end
@@ -1303,7 +1291,6 @@ end
             end
         end
     end
-    # Fire `on_population_evaluated!` for each plugin in tuple order.
     for (plugin, pstate) in zip(options.plugins, worker_plugin_states)
         on_population_evaluated!(plugin, pstate, out_pop, dataset, best_seen, options)
     end
