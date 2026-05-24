@@ -26,6 +26,7 @@ using ..CoreModule:
     RecordType,
     max_features,
     create_expression,
+    init_value,
     AbstractPluginState,
     NoPluginState
 using ..ComplexityModule: compute_complexity
@@ -44,7 +45,7 @@ function logging_callback! end
     ::Type{T}, ::Type{L}, dataset::D, options
 ) where {T,L,D<:Dataset}
     NodeType = with_type_parameters(options.node_type, T)
-    prototype = constructorof(NodeType)(; val=zero(T))
+    prototype = constructorof(NodeType)(; val=init_value(T))
     N = typeof(create_expression(prototype, options, dataset))
     return with_type_parameters(options.popmember_type, T, L, N)
 end

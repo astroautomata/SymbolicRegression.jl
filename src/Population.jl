@@ -56,9 +56,6 @@ end
 function _init_tree(
     dataset, options, nlength::Int, nfeatures::Int, ::Type{T}, plugin_states::Tuple
 ) where {T}
-    # Build the random-tree fallback eagerly so its type defines the
-    # concrete return type; the plugin's candidate is type-asserted to
-    # match, both stabilising inference and validating the plugin output.
     fallback = gen_random_tree(nlength, options, nfeatures, T)
     candidate = invoke_init_member(plugin_states, options.plugins, dataset, options)
     return isnothing(candidate) ? fallback : candidate::typeof(fallback)
@@ -171,7 +168,7 @@ function _best_of_sample(
     p = options.tournament_selection_p
     n = length(members)  # == tournament_selection_n
     adjusted_costs = Vector{L}(undef, n)
-    for i in 1:n
+    for i in eachindex(members, adjusted_costs)
         member = members[i]
         cost = L(member.cost)
         for (plugin, pstate) in zip(options.plugins, plugin_states)

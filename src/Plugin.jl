@@ -364,6 +364,8 @@ function init_member(::AbstractPluginState, ::AbstractPlugin, dataset, options)
     return nothing
 end
 
+# `Base.tail` recursion (vs a `for` loop) so heterogeneous tuples are walked
+# type-stably with early exit on the first non-`nothing` candidate.
 @inline invoke_init_member(::Tuple{}, ::Tuple{}, dataset, options) = nothing
 @inline function invoke_init_member(states::Tuple, plugins::Tuple, dataset, options)
     candidate = init_member(states[1], plugins[1], dataset, options)
@@ -374,26 +376,16 @@ end
     end
 end
 
-# Each kwarg → plugin migration gets a forward-declared "default plugin
-# builder" here. The plugin module that owns the migration provides the only
-# method (plugin modules live above Core in the include order, so Options.jl
-# can't name their plugin types directly). Each builder returns `Tuple` of
-# plugin instances to append (or `()` to skip). Options.jl composes the
-# builders' outputs with the user-supplied `plugins` tuple.
+# Forward-declared per kwarg→plugin migration. Plugin modules (loaded above
+# Core) provide the only method.
 function default_adaptive_parsimony_plugins end
 
-# Merge a user-supplied `plugins::Tuple` with a tuple of default plugins,
-# skipping any default whose type is already represented in the user tuple
-# (so a user-passed instance takes precedence over the auto-default).
+# Append defaults whose type isn't already in the user tuple.
 @unstable function _merge_with_default_plugins(
     @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins::Tuple)
 )
-    out = user_plugins
-    for dp in default_plugins
-        any(p -> typeof(p) === typeof(dp), out) && continue
-        out = (out..., dp)
-    end
-    return out
+    novel = filter(dp -> !any(p -> p isa typeof(dp), user_plugins), default_plugins)
+    return (user_plugins..., novel...)
 end
 
 end  # module PluginModule

@@ -896,7 +896,7 @@ function _warmup_search!(
         HallType = HallOfFame{T,L,N,PM}
 
         # Snapshot each plugin's head-side state for this worker dispatch.
-        c_plugin_states = map(
+        worker_plugin_states = map(
             (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
             options.plugins,
             state.plugin_states,
@@ -913,7 +913,7 @@ function _warmup_search!(
                     iteration=0,
                     ropt.verbosity,
                     cur_maxsize,
-                    plugin_states=c_plugin_states,
+                    plugin_states=worker_plugin_states,
                 )::DefaultWorkerOutputType{Population{T,L,N},HallOfFame{T,L,N}}
             end,
             parallelism = ropt.parallelism,
@@ -1069,7 +1069,7 @@ function _main_search_loop!(
             end
 
             in_pop = copy(cur_pop::Population{T,L,N})
-            c_plugin_states = map(
+            worker_plugin_states = map(
                 (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
                 options.plugins,
                 state.plugin_states,
@@ -1085,7 +1085,7 @@ function _main_search_loop!(
                         iteration,
                         ropt.verbosity,
                         cur_maxsize,
-                        plugin_states=c_plugin_states,
+                        plugin_states=worker_plugin_states,
                     )
                 end,
                 parallelism = ropt.parallelism,
