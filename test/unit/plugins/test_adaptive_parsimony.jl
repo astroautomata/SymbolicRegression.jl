@@ -73,7 +73,7 @@ end
     end
 
     # prepare_dispatch_state normalizes + extracts the slice for the given output.
-    worker_state = prepare_dispatch_state(plugin, head_state, 1, dataset)
+    worker_state = prepare_dispatch_state(head_state, plugin, 1, dataset)
     @test length(worker_state.rss) == 1
     @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0  atol = 1e-9
     @test worker_state.rss[1] !== rss  # snapshot is independent of head
@@ -86,13 +86,13 @@ end
     m5 = PM(dataset, n5, opts; deterministic=false)
 
     # Frequent complexity (1) gets a larger multiplier than the rare one (5).
-    mult1 = tournament_cost_multiplier(plugin, worker_state, m1, opts)
-    mult5 = tournament_cost_multiplier(plugin, worker_state, m5, opts)
+    mult1 = tournament_cost_multiplier(worker_state, plugin, m1, opts)
+    mult5 = tournament_cost_multiplier(worker_state, plugin, m5, opts)
     @test mult1 > mult5
     @test mult1 > 1.0
 
     # mutation_acceptance: small parent (high old_freq), big new (low new_freq) → >1.
-    mult_mut = mutation_acceptance_multiplier(plugin, worker_state, m1, n5, opts)
+    mult_mut = mutation_acceptance_multiplier(worker_state, plugin, m1, n5, opts)
     @test mult_mut > 1.0
 
     # Flag toggles produce identity multipliers when off.
@@ -100,14 +100,14 @@ end
         tournament=false, mutation_acceptance=true
     )
     p_mut_off = AdaptiveParsimonyPlugin(; tournament=true, mutation_acceptance=false)
-    @test tournament_cost_multiplier(p_tournament_off, worker_state, m1, opts) == 1.0
-    @test mutation_acceptance_multiplier(p_mut_off, worker_state, m1, n5, opts) == 1.0
+    @test tournament_cost_multiplier(worker_state, p_tournament_off, m1, opts) == 1.0
+    @test mutation_acceptance_multiplier(worker_state, p_mut_off, m1, n5, opts) == 1.0
 
     # Out-of-range complexity (size > maxsize) → frequency = 0 → tournament multiplier
     # = exp(scaling * 0) = 1.0. Hits the "size out of range" branch.
     big_tree = foldl((acc, _) -> acc + n1, 1:30; init=Node{Float64}(; val=1.0))
     m_huge = PM(dataset, big_tree, opts; deterministic=false)
-    @test tournament_cost_multiplier(plugin, worker_state, m_huge, opts) == 1.0
+    @test tournament_cost_multiplier(worker_state, plugin, m_huge, opts) == 1.0
 end
 
 @testitem "AdaptiveParsimonyPlugin: end-to-end equation_search" begin

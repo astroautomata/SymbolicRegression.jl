@@ -60,7 +60,7 @@ function _init_tree(
     # concrete return type; the plugin's candidate is type-asserted to
     # match, both stabilising inference and validating the plugin output.
     fallback = gen_random_tree(nlength, options, nfeatures, T)
-    candidate = invoke_init_member(options.plugins, plugin_states, dataset, options)
+    candidate = invoke_init_member(plugin_states, options.plugins, dataset, options)
     return isnothing(candidate) ? fallback : candidate::typeof(fallback)
 end
 
@@ -175,7 +175,7 @@ function _best_of_sample(
         member = members[i]
         cost = L(member.cost)
         for (plugin, pstate) in zip(options.plugins, plugin_states)
-            cost *= L(tournament_cost_multiplier(plugin, pstate, member, options))
+            cost *= L(tournament_cost_multiplier(pstate, plugin, member, options))
         end
         adjusted_costs[i] = cost
     end

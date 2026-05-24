@@ -33,31 +33,33 @@
     @test init_plugin_state(p, opts, []) isa NoPluginState
     s = NoPluginState()
 
-    # Observers default to no-op (return nothing).
-    @test on_search_start!(p, s, [], opts, nothing) === nothing
-    @test on_search_end!(p, s, nothing, [], opts, nothing) === nothing
-    @test on_generation_end!(p, s, nothing, [], opts, nothing, 1, nothing) === nothing
-    @test on_cycle_end!(p, s, nothing, nothing, nothing, opts) === nothing
+    # Observers default to no-op (return nothing). Hooks follow the convention
+    # (state, plugin, ...) so the mutated `state` is first.
+    @test on_search_start!(s, p, [], opts, nothing) === nothing
+    @test on_search_end!(s, p, nothing, [], opts, nothing) === nothing
+    @test on_generation_end!(s, p, nothing, [], opts, nothing, 1, nothing) === nothing
+    @test on_cycle_end!(s, p, nothing, nothing, nothing, opts) === nothing
     @test on_mutation_end!(
-        p, s, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
+        s, p, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
     ) === nothing
 
     # Factory defaults: init_member returns nothing, prepare_dispatch_state
     # deepcopies the head state.
-    @test init_member(p, s, nothing, opts) === nothing
+    @test init_member(s, p, nothing, opts) === nothing
     head = NoPluginState()
-    snap = prepare_dispatch_state(p, head, 1, nothing)
+    snap = prepare_dispatch_state(head, p, 1, nothing)
     @test snap isa NoPluginState
     @test snap !== head  # default = deepcopy
 
     # Modifier defaults return 1.0 (multiplicative identity).
-    @test tournament_cost_multiplier(p, s, nothing, opts) == 1.0
-    @test mutation_acceptance_multiplier(p, s, nothing, nothing, opts) == 1.0
+    @test tournament_cost_multiplier(s, p, nothing, opts) == 1.0
+    @test mutation_acceptance_multiplier(s, p, nothing, nothing, opts) == 1.0
 
-    # Conditioner default leaves weights untouched.
+    # Conditioner default leaves weights untouched. `weights` is the mutated
+    # arg → first; then state, then plugin.
     w = MutationWeights()
     before = (w.mutate_constant, w.add_node, w.delete_node)
-    @test condition_mutation_weights!(p, s, w, nothing, opts, 20, 2) === nothing
+    @test condition_mutation_weights!(w, s, p, nothing, opts, 20, 2) === nothing
     @test (w.mutate_constant, w.add_node, w.delete_node) == before
 end
 
@@ -87,16 +89,16 @@ end
         p.counter_ch
     )
     SymbolicRegression.on_search_start!(
-        ::LifecyclePlugin, s::LifecyclePluginState, d, o, r
+        s::LifecyclePluginState, ::LifecyclePlugin, d, o, r
     ) = (put!(s.counter_ch, :start); nothing)
     SymbolicRegression.on_search_end!(
-        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r
+        s::LifecyclePluginState, ::LifecyclePlugin, ss, d, o, r
     ) = (put!(s.counter_ch, :end); nothing)
     SymbolicRegression.on_generation_end!(
-        ::LifecyclePlugin, s::LifecyclePluginState, ss, d, o, r, oi, rp
+        s::LifecyclePluginState, ::LifecyclePlugin, ss, d, o, r, oi, rp
     ) = (put!(s.counter_ch, :gen); nothing)
     SymbolicRegression.on_cycle_end!(
-        ::LifecyclePlugin, s::LifecyclePluginState, pop, d, h, o
+        s::LifecyclePluginState, ::LifecyclePlugin, pop, d, h, o
     ) = (put!(s.counter_ch, :pop); nothing)
 
     opts = Options(;
@@ -147,10 +149,10 @@ end
     SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
     SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
     SymbolicRegression.on_generation_end!(
-        ::PluginA, s::PluginAState, ss, d, o, r, oi, rp
+        s::PluginAState, ::PluginA, ss, d, o, r, oi, rp
     ) = (s.calls[] += 1; nothing)
     SymbolicRegression.on_generation_end!(
-        ::PluginB, s::PluginBState, ss, d, o, r, oi, rp
+        s::PluginBState, ::PluginB, ss, d, o, r, oi, rp
     ) = (s.calls[] += 1; nothing)
 
     opts = Options(;
@@ -188,7 +190,7 @@ end
     )
     # Return nothing to fall through to gen_random_tree, but count calls
     SymbolicRegression.init_member(
-        ::InitMemberPlugin, s::InitMemberPluginState, dataset, options
+        s::InitMemberPluginState, ::InitMemberPlugin, dataset, options
     ) = (s.calls[] += 1; nothing)
 
     opts = Options(;
@@ -226,7 +228,7 @@ end
     SymbolicRegression.init_plugin_state(p::SeedingPlugin, o, d) =
         SeedingPluginState(p.calls)
     function SymbolicRegression.init_member(
-        ::SeedingPlugin, s::SeedingPluginState, dataset, options
+        s::SeedingPluginState, ::SeedingPlugin, dataset, options
     )
         s.calls[] += 1
         nlength = 3
@@ -269,7 +271,7 @@ end
         p.events_ch
     )
     function SymbolicRegression.on_mutation_end!(
-        ::MutEvalPlugin, state::MutEvalPluginState, event::MutationEvent, dataset, opts
+        state::MutEvalPluginState, ::MutEvalPlugin, event::MutationEvent, dataset, opts
     )
         put!(state.events_ch, event)
         return nothing
@@ -329,9 +331,9 @@ end
     mutable struct ZeroConstState <: AbstractPluginState end
     SymbolicRegression.init_plugin_state(::ZeroConstPlugin, o, d) = ZeroConstState()
     function SymbolicRegression.condition_mutation_weights!(
-        ::ZeroConstPlugin,
-        ::ZeroConstState,
         weights,
+        ::ZeroConstState,
+        ::ZeroConstPlugin,
         member,
         options,
         curmaxsize,

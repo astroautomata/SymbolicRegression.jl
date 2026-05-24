@@ -844,7 +844,7 @@ function _initialize_search!(
         push!(state.worker_output[j], new_pop)
     end
     for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-        on_search_start!(plugin, pstate, datasets, options, ropt)
+        on_search_start!(pstate, plugin, datasets, options, ropt)
     end
     return nothing
 end
@@ -897,7 +897,7 @@ function _warmup_search!(
 
         # Snapshot each plugin's head-side state for this worker dispatch.
         c_plugin_states = map(
-            (p, hs) -> prepare_dispatch_state(p, hs, j, dataset),
+            (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
             options.plugins,
             state.plugin_states,
         )
@@ -1046,7 +1046,7 @@ function _main_search_loop!(
 
             for (plugin, pstate) in zip(options.plugins, state.plugin_states)
                 on_generation_end!(
-                    plugin, pstate, state, datasets, options, ropt, j, cur_pop
+                    pstate, plugin, state, datasets, options, ropt, j, cur_pop
                 )
             end
 
@@ -1070,7 +1070,7 @@ function _main_search_loop!(
 
             in_pop = copy(cur_pop::Population{T,L,N})
             c_plugin_states = map(
-                (p, hs) -> prepare_dispatch_state(p, hs, j, dataset),
+                (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
                 options.plugins,
                 state.plugin_states,
             )
@@ -1198,7 +1198,7 @@ function _tear_down!(
         end
     end
     for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-        on_search_end!(plugin, pstate, state, datasets, options, ropt)
+        on_search_end!(pstate, plugin, state, datasets, options, ropt)
     end
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
@@ -1268,7 +1268,7 @@ end
         end
     end
     for (plugin, pstate) in zip(options.plugins, worker_plugin_states)
-        on_cycle_end!(plugin, pstate, out_pop, dataset, best_seen, options)
+        on_cycle_end!(pstate, plugin, out_pop, dataset, best_seen, options)
     end
     return (out_pop, best_seen, record, num_evals)
 end

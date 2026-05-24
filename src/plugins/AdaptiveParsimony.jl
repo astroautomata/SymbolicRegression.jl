@@ -151,8 +151,8 @@ function init_plugin_state(::AdaptiveParsimonyPlugin, options, datasets)
 end
 
 function prepare_dispatch_state(
-    ::AdaptiveParsimonyPlugin,
     head_state::AdaptiveParsimonyState,
+    ::AdaptiveParsimonyPlugin,
     output_index::Int,
     dataset,
 )
@@ -162,8 +162,8 @@ function prepare_dispatch_state(
 end
 
 function tournament_cost_multiplier(
-    p::AdaptiveParsimonyPlugin,
     s::AdaptiveParsimonyState,
+    p::AdaptiveParsimonyPlugin,
     member,
     options::AbstractOptions,
 )
@@ -179,8 +179,8 @@ function tournament_cost_multiplier(
 end
 
 function mutation_acceptance_multiplier(
-    p::AdaptiveParsimonyPlugin,
     s::AdaptiveParsimonyState,
+    p::AdaptiveParsimonyPlugin,
     parent_member,
     new_tree,
     options::AbstractOptions,
@@ -205,8 +205,8 @@ end
 # Head-side per-cycle hook: update frequencies for the returned population's
 # output, then slide the window to keep memory bounded.
 function on_generation_end!(
-    ::AdaptiveParsimonyPlugin,
     s::AdaptiveParsimonyState,
+    ::AdaptiveParsimonyPlugin,
     search_state,
     datasets,
     options,

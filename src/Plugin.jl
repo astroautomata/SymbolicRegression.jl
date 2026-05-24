@@ -40,6 +40,24 @@ using DispatchDoctor: @unstable
 # feels ambiguous, the contract probably isn't one of these six — rethink
 # whether you need a new category or are forcing the feature into the wrong
 # shape.
+#
+# ── Hook argument-order convention ──────────────────────────────────────────
+#
+# All hooks follow the same positional convention:
+#
+#     (mutated_thing_if_any, state, plugin, ...other_context)
+#
+# - For `!` functions that mutate one specific thing (e.g.
+#   `condition_X!(X, ...)`), the mutated thing is the FIRST arg, then
+#   `state`, then `plugin`.
+# - For observer `on_X_end!` hooks, the state is the mutated thing, so
+#   ordering is `(state, plugin, ...)`.
+# - For non-`!` hooks that read state without mutating (`*_multiplier`,
+#   `init_member`, etc.), ordering is still `(state, plugin, ...)`.
+# - For constructor hooks that *create* a state (`init_plugin_state`) — no
+#   state exists yet, so plugin is the dispatch key and goes first.
+#
+# The verb/suffix in the name + this ordering rule together ARE the contract.
 # ────────────────────────────────────────────────────────────────────────────
 
 """
@@ -139,7 +157,7 @@ Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_search_start!(::AbstractPlugin, ::AbstractPluginState, datasets, options, ropt)
+function on_search_start!(::AbstractPluginState, ::AbstractPlugin, datasets, options, ropt)
     return nothing
 end
 
@@ -154,7 +172,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 !!! warning "Experimental"
 """
 function on_search_end!(
-    ::AbstractPlugin, ::AbstractPluginState, search_state, datasets, options, ropt
+    ::AbstractPluginState, ::AbstractPlugin, search_state, datasets, options, ropt
 )
     return nothing
 end
@@ -175,8 +193,8 @@ Override by dispatching on your plugin type. Default is a no-op.
 !!! warning "Experimental"
 """
 function on_generation_end!(
-    ::AbstractPlugin,
     ::AbstractPluginState,
+    ::AbstractPlugin,
     search_state,
     datasets,
     options,
@@ -200,7 +218,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 !!! warning "Experimental"
 """
 function on_cycle_end!(
-    ::AbstractPlugin, ::AbstractPluginState, pop, dataset, hof, options
+    ::AbstractPluginState, ::AbstractPlugin, pop, dataset, hof, options
 )
     return nothing
 end
@@ -265,17 +283,17 @@ Default is a no-op.
 !!! warning "Experimental"
 """
 function on_mutation_end!(
-    ::AbstractPlugin, ::AbstractPluginState, ::MutationEvent, dataset, options
+    ::AbstractPluginState, ::AbstractPlugin, ::MutationEvent, dataset, options
 )
     return nothing
 end
 
 """
-    tournament_cost_multiplier(plugin, state, member, options) -> Real
+    tournament_cost_multiplier(state, plugin, member, options) -> Real
 
 Per-plugin multiplier applied to a candidate's `member.cost` during tournament
 selection in `_best_of_sample`. Plugins compose multiplicatively: the
-adjusted cost is `member.cost * ∏ tournament_cost_multiplier(p, s, ...)`
+adjusted cost is `member.cost * ∏ tournament_cost_multiplier(s, p, ...)`
 across all plugins in tuple order. Default returns `1.0` (no adjustment).
 
 The shipped `AdaptiveParsimonyPlugin` is the canonical example; it reads
@@ -284,13 +302,13 @@ frequency statistics from its own state, not from an engine-passed arg.
 !!! warning "Experimental"
 """
 function tournament_cost_multiplier(
-    ::AbstractPlugin, ::AbstractPluginState, member, options
+    ::AbstractPluginState, ::AbstractPlugin, member, options
 )
     return 1.0
 end
 
 """
-    mutation_acceptance_multiplier(plugin, state, parent_member, new_tree, options) -> Real
+    mutation_acceptance_multiplier(state, plugin, parent_member, new_tree, options) -> Real
 
 Per-plugin multiplier applied to `probChange` inside `next_generation`, after
 the annealing factor (if any) is folded in. Plugins compose multiplicatively;
@@ -299,13 +317,13 @@ defaults to `1.0` (no adjustment).
 !!! warning "Experimental"
 """
 function mutation_acceptance_multiplier(
-    ::AbstractPlugin, ::AbstractPluginState, parent_member, new_tree, options
+    ::AbstractPluginState, ::AbstractPlugin, parent_member, new_tree, options
 )
     return 1.0
 end
 
 """
-    prepare_dispatch_state(plugin, head_state, output_index::Int, dataset) -> AbstractPluginState
+    prepare_dispatch_state(head_state, plugin, output_index::Int, dataset) -> AbstractPluginState
 
 Build the worker-side plugin state for one cycle's dispatch, given the head
 node's current plugin state, the output index (`1:nout` in multi-target
@@ -319,13 +337,13 @@ slice for `output_index` so per-output independence is preserved.
 !!! warning "Experimental"
 """
 function prepare_dispatch_state(
-    ::AbstractPlugin, head_state::AbstractPluginState, output_index::Int, dataset
+    head_state::AbstractPluginState, ::AbstractPlugin, output_index::Int, dataset
 )
     return deepcopy(head_state)
 end
 
 """
-    init_member(plugin, state, dataset, options)
+    init_member(state, plugin, dataset, options)
 
 Called when initializing each population member's tree during **initial
 population creation only**. Called per plugin; the first plugin whose hook
@@ -342,15 +360,15 @@ Override by dispatching on your plugin type. Default returns `nothing`.
 
 !!! warning "Experimental"
 """
-function init_member(::AbstractPlugin, ::AbstractPluginState, dataset, options)
+function init_member(::AbstractPluginState, ::AbstractPlugin, dataset, options)
     return nothing
 end
 
 @inline invoke_init_member(::Tuple{}, ::Tuple{}, dataset, options) = nothing
-@inline function invoke_init_member(plugins::Tuple, states::Tuple, dataset, options)
-    candidate = init_member(plugins[1], states[1], dataset, options)
+@inline function invoke_init_member(states::Tuple, plugins::Tuple, dataset, options)
+    candidate = init_member(states[1], plugins[1], dataset, options)
     return if candidate === nothing
-        invoke_init_member(Base.tail(plugins), Base.tail(states), dataset, options)
+        invoke_init_member(Base.tail(states), Base.tail(plugins), dataset, options)
     else
         candidate
     end

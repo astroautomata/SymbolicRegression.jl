@@ -171,9 +171,9 @@ biases). Default is a no-op.
 !!! warning "Experimental"
 """
 function condition_mutation_weights!(
-    ::AbstractPlugin,
-    ::AbstractPluginState,
     weights::AbstractMutationWeights,
+    ::AbstractPluginState,
+    ::AbstractPlugin,
     member,
     options,
     curmaxsize,
@@ -203,7 +203,7 @@ end
     options::AbstractOptions, plugin_states::Tuple, event::MutationEvent, dataset
 )
     for (plugin, pstate) in zip(options.plugins, plugin_states)
-        on_mutation_end!(plugin, pstate, event, dataset, options)
+        on_mutation_end!(pstate, plugin, event, dataset, options)
     end
     return nothing
 end
@@ -234,7 +234,7 @@ end
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
     for (plugin, pstate) in zip(options.plugins, plugin_states)
         condition_mutation_weights!(
-            plugin, pstate, weights, member, options, curmaxsize, nfeatures
+            weights, pstate, plugin, member, options, curmaxsize, nfeatures
         )
     end
 
@@ -368,7 +368,7 @@ end
     end
     for (plugin, pstate) in zip(options.plugins, plugin_states)
         probChange *= mutation_acceptance_multiplier(
-            plugin, pstate, member, tree, options
+            pstate, plugin, member, tree, options
         )
     end
 
