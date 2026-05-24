@@ -484,25 +484,6 @@ function CO.set_constants_for_optimization!(e::TemplateExpression, constants, re
     end
     return e
 end
-function CO.extract_gradient_for_optimization(grad, ex::TemplateExpression{T}) where {T}
-    inner_grad = map(
-        CO.extract_gradient_for_optimization,
-        values(get_contents(grad)),
-        values(get_contents(ex)),
-    )
-    parameter_pieces = if has_params(ex)
-        grad_params = get_metadata(grad).parameters
-        map(k -> _parameter_data(grad_params[k]), keys(get_metadata(ex).parameters))
-    else
-        ()
-    end
-    return if isempty(inner_grad) && isempty(parameter_pieces)
-        T[]
-    else
-        vcat(inner_grad..., parameter_pieces...)
-    end
-end
-
 Base.@kwdef struct PreallocatedTemplateExpression{A,B}
     trees::A
     parameters::B
@@ -1093,11 +1074,16 @@ end
 
 # COV_EXCL_START
 ES.get_expression_type(::TemplateExpressionSpec) = TemplateExpression
-ES.get_expression_options(spec::TemplateExpressionSpec) = (;
-    spec.structure,
-    spec.inner_expression_type,
-    spec.inner_expression_options,
-)
+# Explicit NamedTuple type pins `inner_expression_type` as `Type{IET}`
+# (a `(; ...)` shorthand widens it to `Type`, killing inference).
+function ES.get_expression_options(
+    spec::TemplateExpressionSpec{ST,IET,IEO}
+) where {ST,IET,IEO}
+    return NamedTuple{
+        (:structure, :inner_expression_type, :inner_expression_options),
+        Tuple{ST,Type{IET},IEO},
+    }((spec.structure, spec.inner_expression_type, spec.inner_expression_options))
+end
 ES.get_node_type(::TemplateExpressionSpec) = Node
 # COV_EXCL_STOP
 

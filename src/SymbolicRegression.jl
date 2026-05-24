@@ -1231,11 +1231,11 @@ end
     iteration::Int,
     verbosity,
     cur_maxsize::Int,
-    plugin_states::Tuple=map(
-        p -> init_plugin_state(p, options, (dataset,)), options.plugins
-    ),
+    plugin_states::Union{Tuple,Nothing}=nothing,
 ) where {T,L,N}
-    worker_plugin_states = plugin_states
+    worker_plugin_states = @something(
+        plugin_states, map(p -> init_plugin_state(p, options, (dataset,)), options.plugins)
+    )
 
     record = RecordType()
     @recorder record["out$(out)_pop$(pop)"] = RecordType(
