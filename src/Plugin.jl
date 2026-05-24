@@ -242,15 +242,32 @@ selection in `_best_of_sample`. Plugins compose multiplicatively: the
 adjusted cost is `member.cost * ∏ tournament_cost_multiplier(p, s, ...)`
 across all plugins in tuple order. Default returns `1.0` (no adjustment).
 
-Use this to bias selection (e.g. against over-represented complexities or
-in favour of recently-improved equations) without rewriting the tournament
-loop. The `FrequencyWeightedTournamentPlugin` shipped under
-`src/plugins/FrequencyWeightedTournament.jl` is the canonical example.
+The shipped `AdaptiveParsimonyPlugin` is the canonical example.
 
 !!! warning "Experimental"
 """
 function tournament_cost_multiplier(
     ::AbstractPlugin, ::AbstractPluginState, member, running_search_statistics, options
+)
+    return 1.0
+end
+
+"""
+    mutation_acceptance_multiplier(plugin, state, parent_member, new_tree, running_search_statistics, options) -> Real
+
+Per-plugin multiplier applied to `probChange` inside `next_generation`, after
+the annealing factor (if any) is folded in. Plugins compose multiplicatively;
+defaults to `1.0` (no adjustment).
+
+!!! warning "Experimental"
+"""
+function mutation_acceptance_multiplier(
+    ::AbstractPlugin,
+    ::AbstractPluginState,
+    parent_member,
+    new_tree,
+    running_search_statistics,
+    options,
 )
     return 1.0
 end
@@ -277,66 +294,6 @@ function init_member(::AbstractPlugin, ::AbstractPluginState, dataset, options)
     return nothing
 end
 
-"""
-    _legacy_plugin_for(::Val{kwarg_name}) -> Union{Nothing,AbstractPlugin}
-
-Late-bound mapping from a legacy `Options` kwarg name to the plugin instance
-that replaces its behaviour. Plugin modules overload this on the kwarg name
-symbol (e.g. `::Val{:use_frequency_in_tournament}`) so that
-`Options(; use_frequency_in_tournament=true)` automatically appends the
-matching plugin to `options.plugins`. Default returns `nothing` (no plugin
-auto-registered for this kwarg).
-
-Used by `Options` construction to keep legacy flags working after the
-underlying feature has been migrated to a plugin.
-"""
-_legacy_plugin_for(::Val) = nothing
-
-"""
-    maybe_append_legacy_plugin(plugins, kwarg_name::Symbol, kwarg_value) -> Tuple
-
-If `kwarg_value === true` and the plugin already in `plugins` doesn't match
-the legacy plugin type for `kwarg_name`, append the legacy plugin. Otherwise
-return `plugins` unchanged.
-
-This helper is intentionally type-unstable in its return (the return is
-`Union{Tuple{}, Tuple{LegacyPlugin}}` depending on the runtime branch), so
-it's only called from within `Options(; ...)`, which is itself `@unstable`.
-"""
-@unstable function maybe_append_legacy_plugin(
-    plugins::Tuple, kwarg_name::Symbol, kwarg_value
-)
-    kwarg_value === true || return plugins
-    legacy = _legacy_plugin_for(Val(kwarg_name))
-    legacy === nothing && return plugins
-    any(p -> typeof(p) === typeof(legacy), plugins) && return plugins
-    return (plugins..., legacy)
-end
-
-"""
-    flatten_plugins(plugins...) -> Tuple
-
-Recursively flatten a varargs list of plugins, skipping `nothing` and
-splatting nested tuples. Returns a heterogeneous tuple of `AbstractPlugin`
-instances. Pattern adapted from SciMLBase's `CallbackSet`.
-"""
-@inline flatten_plugins() = ()
-@inline flatten_plugins(p::AbstractPlugin, rest...) = (p, flatten_plugins(rest...)...)
-@inline flatten_plugins(::Nothing, rest...) = flatten_plugins(rest...)
-@inline flatten_plugins(ps::Tuple, rest...) = (
-    flatten_plugins(ps...)..., flatten_plugins(rest...)...
-)
-@inline flatten_plugins(ps::AbstractVector, rest...) = (
-    flatten_plugins(ps...)..., flatten_plugins(rest...)...
-)
-
-"""
-    invoke_init_member(plugins, states, dataset, options) -> Union{Nothing,AbstractExpression}
-
-Walk the plugin tuple, calling `init_member` on each `(plugin, state)` pair.
-Returns the first non-`nothing` result, or `nothing` if all plugins decline.
-Used by `Population._init_tree` to give plugins a chance to seed members.
-"""
 @inline invoke_init_member(::Tuple{}, ::Tuple{}, dataset, options) = nothing
 @inline function invoke_init_member(plugins::Tuple, states::Tuple, dataset, options)
     candidate = init_member(plugins[1], states[1], dataset, options)
@@ -346,5 +303,12 @@ Used by `Population._init_tree` to give plugins a chance to seed members.
         candidate
     end
 end
+
+# Each kwarg → plugin migration gets one forward-declared injector here.
+# The plugin module that owns the migration provides the only method
+# (necessary because plugin modules live above Core in the include order, so
+# Options.jl can't name their plugin types directly). The plugin module
+# always loads before any Options is constructed at runtime.
+function _inject_adaptive_parsimony_plugin end
 
 end  # module PluginModule

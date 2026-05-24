@@ -39,7 +39,7 @@ using ..OperatorsModule:
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
-using ..PluginModule: flatten_plugins, maybe_append_legacy_plugin
+using ..PluginModule: _inject_adaptive_parsimony_plugin
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -659,7 +659,7 @@ $(OPTION_DESCRIPTIONS)
     use_recorder::Bool=false,
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
-    plugins=(),
+    plugins::Tuple=(),
     ### Not search options; just construction options:
     define_helper_functions::Bool=true,
     #########################################
@@ -1013,9 +1013,8 @@ $(OPTION_DESCRIPTIONS)
     set_mutation_weights = create_mutation_weights(mutation_weights)
     backsolve = something(backsolve, BacksolveOptions())
 
-    plugin_tuple = flatten_plugins(plugins)
-    plugin_tuple = maybe_append_legacy_plugin(
-        plugin_tuple, :use_frequency_in_tournament, use_frequency_in_tournament
+    plugin_tuple = _inject_adaptive_parsimony_plugin(
+        plugins, use_frequency, use_frequency_in_tournament
     )
 
     @assert print_precision > 0

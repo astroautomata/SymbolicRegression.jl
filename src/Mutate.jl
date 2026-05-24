@@ -22,7 +22,8 @@ using ..CoreModule:
     AbstractPluginState,
     NoPluginState,
     MutationEvent,
-    on_mutation_evaluated!
+    on_mutation_evaluated!,
+    mutation_acceptance_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
@@ -340,21 +341,10 @@ end
         delta = after_cost - before_cost
         probChange *= exp(-delta / (temperature * options.alpha))
     end
-    newSize = -1
-    if options.use_frequency
-        oldSize = compute_complexity(member, options)
-        newSize = compute_complexity(tree, options)
-        old_frequency = if (0 < oldSize <= options.maxsize)
-            running_search_statistics.normalized_frequencies[oldSize]
-        else
-            1e-6
-        end
-        new_frequency = if (0 < newSize <= options.maxsize)
-            running_search_statistics.normalized_frequencies[newSize]
-        else
-            1e-6
-        end
-        probChange *= old_frequency / new_frequency
+    for (plugin, pstate) in zip(options.plugins, plugin_states)
+        probChange *= mutation_acceptance_multiplier(
+            plugin, pstate, member, tree, running_search_statistics, options
+        )
     end
 
     if probChange < rand()
@@ -395,7 +385,6 @@ end
             after_cost,
             after_loss,
             options;
-            complexity=newSize,
             parent_ref=parent_ref,
         )
         _fire_on_mutation_evaluated!(

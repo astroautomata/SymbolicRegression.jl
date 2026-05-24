@@ -87,9 +87,8 @@ using .PluginModule:
     on_mutation_evaluated!,
     init_member,
     tournament_cost_multiplier,
-    flatten_plugins,
+    mutation_acceptance_multiplier,
     invoke_init_member,
-    _legacy_plugin_for,
-    maybe_append_legacy_plugin
+    _inject_adaptive_parsimony_plugin
 
 end

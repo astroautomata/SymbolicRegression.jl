@@ -8,7 +8,7 @@ export Population,
     OperatorEnum,
     Dataset,
     MutationWeights,
-    FrequencyWeightedTournamentPlugin,
+    AdaptiveParsimonyPlugin,
     BacksolveOptions,
     Node,
     GraphNode,
@@ -189,7 +189,7 @@ using Compat: @compat, Fix
         init_plugin_state, init_plugin_states,
         on_search_start!, on_search_end!,
         on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member,
-        tournament_cost_multiplier,
+        tournament_cost_multiplier, mutation_acceptance_multiplier,
     )
 )
 #! format: on
@@ -244,7 +244,7 @@ using DispatchDoctor: @stable, @unstable
     include("TemplateExpression.jl")
     include("TemplateExpressionMacro.jl")
     include("ParametricExpression.jl")
-    include("plugins/FrequencyWeightedTournament.jl")
+    include("plugins/AdaptiveParsimony.jl")
 
     __dispatch_doctor_unsable_test() = Val(rand(1:10))
 end
@@ -317,7 +317,8 @@ using .CoreModule:
     on_mutation_evaluated!,
     init_member,
     invoke_init_member,
-    tournament_cost_multiplier
+    tournament_cost_multiplier,
+    mutation_acceptance_multiplier
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity
 using .CheckConstraintsModule: check_constraints
@@ -390,7 +391,7 @@ using .ComposableExpressionModule:
 using .ExpressionBuilderModule: embed_metadata, strip_metadata
 using .ParametricExpressionModule: ParametricExpressionSpec
 using .TemplateExpressionMacroModule: @template_spec
-using .FrequencyWeightedTournamentModule: FrequencyWeightedTournamentPlugin
+using .AdaptiveParsimonyPluginModule: AdaptiveParsimonyPlugin
 
 @stable default_mode = "disable" begin
     include("deprecates.jl")
