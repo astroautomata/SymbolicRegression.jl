@@ -223,7 +223,6 @@ using DispatchDoctor: @stable, @unstable
     include("Complexity.jl")
     include("DimensionalAnalysis.jl")
     include("CheckConstraints.jl")
-    include("AdaptiveParsimony.jl")
     include("InverseFunctions.jl")
     include("EvaluateInverse.jl")
     include("Backsolve.jl")
@@ -390,7 +389,7 @@ using .ComposableExpressionModule:
 using .ExpressionBuilderModule: embed_metadata, strip_metadata
 using .ParametricExpressionModule: ParametricExpressionSpec
 using .TemplateExpressionMacroModule: @template_spec
-using .AdaptiveParsimonyPluginModule: AdaptiveParsimonyPlugin
+using .AdaptiveParsimonyModule: AdaptiveParsimonyPlugin
 
 @stable default_mode = "disable" begin
     include("deprecates.jl")

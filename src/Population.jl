@@ -39,23 +39,22 @@ function Population(pop::Vector{<:AbstractPopMember})
 end
 
 """
-    _init_tree(plugin_states, dataset, options, nlength, nfeatures, ::Type{T})
+    _init_tree(dataset, options, nlength, nfeatures, ::Type{T}, plugin_states)
 
 Initialize a tree for a new population member. Walks `options.plugins` in
 order via [`invoke_init_member`](@ref); the first plugin that returns a
 non-`nothing` expression wins. If all plugins return `nothing` (the common
 case — no plugin overrides `init_member`), falls back to `gen_random_tree`.
 
-A dedicated `()` overload for the empty `plugin_states` tuple keeps the
-no-plugin path fully type-stable (no `Union{Nothing, Expression}` widening).
+The empty-tuple specialisation keeps the no-plugin path fully type-stable.
 """
 function _init_tree(
-    ::Tuple{}, dataset, options, nlength::Int, nfeatures::Int, ::Type{T}
+    dataset, options, nlength::Int, nfeatures::Int, ::Type{T}, ::Tuple{}
 ) where {T}
     return gen_random_tree(nlength, options, nfeatures, T)
 end
 function _init_tree(
-    plugin_states::Tuple, dataset, options, nlength::Int, nfeatures::Int, ::Type{T}
+    dataset, options, nlength::Int, nfeatures::Int, ::Type{T}, plugin_states::Tuple
 ) where {T}
     # Build the random-tree fallback eagerly so its type defines the
     # concrete return type; the plugin's candidate is type-asserted to
@@ -88,7 +87,7 @@ function Population(
     # Create first member to get concrete type
     first_member = constructorof(PM)(
         dataset,
-        _init_tree(plugin_states, dataset, options, nlength, nfeatures, T),
+        _init_tree(dataset, options, nlength, nfeatures, T, plugin_states),
         options;
         parent=-1,
         deterministic=options.deterministic,
@@ -101,7 +100,7 @@ function Population(
         else
             constructorof(PM)(
                 dataset,
-                _init_tree(plugin_states, dataset, options, nlength, nfeatures, T),
+                _init_tree(dataset, options, nlength, nfeatures, T, plugin_states),
                 options;
                 parent=-1,
                 deterministic=options.deterministic,

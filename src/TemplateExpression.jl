@@ -570,7 +570,7 @@ end
     ::Val{N},
 ) where {IET,N}
     return ntuple(
-        _ -> IET(
+        _ -> DE.constructorof(IET)(
             copy(t);
             operators,
             variable_names,
@@ -1093,14 +1093,11 @@ end
 
 # COV_EXCL_START
 ES.get_expression_type(::TemplateExpressionSpec) = TemplateExpression
-function ES.get_expression_options(
-    spec::TemplateExpressionSpec{ST,IET,IEO}
-) where {ST,IET,IEO}
-    return NamedTuple{
-        (:structure, :inner_expression_type, :inner_expression_options),
-        Tuple{ST,Type{IET},IEO},
-    }((spec.structure, spec.inner_expression_type, spec.inner_expression_options))
-end
+ES.get_expression_options(spec::TemplateExpressionSpec) = (;
+    spec.structure,
+    spec.inner_expression_type,
+    spec.inner_expression_options,
+)
 ES.get_node_type(::TemplateExpressionSpec) = Node
 # COV_EXCL_STOP
 
@@ -1151,20 +1148,20 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
     kws...,
 )
     if expression_spec !== nothing
-        actual_expression_type = ES.get_expression_type(expression_spec)
-        actual_expression_options = ES.get_expression_options(expression_spec)
-        actual_node_type = ES.get_node_type(expression_spec)
+        resolved_expression_type = ES.get_expression_type(expression_spec)
+        resolved_expression_options = ES.get_expression_options(expression_spec)
+        resolved_node_type = ES.get_node_type(expression_spec)
     else
-        actual_expression_type = something(expression_type, TemplateExpression)
-        actual_expression_options = expression_options
-        actual_node_type = something(node_type, Node)
+        resolved_expression_type = something(expression_type, TemplateExpression)
+        resolved_expression_options = expression_options
+        resolved_node_type = something(node_type, Node)
     end
 
     # COV_EXCL_START
-    @assert actual_expression_type <: TemplateExpression
+    @assert resolved_expression_type <: TemplateExpression
     @assert(
-        actual_expression_options !== nothing &&
-            actual_expression_options.structure isa TemplateStructure,
+        resolved_expression_options !== nothing &&
+            resolved_expression_options.structure isa TemplateStructure,
         "NamedTuple expressions require expression_options with a TemplateStructure"
     )
     # COV_EXCL_STOP
@@ -1175,14 +1172,14 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
         NamedTuple()
     end
     inner_expression_type =
-        if hasproperty(actual_expression_options, :inner_expression_type)
-            actual_expression_options.inner_expression_type
+        if hasproperty(resolved_expression_options, :inner_expression_type)
+            resolved_expression_options.inner_expression_type
         else
             ComposableExpression
         end
     inner_expression_options =
-        if hasproperty(actual_expression_options, :inner_expression_options)
-            actual_expression_options.inner_expression_options
+        if hasproperty(resolved_expression_options, :inner_expression_options)
+            resolved_expression_options.inner_expression_options
         else
             NamedTuple()
         end
@@ -1208,11 +1205,11 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
                 unary_operators,
                 variable_names=placeholder_variable_names,
                 expression_type=DE.Expression,
-                node_type=actual_node_type,
+                node_type=resolved_node_type,
                 kws...,
             )
 
-            inner_expression_type(
+            DE.constructorof(inner_expression_type)(
                 parsed_expr.tree;
                 operators,
                 variable_names=nothing,
@@ -1222,9 +1219,9 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
         end,
     )
 
-    return actual_expression_type(
+    return DE.constructorof(resolved_expression_type)(
         inner_expressions;
-        structure=actual_expression_options.structure,
+        structure=resolved_expression_options.structure,
         operators,
         variable_names=nothing,
         kws...,

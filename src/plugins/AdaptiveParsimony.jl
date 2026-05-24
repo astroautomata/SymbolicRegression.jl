@@ -1,13 +1,8 @@
-module AdaptiveParsimonyPluginModule
+module AdaptiveParsimonyModule
 
 using DispatchDoctor: @stable
 using ..CoreModule: AbstractPlugin, AbstractPluginState, AbstractOptions
 using ..ComplexityModule: compute_complexity
-using ..AdaptiveParsimonyModule:
-    RunningSearchStatistics,
-    update_frequencies!,
-    move_window!,
-    normalize_frequencies!
 import ..CoreModule:
     init_plugin_state,
     prepare_dispatch_state,
@@ -15,6 +10,96 @@ import ..CoreModule:
     mutation_acceptance_multiplier,
     on_generation_end!,
     default_adaptive_parsimony_plugins
+
+"""
+    RunningSearchStatistics
+
+A struct to keep track of various running averages of the search and discovered
+equations, for use in adaptive losses and parsimony.
+
+# Fields
+
+- `window_size::Int`: After this many equations are seen, the frequencies are reduced
+    by 1, averaged over all complexities, each time a new equation is seen.
+- `frequencies::Vector{Float64}`: The number of equations seen at this complexity,
+    given by the index.
+- `normalized_frequencies::Vector{Float64}`: This is the same as `frequencies`, but
+    normalized to sum to 1.0. This is updated once in a while.
+"""
+struct RunningSearchStatistics
+    window_size::Int
+    frequencies::Vector{Float64}
+    normalized_frequencies::Vector{Float64}  # Stores `frequencies`, but normalized (updated once in a while)
+end
+
+function RunningSearchStatistics(; options::AbstractOptions, window_size::Int=100000)
+    init_frequencies = ones(Float64, options.maxsize)
+
+    return RunningSearchStatistics(
+        window_size, init_frequencies, copy(init_frequencies) / sum(init_frequencies)
+    )
+end
+
+"""
+    update_frequencies!(running_search_statistics::RunningSearchStatistics; size=nothing)
+
+Update the frequencies in `running_search_statistics` by adding 1 to the frequency
+for an equation at size `size`.
+"""
+@inline function update_frequencies!(
+    running_search_statistics::RunningSearchStatistics; size=nothing
+)
+    if 0 < size <= length(running_search_statistics.frequencies)
+        running_search_statistics.frequencies[size] += 1
+    end
+    return nothing
+end
+
+"""
+    move_window!(running_search_statistics::RunningSearchStatistics)
+
+Reduce `running_search_statistics.frequencies` until it sums to
+`window_size`.
+"""
+function move_window!(running_search_statistics::RunningSearchStatistics)
+    smallest_frequency_allowed = 1
+    max_loops = 1000
+
+    frequencies = running_search_statistics.frequencies
+    window_size = running_search_statistics.window_size
+
+    cur_size_frequency_complexities = sum(frequencies)
+    if cur_size_frequency_complexities > window_size
+        difference_in_size = cur_size_frequency_complexities - window_size
+        # We need frequencyComplexities to be positive, but also sum to a number.
+        num_loops = 0
+        # TODO: Clean this code up. Should not have to have
+        # loop catching.
+        while difference_in_size > 0
+            indices_to_subtract = findall(frequencies .> smallest_frequency_allowed)
+            num_remaining = size(indices_to_subtract, 1)
+            amount_to_subtract = min(
+                difference_in_size / num_remaining,
+                min(frequencies[indices_to_subtract]...) - smallest_frequency_allowed,
+            )
+            frequencies[indices_to_subtract] .-= amount_to_subtract
+            total_amount_to_subtract = amount_to_subtract * num_remaining
+            difference_in_size -= total_amount_to_subtract
+            num_loops += 1
+            if num_loops > max_loops || total_amount_to_subtract < 1e-6
+                # Sometimes, total_amount_to_subtract can be a very very small number.
+                break
+            end
+        end
+    end
+    return nothing
+end
+
+function normalize_frequencies!(running_search_statistics::RunningSearchStatistics)
+    running_search_statistics.normalized_frequencies .=
+        running_search_statistics.frequencies ./ sum(running_search_statistics.frequencies)
+    return nothing
+end
 
 """
     AdaptiveParsimonyPlugin <: AbstractPlugin
@@ -84,9 +169,9 @@ function tournament_cost_multiplier(
 )
     p.tournament || return 1.0
     rss = s.rss[1]
-    size = compute_complexity(member, options)
-    frequency = if (0 < size <= options.maxsize)
-        Float64(rss.normalized_frequencies[size])
+    sz = compute_complexity(member, options)
+    frequency = if (0 < sz <= options.maxsize)
+        Float64(rss.normalized_frequencies[sz])
     else
         0.0
     end
@@ -131,8 +216,8 @@ function on_generation_end!(
 )
     rss = s.rss[output_index]
     for member in returned_pop.members
-        size = compute_complexity(member, options)
-        update_frequencies!(rss; size=size)
+        sz = compute_complexity(member, options)
+        update_frequencies!(rss; size=sz)
     end
     move_window!(rss)
     return nothing
@@ -152,4 +237,4 @@ end
     end
 )
 
-end  # module AdaptiveParsimonyPluginModule
+end  # module AdaptiveParsimonyModule
