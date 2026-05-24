@@ -25,6 +25,7 @@ function create_search_benchmark()
         extra_kws = merge(extra_kws, (define_helper_functions=false,))
     end
     option_kws = (;
+        defaults=v"1.0.0",
         binary_operators=(+, -, /, *),
         unary_operators=(exp, abs),
         maxsize=30,

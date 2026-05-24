@@ -111,6 +111,7 @@ end
     dataset = Dataset(X, y; X_units=["kg"], y_units="1")
     custom_op(x, y) = x + y
     options = Options(;
+        defaults=v"1.0.0",
         binary_operators=[-, *, /, custom_op],
         unary_operators=[cos],
         early_stop_condition=(loss, complexity) -> (loss < 1e-7 && complexity <= 8),
@@ -200,6 +201,7 @@ end
 
     custom_op(x, y) = x + y
     options = Options(;
+        defaults=v"1.0.0",
         binary_operators=[-, *, /, custom_op],
         unary_operators=[cos],
         early_stop_condition=(loss, complexity) -> (loss < 1e-7 && complexity == 3),
@@ -233,6 +235,7 @@ end
     X = randn(rng, 2, 128)
     y = @. cbrt(X[1, :]) .+ sqrt(abs(X[2, :]))
     options2 = Options(;
+        defaults=v"1.0.0",
         binary_operators=[+, *],
         unary_operators=[sqrt, cbrt, abs],
         early_stop_condition=(loss, complexity) -> (loss < 1e-7 && complexity == 6),

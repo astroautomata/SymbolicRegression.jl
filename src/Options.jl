@@ -426,10 +426,9 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
 - `optimizer_probability`: Probability of performing optimization of constants at
     the end of a given iteration.
 - `optimizer_iterations`: How many optimization iterations to perform. This gets
-    passed to `Optim.Options` as `iterations`. The default is 8.
+    passed to `Optim.Options` as `iterations`.
 - `optimizer_f_calls_limit`: How many function calls to allow during optimization.
-    This gets passed to `Optim.Options` as `f_calls_limit`. The default is
-    `10_000`.
+    This gets passed to `Optim.Options` as `f_calls_limit`.
 - `optimizer_options`: General options for the constant optimization. For details
     we refer to the documentation on `Optim.Options` from the `Optim.jl` package.
     Options can be provided here as `NamedTuple`, e.g. `(iterations=16,)`, as a
@@ -604,8 +603,8 @@ $(OPTION_DESCRIPTIONS)
     loss_scale::Symbol=:log,
     ## 4. Working with Complexities:
     complexity_mapping::Union{Function,ComplexityMapping,Nothing}=nothing,
-    use_frequency::Bool=true,
-    use_frequency_in_tournament::Bool=true,
+    use_frequency::Union{Bool,Nothing}=nothing,
+    use_frequency_in_tournament::Union{Bool,Nothing}=nothing,
     should_simplify::Union{Nothing,Bool}=nothing,
     ## 5. Mutations:
     perturbation_factor::Union{Nothing,Real}=nothing,
@@ -618,8 +617,8 @@ $(OPTION_DESCRIPTIONS)
     optimizer_algorithm::Union{AbstractString,Optim.AbstractOptimizer}=Optim.BFGS(;
         linesearch=LineSearches.BackTracking()
     ),
-    optimizer_nrestarts::Int=2,
-    optimizer_probability::AbstractFloat=0.14,
+    optimizer_nrestarts::Union{Nothing,Integer}=nothing,
+    optimizer_probability::Union{Nothing,AbstractFloat}=nothing,
     optimizer_iterations::Union{Nothing,Integer}=nothing,
     optimizer_f_calls_limit::Union{Nothing,Integer}=nothing,
     optimizer_options::Union{Dict,NamedTuple,Optim.Options,Nothing}=nothing,
@@ -801,6 +800,10 @@ $(OPTION_DESCRIPTIONS)
     alpha = something(alpha, _default_options.alpha)
     perturbation_factor = something(perturbation_factor, _default_options.perturbation_factor)
     probability_negate_constant = something(probability_negate_constant, _default_options.probability_negate_constant)
+    use_frequency = something(use_frequency, _default_options.use_frequency)
+    use_frequency_in_tournament = something(use_frequency_in_tournament, _default_options.use_frequency_in_tournament)
+    optimizer_nrestarts = something(optimizer_nrestarts, _default_options.optimizer_nrestarts)
+    optimizer_probability = something(optimizer_probability, _default_options.optimizer_probability)
     tournament_selection_n = something(tournament_selection_n, _default_options.tournament_selection_n)
     tournament_selection_p = something(tournament_selection_p, _default_options.tournament_selection_p)
     fraction_replaced = something(fraction_replaced, _default_options.fraction_replaced)
@@ -992,8 +995,12 @@ $(OPTION_DESCRIPTIONS)
 
     # Parse optimizer options
     if !isa(optimizer_options, Optim.Options)
-        optimizer_iterations = something(optimizer_iterations, 8)
-        optimizer_f_calls_limit = something(optimizer_f_calls_limit, 10_000)
+        optimizer_iterations = something(
+            optimizer_iterations, _default_options.optimizer_iterations
+        )
+        optimizer_f_calls_limit = something(
+            optimizer_f_calls_limit, _default_options.optimizer_f_calls_limit
+        )
         extra_kws = hasfield(Optim.Options, :show_warnings) ? (; show_warnings=false) : ()
         optimizer_options = Optim.Options(;
             iterations=optimizer_iterations,
@@ -1155,6 +1162,12 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
             alpha=0.1,
             perturbation_factor=0.076,
             probability_negate_constant=0.01,
+            use_frequency=true,
+            use_frequency_in_tournament=true,
+            optimizer_nrestarts=2,
+            optimizer_probability=0.14,
+            optimizer_iterations=8,
+            optimizer_f_calls_limit=10_000,
             # Tournament Selection
             tournament_selection_n=12,
             tournament_selection_p=0.86,
@@ -1201,6 +1214,12 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
         alpha=3.17,
         perturbation_factor=0.129,
         probability_negate_constant=0.00743,
+        use_frequency=true,
+        use_frequency_in_tournament=true,
+        optimizer_nrestarts=2,
+        optimizer_probability=0.14,
+        optimizer_iterations=8,
+        optimizer_f_calls_limit=10_000,
         # Tournament Selection
         tournament_selection_n=15,
         tournament_selection_p=0.982,
@@ -1217,8 +1236,46 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
         batch_size=50,
     )
 
-    if version isa VersionNumber && version >= v"2.0.0-"
-        defaults = (; defaults..., adaptive_parsimony_scaling=20.0)
+    if isnothing(version) || version >= v"2.0.0-"
+        defaults = (;
+            defaults...,
+            populations=18,
+            population_size=21,
+            ncycles_per_iteration=560,
+            adaptive_parsimony_scaling=20.0,
+            mutation_weights=MutationWeights(;
+                mutate_constant=0.0346,
+                mutate_operator=0.01,
+                mutate_feature=0.15,
+                swap_operands=0.80,
+                rotate_tree=0.20,
+                add_node=4.70,
+                insert_node=0.06,
+                delete_node=2.10,
+                simplify=0.0020,
+                randomize=0.0001,
+                do_nothing=0.26,
+                optimize=0.0,
+                backsolve=0.0,
+                form_connection=0.5,
+                break_connection=0.1,
+            ),
+            crossover_probability=0.20,
+            alpha=0.1125,
+            perturbation_factor=0.02,
+            use_frequency=false,
+            use_frequency_in_tournament=false,
+            optimizer_nrestarts=3,
+            optimizer_probability=0.28,
+            optimizer_iterations=10,
+            optimizer_f_calls_limit=3000,
+            tournament_selection_n=10,
+            tournament_selection_p=0.74,
+            fraction_replaced=0.00036,
+            fraction_replaced_hof=0.5,
+            fraction_replaced_guesses=0.001,
+            topn=12,
+        )
     end
 
     return defaults

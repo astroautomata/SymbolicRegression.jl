@@ -27,6 +27,74 @@
     @test_throws AssertionError Options(; loss_scale=:cubic)
 end
 
+@testitem "Test versioned default profile selection" begin
+    using SymbolicRegression
+    using Optim: Optim
+    using SymbolicRegression.CoreModule.OptionsModule: default_options
+
+    pre_v2_defaults = default_options(v"1.0.0")
+    v2_defaults = default_options(v"2.0.0-alpha")
+    current_defaults = default_options()
+
+    changed_fields = (
+        :populations,
+        :population_size,
+        :ncycles_per_iteration,
+        :adaptive_parsimony_scaling,
+        :use_frequency,
+        :use_frequency_in_tournament,
+        :optimizer_nrestarts,
+        :optimizer_probability,
+        :optimizer_iterations,
+        :optimizer_f_calls_limit,
+        :tournament_selection_n,
+        :tournament_selection_p,
+        :fraction_replaced_hof,
+    )
+    unchanged_fields = (:fraction_replaced, :fraction_replaced_guesses, :topn)
+
+    for field in (changed_fields..., unchanged_fields...)
+        @test getproperty(current_defaults, field) == getproperty(v2_defaults, field)
+    end
+    for field in changed_fields
+        @test getproperty(pre_v2_defaults, field) != getproperty(v2_defaults, field)
+    end
+    for field in unchanged_fields
+        @test getproperty(pre_v2_defaults, field) == getproperty(v2_defaults, field)
+    end
+
+    # These used to be hardcoded constructor defaults, so this checks the
+    # versioned bundle is not silently masked before OptionsStruct construction.
+    for (version, defaults) in ((v"1.0.0", pre_v2_defaults), (v"2.0.0-alpha", v2_defaults))
+        options = Options(; defaults=version)
+        @test options.use_frequency == defaults.use_frequency
+        @test options.use_frequency_in_tournament == defaults.use_frequency_in_tournament
+        @test options.optimizer_nrestarts == defaults.optimizer_nrestarts
+        @test options.optimizer_probability ≈ Float32(defaults.optimizer_probability)
+        @test options.optimizer_options.iterations == defaults.optimizer_iterations
+        @test options.optimizer_options.f_calls_limit == defaults.optimizer_f_calls_limit
+    end
+
+    user_optimizer_options = Optim.Options(; iterations=16)
+    overridden = Options(;
+        defaults=v"2.0.0-alpha",
+        use_frequency=true,
+        use_frequency_in_tournament=true,
+        optimizer_nrestarts=7,
+        optimizer_probability=0.05,
+        optimizer_options=user_optimizer_options,
+    )
+    @test overridden.use_frequency
+    @test overridden.use_frequency_in_tournament
+    @test overridden.optimizer_nrestarts == 7
+    @test overridden.optimizer_probability ≈ Float32(0.05)
+    @test overridden.optimizer_options === user_optimizer_options
+
+    @test_throws AssertionError Options(;
+        optimizer_options=user_optimizer_options, optimizer_iterations=10
+    )
+end
+
 @testitem "Test backsolve options" begin
     using SymbolicRegression
 
