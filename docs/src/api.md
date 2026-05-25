@@ -17,6 +17,14 @@ equation_search
 
 ```@docs
 @template_spec
+NoTemplateSharedState
+template_shared_state
+get_template_shared_state
+copy_template_shared_state
+attach_template_shared_state
+get_template_optimizable_parameters
+set_template_optimizable_parameters!
+extract_template_optimizable_gradient
 ```
 
 ## Options

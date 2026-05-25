@@ -321,6 +321,85 @@ struct TemplateExpression{
     end
 end
 
+"""
+    NoTemplateSharedState
+
+Sentinel used by the default template hooks when an inner expression type does not
+need candidate-local state shared across the subexpressions of a
+`TemplateExpression`.
+"""
+struct NoTemplateSharedState end
+
+"""
+    template_shared_state(::Type{E}, contents, metadata)
+
+Return candidate-local state that should be shared by every inner expression of
+a `TemplateExpression` whose inner expression type is `E`.
+
+The default returns `NoTemplateSharedState()`. Plugins that use this hook should
+also implement `attach_template_shared_state`, `get_template_shared_state`, and
+`copy_template_shared_state`.
+"""
+template_shared_state(::Type, ::NamedTuple, ::Metadata) = NoTemplateSharedState()
+
+"""
+    get_template_shared_state(::Type{E}, ex::TemplateExpression)
+
+Return the candidate-local state currently attached to `ex`.
+"""
+get_template_shared_state(::Type, ::TemplateExpression) = NoTemplateSharedState()
+
+"""
+    copy_template_shared_state(::Type{E}, state)
+
+Return the copied candidate-local template state used when a
+`TemplateExpression` candidate is copied or copied into a preallocated
+container. The default supports `NoTemplateSharedState`.
+"""
+copy_template_shared_state(::Type, ::NoTemplateSharedState) = NoTemplateSharedState()
+function copy_template_shared_state(::Type{E}, state) where {E}
+    return throw(
+        ArgumentError(
+            "`copy_template_shared_state` must be implemented for template inner expression type $E and shared state $(typeof(state)).",
+        ),
+    )
+end
+
+"""
+    attach_template_shared_state(::Type{E}, inner, state, key::Symbol)
+
+Return `inner` with `state` attached for the template slot named by `key`.
+Methods should return the same concrete inner expression type as `inner`.
+"""
+attach_template_shared_state(::Type, inner, ::NoTemplateSharedState, ::Symbol) = inner
+function attach_template_shared_state(::Type{E}, inner, state, key::Symbol) where {E}
+    return throw(
+        ArgumentError(
+            "`attach_template_shared_state` must be implemented for template inner expression type $E and shared state $(typeof(state)) at key `$key`.",
+        ),
+    )
+end
+
+function _attach_template_shared_state(::Type{E}, contents::NamedTuple, state) where {E}
+    state isa NoTemplateSharedState && return contents
+    content_keys = keys(contents)
+    return NamedTuple{content_keys}(
+        ntuple(Val(length(content_keys))) do i
+            key = content_keys[i]
+            inner = contents[key]
+            attached = attach_template_shared_state(E, inner, state, key)
+            if !(attached isa E)
+                throw(
+                    ArgumentError(
+                        "`attach_template_shared_state` for key `$key` returned $(typeof(attached)); expected an instance of $E.",
+                    ),
+                )
+            end
+            return attached
+        end,
+    )
+end
+
 function TemplateExpression(
     trees::NamedTuple{<:Any,<:NTuple{<:Any,<:AbstractExpression{T}}};
     structure::TemplateStructure,
@@ -356,7 +435,11 @@ function TemplateExpression(
         NamedTuple()
     end
     metadata = (; structure, operators, variable_names, parameters=final_parameters)
-    return TemplateExpression(trees, Metadata(metadata))
+    typed_metadata = Metadata(metadata)
+    E = typeof(first(values(trees)))
+    shared_state = template_shared_state(E, trees, typed_metadata)
+    trees_with_shared_state = _attach_template_shared_state(E, trees, shared_state)
+    return TemplateExpression(trees_with_shared_state, typed_metadata)
 end
 
 @unstable DE.constructorof(::Type{<:TemplateExpression}) = TemplateExpression  # COV_EXCL_LINE
@@ -375,7 +458,10 @@ function Base.copy(e::TemplateExpression)
     ts = get_contents(e)
     meta = get_metadata(e)
     meta_inner = DE.ExpressionModule.unpack_metadata(meta)
+    E = typeof(first(values(ts)))
+    shared_state = copy_template_shared_state(E, get_template_shared_state(E, e))
     copy_ts = NamedTuple{keys(ts)}(map(copy, values(ts)))
+    copy_ts = _attach_template_shared_state(E, copy_ts, shared_state)
     keys_except_structure = filter(!=(:structure), keys(meta_inner))
     copy_metadata = (;
         meta_inner.structure,
@@ -447,6 +533,20 @@ _parameter_data(x::ParamVector) = x._data
 _parameter_data(x) = x
 
 function CO.get_optimizable_parameters(e::TemplateExpression{T}) where {T}
+    E = typeof(first(values(get_contents(e))))
+    return get_template_optimizable_parameters(E, e)
+end
+"""
+    get_template_optimizable_parameters(::Type{E}, ex::TemplateExpression)
+
+Template-level analogue of [`get_optimizable_parameters`](@ref). Override this
+when a template inner expression type `E` stores candidate-local optimizable
+state that should appear once per `TemplateExpression` candidate rather than
+once per inner subexpression.
+"""
+function get_template_optimizable_parameters(
+    ::Type, e::TemplateExpression{T}
+) where {T}
     inner_params_and_refs = map(CO.get_optimizable_parameters, values(get_contents(e)))
     inner_chunks = first.(inner_params_and_refs)
     parameter_chunks = if has_params(e)
@@ -466,6 +566,15 @@ function CO.get_optimizable_parameters(e::TemplateExpression{T}) where {T}
     return flat, refs
 end
 function CO.set_optimizable_parameters!(e::TemplateExpression, constants, refs)
+    E = typeof(first(values(get_contents(e))))
+    return set_template_optimizable_parameters!(E, e, constants, refs)
+end
+"""
+    set_template_optimizable_parameters!(::Type{E}, ex::TemplateExpression, x, refs)
+
+Template-level analogue of [`set_optimizable_parameters!`](@ref).
+"""
+function set_template_optimizable_parameters!(::Type, e::TemplateExpression, constants, refs)
     cursor = Ref(1)
     foreach(values(get_contents(e)), refs.inner) do tree, r
         n = r.n
@@ -485,6 +594,15 @@ function CO.set_optimizable_parameters!(e::TemplateExpression, constants, refs)
     return e
 end
 function CO.extract_optimizable_gradient(grad, ex::TemplateExpression{T}) where {T}
+    E = typeof(first(values(get_contents(ex))))
+    return extract_template_optimizable_gradient(E, grad, ex)
+end
+"""
+    extract_template_optimizable_gradient(::Type{E}, grad, ex::TemplateExpression)
+
+Template-level analogue of [`extract_optimizable_gradient`](@ref).
+"""
+function extract_template_optimizable_gradient(::Type, grad, ex::TemplateExpression{T}) where {T}
     inner_grad = map(
         CO.extract_optimizable_gradient,
         values(get_contents(grad)),
@@ -520,7 +638,10 @@ end
 function DE.copy_into!(dest::PreallocatedTemplateExpression, src::TemplateExpression)
     ts = get_contents(src)
     parameters = get_metadata(src).parameters
+    E = typeof(first(values(ts)))
+    shared_state = copy_template_shared_state(E, get_template_shared_state(E, src))
     new_contents = NamedTuple{keys(ts)}(map(DE.copy_into!, values(dest.trees), values(ts)))
+    new_contents = _attach_template_shared_state(E, new_contents, shared_state)
     for k in keys(parameters)
         dest.parameters[k][:] = (parameters[k]::ParamVector)[:]
     end

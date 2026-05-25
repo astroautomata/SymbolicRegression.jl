@@ -2,18 +2,25 @@
 
 > **Experimental**: The plugin interface is experimental. Design may change until validated by multiple plugin packages.
 
-SymbolicRegression.jl provides two complementary layers of extension. This guide walks through both, when to use each, and how to combine them for real-world plugins.
+SymbolicRegression.jl provides two main extension layers, plus candidate-local
+state hooks for custom expression types. This guide walks through each scope,
+when to use it, and how to combine them for real-world plugins.
 
 ---
 
-## Overview: Two Layers of Extension
+## Overview: Layers and State Scopes
 
-| Layer       | Mechanism                                          | Best for                                                         |
-| ----------- | -------------------------------------------------- | ---------------------------------------------------------------- |
-| **Layer 1** | Dispatch on a custom `AbstractOptions` subtype     | Swapping out algorithms (complexity, loss, optimizer, mutations) |
-| **Layer 2** | Lifecycle hooks + per-worker `AbstractPluginState` | Cross-generation state, concept databases, logging, steering     |
+| Layer       | Scope                    | Mechanism                                          | Best for                                                             |
+| ----------- | ------------------------ | -------------------------------------------------- | -------------------------------------------------------------------- |
+| **Layer 1** | **Algorithm overrides**  | Dispatch on a custom `AbstractOptions` subtype     | Swapping out algorithms (complexity, loss, optimizer, mutations)     |
+| **Layer 1** | **Expression state**     | Expression-local optimizable parameter hooks       | Extra differentiable state owned by one expression object            |
+| **Layer 1** | **Template state**       | Candidate-local `TemplateExpression` hooks         | State shared by multiple template subexpressions in one candidate    |
+| **Layer 2** | **Lifecycle state**      | Lifecycle hooks + per-worker `AbstractPluginState` | Cross-generation state, concept databases, logging, steering         |
 
-These layers are independent and composable — most plugins will use both.
+Layer 1 and Layer 2 remain the main mental model: Layer 1 changes how
+candidates behave or are optimized, while Layer 2 manages state across the
+search loop. Expression-local and template shared-state hooks are candidate-local
+state scopes used within Layer 1.
 
 ---
 
@@ -168,6 +175,77 @@ end
 The gradient object supplied by the autodiff backend must expose the same
 differentiable metadata fields that your hook reads, such as
 `get_metadata(grad).scale` above.
+
+### Sharing state across `TemplateExpression` subexpressions
+
+Expression-local hooks expose state owned by one expression object. In contrast,
+some template plugins need state that is owned by the whole candidate and shared
+by every inner expression in a `TemplateExpression`. For example, a template may
+contain `f` and `g`, but both should refer to the same learned operator
+parameters inside one population member. Another population member should still
+receive its own independent copy of those parameters.
+
+Use the template shared-state hooks for this case:
+
+- [`NoTemplateSharedState`](@ref)
+- [`template_shared_state`](@ref)
+- [`get_template_shared_state`](@ref)
+- [`copy_template_shared_state`](@ref)
+- [`attach_template_shared_state`](@ref)
+- [`get_template_optimizable_parameters`](@ref)
+- [`set_template_optimizable_parameters!`](@ref)
+- [`extract_template_optimizable_gradient`](@ref)
+
+The hook dispatch key is the inner expression type `E` used by the
+`TemplateExpression`. A minimal shared-state implementation looks like:
+
+```julia
+using DynamicExpressions: get_contents, get_metadata, with_metadata
+import SymbolicRegression:
+    template_shared_state,
+    get_template_shared_state,
+    copy_template_shared_state,
+    attach_template_shared_state
+
+mutable struct MySharedState
+    weight::Float64
+end
+
+template_shared_state(
+    ::Type{<:MyExpression}, contents::NamedTuple, metadata
+) = MySharedState(0.0)
+
+function get_template_shared_state(::Type{<:MyExpression}, ex::TemplateExpression)
+    states = MySharedState[]
+    for inner in values(get_contents(ex))
+        state = get_metadata(inner).state
+        any(existing -> existing === state, states) || push!(states, state)
+    end
+    length(states) == 1 || error("template inners do not share state")
+    return only(states)
+end
+
+copy_template_shared_state(
+    ::Type{<:MyExpression}, state::MySharedState
+) = MySharedState(state.weight)
+
+attach_template_shared_state(
+    ::Type{<:MyExpression}, inner::MyExpression, state::MySharedState, key::Symbol
+) = with_metadata(inner; state)
+```
+
+`template_shared_state` is applied by the public keyword constructor for
+`TemplateExpression`, by expression parsing/creation paths that go through that
+constructor, and by template `copy`/`copy_into!`. The raw
+`TemplateExpression(contents, metadata)` constructor preserves the contents it
+is given. This matters for gradient objects, which may intentionally contain
+separate per-subexpression gradient state that should be reduced by
+`extract_template_optimizable_gradient`.
+
+If the shared state is optimizable, override the template-level optimizer hooks
+instead of the ordinary expression-level hooks. The template-level hooks should
+flatten candidate-local state once, then include any template parameters from
+`get_metadata(ex).parameters` if those should remain optimizable.
 
 ### Overriding `optimize_constants`
 
@@ -382,6 +460,7 @@ weights, see
 - **Head node hooks** (`on_generation_complete!`, `on_search_start!`, `on_search_end!`) are always serial — safe to mutate shared state.
 - **Worker hooks** (`on_population_evaluated!`, `on_mutation_evaluated!`) may run concurrently in multithreading mode. Each `(output, population)` slot has its own `AbstractPluginState` Ref, so **there are no races between slots**. Each worker thread only touches its own state.
 - **`init_member`** uses the **head node's** state and is called only during initial population creation. In `:multithreading`, multiple population slots are created concurrently — keep `init_member` read-only or thread-safe.
+- **Template shared state** lives inside expression candidates, not in `AbstractPluginState`. It is copied when candidates are copied, so each population member owns independent candidate-local state even if its template subexpressions share within that member.
 - To push data from workers to the head node (e.g., promising trees found during evaluation), use a `Channel{T}` stored in your options and drained in `on_generation_complete!`.
 
 ### Multiprocessing

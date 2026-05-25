@@ -29,6 +29,144 @@
     @test SymbolicRegression.get_optimizable_parameters(template)[1] == [4.0, 5.0]
 end
 
+@testitem "Template optimizable parameter hooks can expose candidate-local state" begin
+    using DynamicExpressions:
+        DynamicExpressions,
+        AbstractExpressionNode,
+        AbstractOperatorEnum,
+        EvalOptions,
+        Metadata,
+        Node,
+        OperatorEnum,
+        get_contents,
+        get_metadata,
+        with_metadata
+    using SymbolicRegression
+    using SymbolicRegression: AbstractComposableExpression
+
+    mutable struct TemplateOptState
+        value::Float64
+    end
+
+    struct TemplateOptExpression{T,N<:AbstractExpressionNode{T},D} <:
+           AbstractComposableExpression{T,N}
+        tree::N
+        metadata::Metadata{D}
+    end
+
+    function TemplateOptExpression(
+        tree::AbstractExpressionNode{T};
+        operators::Union{AbstractOperatorEnum,Nothing}=nothing,
+        variable_names::Union{AbstractVector{<:AbstractString},Nothing}=nothing,
+        eval_options::Union{EvalOptions,Nothing}=nothing,
+        state::TemplateOptState=TemplateOptState(1.0),
+    ) where {T}
+        return TemplateOptExpression(
+            tree, Metadata((; operators, variable_names, eval_options, state))
+        )
+    end
+
+    DynamicExpressions.constructorof(::Type{<:TemplateOptExpression}) =
+        TemplateOptExpression
+
+    function DynamicExpressions.with_metadata(ex::TemplateOptExpression; kws...)
+        meta = get_metadata(ex)
+        state = haskey(kws, :state) ? kws[:state] : meta.state
+        operators = haskey(kws, :operators) ? kws[:operators] : meta.operators
+        variable_names = haskey(kws, :variable_names) ? kws[:variable_names] : meta.variable_names
+        eval_options = haskey(kws, :eval_options) ? kws[:eval_options] : meta.eval_options
+        return TemplateOptExpression(
+            get_contents(ex), Metadata((; operators, variable_names, eval_options, state))
+        )
+    end
+
+    SymbolicRegression.template_shared_state(
+        ::Type{<:TemplateOptExpression}, contents::NamedTuple, metadata::Metadata
+    ) = TemplateOptState(1.0)
+
+    function SymbolicRegression.get_template_shared_state(
+        ::Type{<:TemplateOptExpression}, ex::TemplateExpression
+    )
+        states = TemplateOptState[]
+        for inner in values(get_contents(ex))
+            state = get_metadata(inner).state
+            any(existing -> existing === state, states) || push!(states, state)
+        end
+        @assert length(states) == 1
+        return only(states)
+    end
+
+    SymbolicRegression.copy_template_shared_state(
+        ::Type{<:TemplateOptExpression}, state::TemplateOptState
+    ) = TemplateOptState(state.value)
+
+    function SymbolicRegression.attach_template_shared_state(
+        ::Type{<:TemplateOptExpression},
+        inner::TemplateOptExpression,
+        state::TemplateOptState,
+        key::Symbol,
+    )
+        return with_metadata(inner; state)
+    end
+
+    function SymbolicRegression.get_template_optimizable_parameters(
+        ::Type{<:TemplateOptExpression}, ex::TemplateExpression{T}
+    ) where {T}
+        state = SymbolicRegression.get_template_shared_state(TemplateOptExpression, ex)
+        params = get_metadata(ex).parameters
+        return T[state.value, params.p[1]], (; parameter_keys=[:p])
+    end
+
+    function SymbolicRegression.set_template_optimizable_parameters!(
+        ::Type{<:TemplateOptExpression}, ex::TemplateExpression, x, refs
+    )
+        state = SymbolicRegression.get_template_shared_state(TemplateOptExpression, ex)
+        state.value = x[1]
+        get_metadata(ex).parameters.p._data[1] = x[2]
+        return ex
+    end
+
+    function SymbolicRegression.extract_template_optimizable_gradient(
+        ::Type{<:TemplateOptExpression}, grad, ex::TemplateExpression{T}
+    ) where {T}
+        state = SymbolicRegression.get_template_shared_state(TemplateOptExpression, grad)
+        return T[state.value, get_metadata(grad).parameters.p[1]]
+    end
+
+    operators = OperatorEnum(; unary_operators=(), binary_operators=(+,))
+    structure = TemplateStructure{(:f,),(:p,)}(
+        ((; f), (; p), (x,)) -> f(x) + p[1]; num_parameters=(; p=1)
+    )
+    template = TemplateExpression(
+        (; f=TemplateOptExpression(Node{Float64}(; feature=1); operators));
+        structure,
+        operators,
+        parameters=(; p=[2.0]),
+    )
+
+    params, refs = SymbolicRegression.get_optimizable_parameters(template)
+    @test params == [1.0, 2.0]
+
+    SymbolicRegression.set_optimizable_parameters!(template, [3.0, 4.0], refs)
+    @test SymbolicRegression.get_optimizable_parameters(template)[1] == [3.0, 4.0]
+    @test get_metadata(first(values(get_contents(template)))).state.value == 3.0
+    @test get_metadata(template).parameters.p[1] == 4.0
+
+    grad_inner = TemplateOptExpression(
+        Node{Float64}(; feature=1); operators, state=TemplateOptState(0.5)
+    )
+    grad = TemplateExpression(
+        (; f=grad_inner),
+        Metadata((;
+            structure,
+            operators,
+            variable_names=nothing,
+            parameters=(; p=SymbolicRegression.TemplateExpressionModule.ParamVector([0.25])),
+        )),
+    )
+    @test SymbolicRegression.extract_optimizable_gradient(grad, template) == [0.5, 0.25]
+end
+
 @testitem "Default optimize_constants handles custom optimizable expression state" begin
     using DynamicExpressions:
         DynamicExpressions,

@@ -186,7 +186,11 @@ using Compat: @compat, Fix
         set_optimizable_parameters!, extract_optimizable_gradient,
         AbstractPluginState, NoPluginState,
         init_plugin_state, on_search_start!, on_search_end!,
-        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member
+        on_generation_complete!, on_population_evaluated!, on_mutation_evaluated!, init_member,
+        NoTemplateSharedState, template_shared_state, get_template_shared_state,
+        copy_template_shared_state, attach_template_shared_state,
+        get_template_optimizable_parameters, set_template_optimizable_parameters!,
+        extract_template_optimizable_gradient
     )
 )
 #! format: on
@@ -369,7 +373,19 @@ using .SearchUtilsModule:
     infer_popmember_type
 using .LoggingModule: AbstractSRLogger, SRLogger, get_logger
 using .TemplateExpressionModule:
-    TemplateExpression, TemplateStructure, TemplateExpressionSpec, ParamVector, has_params
+    TemplateExpression,
+    TemplateStructure,
+    TemplateExpressionSpec,
+    ParamVector,
+    has_params,
+    NoTemplateSharedState,
+    template_shared_state,
+    get_template_shared_state,
+    copy_template_shared_state,
+    attach_template_shared_state,
+    get_template_optimizable_parameters,
+    set_template_optimizable_parameters!,
+    extract_template_optimizable_gradient
 using .TemplateExpressionModule: ValidVector, TemplateReturnError
 using .ComposableExpressionModule:
     AbstractComposableExpression,
