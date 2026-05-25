@@ -1022,6 +1022,16 @@ function _main_search_loop!(
             if options.save_to_file
                 save_to_file(dominating, nout, j, dataset, options, ropt)
             end
+
+            # Update plugin state (e.g. parsimony frequency table) from the
+            # population the worker actually produced, before migration mixes
+            # in pareto/seed/best-of-each members from outside this cycle.
+            for (plugin, pstate) in zip(options.plugins, state.plugin_states)
+                on_generation_end!(
+                    pstate, plugin, state, datasets, options, ropt, j, cur_pop
+                )
+            end
+
             ###################################################################
             # Migration #######################################################
             if options.migration
@@ -1043,12 +1053,6 @@ function _main_search_loop!(
                 )
             end
             ###################################################################
-
-            for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-                on_generation_end!(
-                    pstate, plugin, state, datasets, options, ropt, j, cur_pop
-                )
-            end
 
             state.cycles_remaining[j] -= 1
             if state.cycles_remaining[j] == 0
