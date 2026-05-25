@@ -91,7 +91,7 @@ doesn't need to know about (counters, channels, concept databases, etc.).
 **Thread / Multiprocessing Safety**:
 - `on_generation_end!` runs serially on the head node — safe to mutate.
 - `on_cycle_end!` and `on_mutation_end!` run on workers, against per-dispatch
-  copies built by [`prepare_dispatch_state`](@ref). Cross-worker
+  copies built by [`fork_worker_state`](@ref). Cross-worker
   communication must use `Channel` / `RemoteChannel`.
 - `init_member` reads the head node's per-output state during initial
   population creation. In multithreading mode, multiple population-creation
@@ -310,7 +310,7 @@ function mutation_acceptance_multiplier(
 end
 
 """
-    prepare_dispatch_state(head_state, plugin, dataset) -> AbstractPluginState
+    fork_worker_state(head_state, plugin, dataset) -> AbstractPluginState
 
 Build the worker-side plugin state for one cycle's dispatch, given the head
 node's current plugin state for this output and the dataset the worker will
@@ -320,7 +320,7 @@ Default returns `deepcopy(head_state)` (full snapshot).
 
 !!! warning "Experimental"
 """
-function prepare_dispatch_state(head_state::AbstractPluginState, ::AbstractPlugin, dataset)
+function fork_worker_state(head_state::AbstractPluginState, ::AbstractPlugin, dataset)
     return deepcopy(head_state)
 end
 

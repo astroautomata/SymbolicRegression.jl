@@ -6,7 +6,7 @@ using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember
 import ..CoreModule:
     init_plugin_state,
-    prepare_dispatch_state,
+    fork_worker_state,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     on_generation_end!,
@@ -137,7 +137,7 @@ Per-output plugin state for [`AdaptiveParsimonyPlugin`](@ref). One instance
 per output (per dataset in multi-target regression); each instance owns a
 single `RunningSearchStatistics`.
 """
-mutable struct AdaptiveParsimonyState <: AbstractPluginState
+struct AdaptiveParsimonyState <: AbstractPluginState
     rss::RunningSearchStatistics
 end
 
@@ -145,7 +145,7 @@ function init_plugin_state(::AdaptiveParsimonyPlugin, options, dataset)
     return AdaptiveParsimonyState(RunningSearchStatistics(; options=options))
 end
 
-function prepare_dispatch_state(
+function fork_worker_state(
     head_state::AdaptiveParsimonyState, ::AdaptiveParsimonyPlugin, dataset
 )
     snapshot = deepcopy(head_state.rss)::RunningSearchStatistics

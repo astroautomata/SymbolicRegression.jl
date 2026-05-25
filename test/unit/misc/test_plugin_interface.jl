@@ -5,7 +5,7 @@
         AbstractPluginState,
         NoPluginState,
         init_plugin_state,
-        prepare_dispatch_state,
+        fork_worker_state,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
@@ -43,11 +43,11 @@
         s, p, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
     ) === nothing
 
-    # Factory defaults: init_member returns nothing, prepare_dispatch_state
+    # Factory defaults: init_member returns nothing, fork_worker_state
     # deepcopies the head state.
     @test init_member(s, p, nothing, opts) === nothing
     head = NoPluginState()
-    snap = prepare_dispatch_state(head, p, nothing)
+    snap = fork_worker_state(head, p, nothing)
     @test snap isa NoPluginState
     @test snap !== head  # default = deepcopy
 
