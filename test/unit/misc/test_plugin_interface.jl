@@ -357,4 +357,3 @@ end
     hof = equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
     @test hof isa SymbolicRegression.HallOfFame
 end
-
