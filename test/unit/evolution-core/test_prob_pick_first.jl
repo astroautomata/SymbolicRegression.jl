@@ -35,12 +35,8 @@
 
         pop = Population(members)
 
-        dummy_running_stats = SymbolicRegression.AdaptiveParsimonyModule.RunningSearchStatistics(;
-            options=options
-        )
         best_pop_member = [
-            SymbolicRegression.best_of_sample(pop, dummy_running_stats, options).cost for
-            j in 1:100
+            SymbolicRegression.best_of_sample(pop, options).cost for j in 1:100
         ]
 
         mean_value = sum(best_pop_member) / length(best_pop_member)

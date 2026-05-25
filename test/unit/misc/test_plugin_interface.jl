@@ -44,12 +44,12 @@
     ) === nothing
 
     # Factory defaults: init_member returns nothing, fork_worker_state
-    # deepcopies the head state.
+    # deepcopies the head state. (NoPluginState is an empty singleton, so
+    # `===` returns true after deepcopy — we just check the type.)
     @test init_member(s, p, nothing, opts) === nothing
     head = NoPluginState()
     snap = fork_worker_state(head, p, nothing)
     @test snap isa NoPluginState
-    @test snap !== head  # default = deepcopy
 
     # Modifier defaults return 1.0 (multiplicative identity).
     @test tournament_cost_multiplier(s, p, nothing, opts) == 1.0
@@ -69,6 +69,7 @@ end
         AbstractPlugin,
         AbstractPluginState,
         init_plugin_state,
+        fork_worker_state,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
@@ -88,6 +89,11 @@ end
     SymbolicRegression.init_plugin_state(p::LifecyclePlugin, options, datasets) = LifecyclePluginState(
         p.counter_ch
     )
+    # Share the head state's channel with workers (default fork deepcopies,
+    # which would isolate the channel and lose worker-side events).
+    SymbolicRegression.fork_worker_state(
+        head::LifecyclePluginState, ::LifecyclePlugin, dataset
+    ) = head
     SymbolicRegression.on_search_start!(
         s::LifecyclePluginState, ::LifecyclePlugin, d, o, r
     ) = (put!(s.counter_ch, :start); nothing)
@@ -269,6 +275,10 @@ end
     SymbolicRegression.init_plugin_state(p::MutEvalPlugin, o, d) = MutEvalPluginState(
         p.events_ch
     )
+    # Share the channel with workers (default fork deepcopies → events lost).
+    SymbolicRegression.fork_worker_state(
+        head::MutEvalPluginState, ::MutEvalPlugin, dataset
+    ) = head
     function SymbolicRegression.on_mutation_end!(
         state::MutEvalPluginState, ::MutEvalPlugin, event::MutationEvent, dataset, opts
     )
@@ -330,7 +340,13 @@ end
     mutable struct ZeroConstState <: AbstractPluginState end
     SymbolicRegression.init_plugin_state(::ZeroConstPlugin, o, d) = ZeroConstState()
     function SymbolicRegression.condition_mutation_weights!(
-        weights, ::ZeroConstState, ::ZeroConstPlugin, member, options, curmaxsize, nfeatures
+        weights::SymbolicRegression.AbstractMutationWeights,
+        ::ZeroConstState,
+        ::ZeroConstPlugin,
+        member,
+        options,
+        curmaxsize,
+        nfeatures,
     )
         weights.mutate_constant = 0.0
         return nothing
