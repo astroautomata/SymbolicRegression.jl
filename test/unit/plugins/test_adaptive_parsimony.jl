@@ -75,7 +75,7 @@ end
     # prepare_dispatch_state normalizes + extracts the slice for the given output.
     worker_state = prepare_dispatch_state(head_state, plugin, 1, dataset)
     @test length(worker_state.rss) == 1
-    @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0  atol = 1e-9
+    @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0 atol = 1e-9
     @test worker_state.rss[1] !== rss  # snapshot is independent of head
 
     # Build members of two complexities (1 vs 5) via the popmember_type from Options.
@@ -96,9 +96,7 @@ end
     @test mult_mut > 1.0
 
     # Flag toggles produce identity multipliers when off.
-    p_tournament_off = AdaptiveParsimonyPlugin(;
-        tournament=false, mutation_acceptance=true
-    )
+    p_tournament_off = AdaptiveParsimonyPlugin(; tournament=false, mutation_acceptance=true)
     p_mut_off = AdaptiveParsimonyPlugin(; tournament=true, mutation_acceptance=false)
     @test tournament_cost_multiplier(worker_state, p_tournament_off, m1, opts) == 1.0
     @test mutation_acceptance_multiplier(worker_state, p_mut_off, m1, n5, opts) == 1.0

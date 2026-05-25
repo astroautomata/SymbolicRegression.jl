@@ -232,7 +232,7 @@ end
         (use_frequency || use_frequency_in_tournament) || return ()
         return (
             AdaptiveParsimonyPlugin(;
-                tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency,
+                tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency
             ),
         )
     end

@@ -155,9 +155,7 @@ end
 
 # Sample the population, and get the best member from that sample
 function best_of_sample(
-    pop::Population{T,L,N},
-    options::AbstractOptions;
-    plugin_states::Tuple=(),
+    pop::Population{T,L,N}, options::AbstractOptions; plugin_states::Tuple=()
 ) where {T,L,N}
     sample = sample_pop(pop, options)
     return copy(_best_of_sample(sample.members, options; plugin_states))

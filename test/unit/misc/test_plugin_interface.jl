@@ -148,12 +148,10 @@ end
 
     SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
     SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
-    SymbolicRegression.on_generation_end!(
-        s::PluginAState, ::PluginA, ss, d, o, r, oi, rp
-    ) = (s.calls[] += 1; nothing)
-    SymbolicRegression.on_generation_end!(
-        s::PluginBState, ::PluginB, ss, d, o, r, oi, rp
-    ) = (s.calls[] += 1; nothing)
+    SymbolicRegression.on_generation_end!(s::PluginAState, ::PluginA, ss, d, o, r, oi, rp) =
+        (s.calls[] += 1; nothing)
+    SymbolicRegression.on_generation_end!(s::PluginBState, ::PluginB, ss, d, o, r, oi, rp) =
+        (s.calls[] += 1; nothing)
 
     opts = Options(;
         binary_operators=[+, *],
@@ -225,8 +223,9 @@ end
     mutable struct SeedingPluginState <: AbstractPluginState
         calls::Base.RefValue{Int}
     end
-    SymbolicRegression.init_plugin_state(p::SeedingPlugin, o, d) =
-        SeedingPluginState(p.calls)
+    SymbolicRegression.init_plugin_state(p::SeedingPlugin, o, d) = SeedingPluginState(
+        p.calls
+    )
     function SymbolicRegression.init_member(
         s::SeedingPluginState, ::SeedingPlugin, dataset, options
     )
@@ -331,13 +330,7 @@ end
     mutable struct ZeroConstState <: AbstractPluginState end
     SymbolicRegression.init_plugin_state(::ZeroConstPlugin, o, d) = ZeroConstState()
     function SymbolicRegression.condition_mutation_weights!(
-        weights,
-        ::ZeroConstState,
-        ::ZeroConstPlugin,
-        member,
-        options,
-        curmaxsize,
-        nfeatures,
+        weights, ::ZeroConstState, ::ZeroConstPlugin, member, options, curmaxsize, nfeatures
     )
         weights.mutate_constant = 0.0
         return nothing

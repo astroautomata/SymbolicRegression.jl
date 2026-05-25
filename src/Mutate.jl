@@ -367,9 +367,7 @@ end
         probChange *= exp(-delta / (temperature * options.alpha))
     end
     for (plugin, pstate) in zip(options.plugins, plugin_states)
-        probChange *= mutation_acceptance_multiplier(
-            pstate, plugin, member, tree, options
-        )
+        probChange *= mutation_acceptance_multiplier(pstate, plugin, member, tree, options)
     end
 
     if probChange < rand()
@@ -405,12 +403,7 @@ end
         end
         mutation_accepted = true
         new_member = create_child(
-            member,
-            tree,
-            after_cost,
-            after_loss,
-            options;
-            parent_ref=parent_ref,
+            member, tree, after_cost, after_loss, options; parent_ref=parent_ref
         )
         _fire_on_mutation_end!(
             options,

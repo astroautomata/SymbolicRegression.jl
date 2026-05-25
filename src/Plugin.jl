@@ -217,9 +217,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_cycle_end!(
-    ::AbstractPluginState, ::AbstractPlugin, pop, dataset, hof, options
-)
+function on_cycle_end!(::AbstractPluginState, ::AbstractPlugin, pop, dataset, hof, options)
     return nothing
 end
 

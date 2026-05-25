@@ -121,7 +121,8 @@ end
     gradient = WrappedGradient(
         NodeTangent(get_contents(wrapped), [-0.5]), Metadata((; scale=0.75))
     )
-    @test SymbolicRegression.extract_gradient_for_optimization(gradient, wrapped) == [-0.5, 0.75]
+    @test SymbolicRegression.extract_gradient_for_optimization(gradient, wrapped) ==
+        [-0.5, 0.75]
 
     function loss(
         ex::WrappedExpression{Float64}, _dataset::Dataset{Float64,Float64}, _options
