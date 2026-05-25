@@ -29,12 +29,12 @@ using DispatchDoctor: @unstable
 #                                   wins. Use for control-flow forks.
 #
 #   `init_X`                      — Factory (one-time). Called once per
-#                                   (plugin, worker) at startup. Returns a
+#                                   (plugin, output) at startup. Returns a
 #                                   new instance.
 #
 #   `prepare_X`                   — Factory (per-context). Called per dispatch
-#                                   with context (output index, dataset).
-#                                   Returns a new instance for the worker.
+#                                   with the dataset. Returns a new instance
+#                                   for the worker.
 #
 # When adding a new hook: pick a category, follow the verb shape. If the name
 # feels ambiguous, the contract probably isn't one of these six — rethink
@@ -82,21 +82,20 @@ abstract type AbstractPlugin end
 """
     AbstractPluginState
 
-Abstract type for mutable per-worker plugin state.
+Abstract type for mutable per-output plugin state.
 
-Each plugin gets its own state instance per worker via [`init_plugin_state`](@ref).
-States hold the mutable runtime data the engine doesn't need to know about
-(counters, channels, concept databases, etc.).
+Each (plugin, output) pair gets its own state instance via
+[`init_plugin_state`](@ref). States hold the mutable runtime data the engine
+doesn't need to know about (counters, channels, concept databases, etc.).
 
 **Thread / Multiprocessing Safety**:
 - `on_generation_end!` runs serially on the head node — safe to mutate.
-- `on_cycle_end!` and `on_mutation_end!` run on workers
-  concurrently in multithreading mode. Each `(plugin, worker)` slot has its
-  own state, so no cross-slot races occur. Cross-worker communication must
-  use `Channel` / `RemoteChannel`.
-- `init_member` uses the head node's states during initial population
-  creation. In multithreading mode, multiple population-creation tasks may
-  call it concurrently — keep it read-only or thread-safe.
+- `on_cycle_end!` and `on_mutation_end!` run on workers, against per-dispatch
+  copies built by [`prepare_dispatch_state`](@ref). Cross-worker
+  communication must use `Channel` / `RemoteChannel`.
+- `init_member` reads the head node's per-output state during initial
+  population creation. In multithreading mode, multiple population-creation
+  tasks may call it concurrently — keep it read-only or thread-safe.
 - In multiprocessing mode, plugin config is serialized to workers (via
   `options.plugins`); worker state is initialized lazily on each worker
   process.
@@ -115,78 +114,70 @@ a plugin doesn't override it.
 struct NoPluginState <: AbstractPluginState end
 
 """
-    init_plugin_state(plugin::AbstractPlugin, options, datasets) -> AbstractPluginState
+    init_plugin_state(plugin::AbstractPlugin, options, dataset) -> AbstractPluginState
 
-Create the mutable per-worker state for `plugin`. Called once on the head node
-(with the full `datasets` vector) and once per worker (with a single-element
-tuple `(dataset,)`).
+Create the mutable per-output state for `plugin`. Called once per
+(plugin, output) pair at search start.
 
 Override by dispatching on your plugin type:
 
 ```julia
-SymbolicRegression.init_plugin_state(p::MyPlugin, options, datasets) =
+SymbolicRegression.init_plugin_state(p::MyPlugin, options, dataset) =
     MyPluginState(p.config)
 ```
-
-If your implementation uses `datasets`, note the type difference: the head
-node receives a `Vector{<:Dataset}` while each worker receives a
-`Tuple{<:Dataset}`.
 
 Default returns `NoPluginState()`.
 
 !!! warning "Experimental"
 """
-function init_plugin_state(::AbstractPlugin, options, datasets)
+function init_plugin_state(::AbstractPlugin, options, dataset)
     return NoPluginState()
 end
 
 """
-    on_search_start!(plugin, state, datasets, options, ropt)
+    on_search_start!(plugin, state, dataset, options, ropt)
 
 Lifecycle hook called on the head node after initialization, before warmup
-and the main search loop. Called once per plugin, in the order
-`options.plugins` was constructed.
+and the main search loop. Called once per (plugin, output) pair.
 
 Override by dispatching on your plugin type:
 
 ```julia
-SymbolicRegression.on_search_start!(p::MyPlugin, s::MyPluginState, datasets, options, ropt) = ...
+SymbolicRegression.on_search_start!(p::MyPlugin, s::MyPluginState, dataset, options, ropt) = ...
 ```
 
 Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_search_start!(::AbstractPluginState, ::AbstractPlugin, datasets, options, ropt)
+function on_search_start!(::AbstractPluginState, ::AbstractPlugin, dataset, options, ropt)
     return nothing
 end
 
 """
-    on_search_end!(plugin, state, search_state, datasets, options, ropt)
+    on_search_end!(plugin, state, search_state, dataset, options, ropt)
 
 Lifecycle hook called on the head node after all workers have completed,
-before tearing down processes/threads. Called once per plugin.
+before tearing down processes/threads. Called once per (plugin, output) pair.
 
 Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
 function on_search_end!(
-    ::AbstractPluginState, ::AbstractPlugin, search_state, datasets, options, ropt
+    ::AbstractPluginState, ::AbstractPlugin, search_state, dataset, options, ropt
 )
     return nothing
 end
 
 """
-    on_generation_end!(plugin, state, search_state, datasets, options, ropt, output_index, returned_pop)
+    on_generation_end!(plugin, state, search_state, dataset, options, ropt, returned_pop)
 
 Lifecycle hook called on the HEAD NODE after each cycle's result has been
-received from a worker (after HoF update + migration). Runs serially; safe
-to mutate plugin state, update concept databases, drain feedback channels,
-etc. Called once per plugin per cycle.
-
-`output_index` is the `1:nout` index of the dataset whose cycle just
-returned. `returned_pop` is the population the worker produced.
+received from a worker. Runs serially; safe to mutate plugin state, update
+concept databases, drain feedback channels, etc. Called once per (plugin,
+output) pair per cycle. `state` is this output's state; `returned_pop` is
+the population the worker produced.
 
 Override by dispatching on your plugin type. Default is a no-op.
 
@@ -196,10 +187,9 @@ function on_generation_end!(
     ::AbstractPluginState,
     ::AbstractPlugin,
     search_state,
-    datasets,
+    dataset,
     options,
     ropt,
-    output_index::Int,
     returned_pop,
 )
     return nothing
@@ -249,7 +239,6 @@ distinguish "valid tree, probabilistically rejected" from "invalid tree,
 never evaluated" by checking `isnan(after_loss)`.
 
 !!! warning "Experimental"
-    Fields may be added in minor releases (never removed or renamed).
 """
 struct MutationEvent
     mutation_type::Symbol
@@ -321,22 +310,17 @@ function mutation_acceptance_multiplier(
 end
 
 """
-    prepare_dispatch_state(head_state, plugin, output_index::Int, dataset) -> AbstractPluginState
+    prepare_dispatch_state(head_state, plugin, dataset) -> AbstractPluginState
 
 Build the worker-side plugin state for one cycle's dispatch, given the head
-node's current plugin state, the output index (`1:nout` in multi-target
-regression), and the dataset the worker will operate on. Called once per
-plugin per cycle dispatch.
+node's current plugin state for this output and the dataset the worker will
+operate on. Called once per (plugin, output) pair per cycle dispatch.
 
-Default returns `deepcopy(head_state)` (full snapshot). Plugins that
-maintain per-output state should override to extract only the relevant
-slice for `output_index` so per-output independence is preserved.
+Default returns `deepcopy(head_state)` (full snapshot).
 
 !!! warning "Experimental"
 """
-function prepare_dispatch_state(
-    head_state::AbstractPluginState, ::AbstractPlugin, output_index::Int, dataset
-)
+function prepare_dispatch_state(head_state::AbstractPluginState, ::AbstractPlugin, dataset)
     return deepcopy(head_state)
 end
 

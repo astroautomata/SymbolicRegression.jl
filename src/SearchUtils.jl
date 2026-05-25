@@ -628,7 +628,7 @@ Base.@kwdef struct SearchState{
     stdin_reader::StdinReader
     record::Base.RefValue{RecordType}
     seed_members::Vector{Vector{PM}}
-    plugin_states::PluginStatesType
+    plugin_states::Vector{PluginStatesType}
 end
 
 function save_to_file(

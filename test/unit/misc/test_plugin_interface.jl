@@ -30,14 +30,14 @@
     # Dummy plugin exercises every default hook contract.
     struct DummyPlugin <: AbstractPlugin end
     p = DummyPlugin()
-    @test init_plugin_state(p, opts, []) isa NoPluginState
+    @test init_plugin_state(p, opts, nothing) isa NoPluginState
     s = NoPluginState()
 
     # Observers default to no-op (return nothing). Hooks follow the convention
     # (state, plugin, ...) so the mutated `state` is first.
-    @test on_search_start!(s, p, [], opts, nothing) === nothing
-    @test on_search_end!(s, p, nothing, [], opts, nothing) === nothing
-    @test on_generation_end!(s, p, nothing, [], opts, nothing, 1, nothing) === nothing
+    @test on_search_start!(s, p, nothing, opts, nothing) === nothing
+    @test on_search_end!(s, p, nothing, nothing, opts, nothing) === nothing
+    @test on_generation_end!(s, p, nothing, nothing, opts, nothing, nothing) === nothing
     @test on_cycle_end!(s, p, nothing, nothing, nothing, opts) === nothing
     @test on_mutation_end!(
         s, p, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
@@ -47,7 +47,7 @@
     # deepcopies the head state.
     @test init_member(s, p, nothing, opts) === nothing
     head = NoPluginState()
-    snap = prepare_dispatch_state(head, p, 1, nothing)
+    snap = prepare_dispatch_state(head, p, nothing)
     @test snap isa NoPluginState
     @test snap !== head  # default = deepcopy
 
@@ -95,7 +95,7 @@ end
         s::LifecyclePluginState, ::LifecyclePlugin, ss, d, o, r
     ) = (put!(s.counter_ch, :end); nothing)
     SymbolicRegression.on_generation_end!(
-        s::LifecyclePluginState, ::LifecyclePlugin, ss, d, o, r, oi, rp
+        s::LifecyclePluginState, ::LifecyclePlugin, ss, d, o, r, rp
     ) = (put!(s.counter_ch, :gen); nothing)
     SymbolicRegression.on_cycle_end!(
         s::LifecyclePluginState, ::LifecyclePlugin, pop, d, h, o
@@ -148,9 +148,9 @@ end
 
     SymbolicRegression.init_plugin_state(p::PluginA, o, d) = PluginAState(p.calls)
     SymbolicRegression.init_plugin_state(p::PluginB, o, d) = PluginBState(p.calls)
-    SymbolicRegression.on_generation_end!(s::PluginAState, ::PluginA, ss, d, o, r, oi, rp) =
+    SymbolicRegression.on_generation_end!(s::PluginAState, ::PluginA, ss, d, o, r, rp) =
         (s.calls[] += 1; nothing)
-    SymbolicRegression.on_generation_end!(s::PluginBState, ::PluginB, ss, d, o, r, oi, rp) =
+    SymbolicRegression.on_generation_end!(s::PluginBState, ::PluginB, ss, d, o, r, rp) =
         (s.calls[] += 1; nothing)
 
     opts = Options(;

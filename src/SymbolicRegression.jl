@@ -731,9 +731,13 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    plugin_states = map(p -> init_plugin_state(p, options, datasets), options.plugins)
+    plugin_states = [
+        map(p -> init_plugin_state(p, options, datasets[j]), options.plugins) for
+        j in 1:nout
+    ]
+    PluginStatesType = eltype(plugin_states)
 
-    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,typeof(plugin_states)}(;
+    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,PluginStatesType}(;
         procs=procs,
         we_created_procs=we_created_procs,
         worker_output=worker_output,
@@ -818,7 +822,7 @@ function _initialize_search!(
                 if saved_pop !== nothing && ropt.verbosity > 0
                     @warn "Recreating population (output=$(j), population=$(i)), as the saved one doesn't have the correct number of members."
                 end
-                let _plugin_states = state.plugin_states, _dataset = datasets[j]
+                let _plugin_states = state.plugin_states[j], _dataset = datasets[j]
                     @sr_spawner(
                         begin
                             (
@@ -843,8 +847,10 @@ function _initialize_search!(
             end
         push!(state.worker_output[j], new_pop)
     end
-    for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-        on_search_start!(pstate, plugin, datasets, options, ropt)
+    for j in eachindex(datasets, state.plugin_states)
+        for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+            on_search_start!(pstate, plugin, datasets[j], options, ropt)
+        end
     end
     return nothing
 end
@@ -897,9 +903,9 @@ function _warmup_search!(
 
         # Snapshot each plugin's head-side state for this worker dispatch.
         worker_plugin_states = map(
-            (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
+            (p, hs) -> prepare_dispatch_state(hs, p, dataset),
             options.plugins,
-            state.plugin_states,
+            state.plugin_states[j],
         )
         updated_pop = @sr_spawner(
             begin
@@ -1026,10 +1032,8 @@ function _main_search_loop!(
             # Update plugin state (e.g. parsimony frequency table) from the
             # population the worker actually produced, before migration mixes
             # in pareto/seed/best-of-each members from outside this cycle.
-            for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-                on_generation_end!(
-                    pstate, plugin, state, datasets, options, ropt, j, cur_pop
-                )
+            for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+                on_generation_end!(pstate, plugin, state, dataset, options, ropt, cur_pop)
             end
 
             ###################################################################
@@ -1074,9 +1078,9 @@ function _main_search_loop!(
 
             in_pop = copy(cur_pop::Population{T,L,N})
             worker_plugin_states = map(
-                (p, hs) -> prepare_dispatch_state(hs, p, j, dataset),
+                (p, hs) -> prepare_dispatch_state(hs, p, dataset),
                 options.plugins,
-                state.plugin_states,
+                state.plugin_states[j],
             )
             state.worker_output[j][i] = @sr_spawner(
                 begin
@@ -1201,8 +1205,10 @@ function _tear_down!(
             wait(state.worker_output[j][i])
         end
     end
-    for (plugin, pstate) in zip(options.plugins, state.plugin_states)
-        on_search_end!(pstate, plugin, state, datasets, options, ropt)
+    for j in eachindex(datasets, state.plugin_states)
+        for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+            on_search_end!(pstate, plugin, state, datasets[j], options, ropt)
+        end
     end
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
@@ -1238,7 +1244,7 @@ end
     plugin_states::Union{Tuple,Nothing}=nothing,
 ) where {T,L,N}
     worker_plugin_states = @something(
-        plugin_states, map(p -> init_plugin_state(p, options, (dataset,)), options.plugins)
+        plugin_states, map(p -> init_plugin_state(p, options, dataset), options.plugins)
     )
 
     record = RecordType()

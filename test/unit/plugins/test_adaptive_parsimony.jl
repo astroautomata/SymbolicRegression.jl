@@ -65,18 +65,16 @@ end
     dataset = Dataset(randn(2, 10), randn(10))
     plugin = first(p for p in opts.plugins if p isa AdaptiveParsimonyPlugin)
 
-    head_state = init_plugin_state(plugin, opts, [dataset])
+    head_state = init_plugin_state(plugin, opts, dataset)
     # Inject known frequency history via the public RunningSearchStatistics API.
-    rss = head_state.rss[1]
     for size in (1, 1, 1, 1, 1, 3, 3, 5)
-        update_frequencies!(rss; size=size)
+        update_frequencies!(head_state.rss; size=size)
     end
 
-    # prepare_dispatch_state normalizes + extracts the slice for the given output.
-    worker_state = prepare_dispatch_state(head_state, plugin, 1, dataset)
-    @test length(worker_state.rss) == 1
-    @test sum(worker_state.rss[1].normalized_frequencies) ≈ 1.0 atol = 1e-9
-    @test worker_state.rss[1] !== rss  # snapshot is independent of head
+    # prepare_dispatch_state normalizes + deepcopies for the worker.
+    worker_state = prepare_dispatch_state(head_state, plugin, dataset)
+    @test sum(worker_state.rss.normalized_frequencies) ≈ 1.0 atol = 1e-9
+    @test worker_state.rss !== head_state.rss  # snapshot is independent of head
 
     # Build members of two complexities (1 vs 5) via the popmember_type from Options.
     PM = opts.popmember_type
@@ -142,4 +140,27 @@ end
         X, y; options=opts_plugin, niterations=2, parallelism=:serial
     )
     @test hof_plugin isa SymbolicRegression.HallOfFame
+end
+
+@testitem "AdaptiveParsimonyPlugin: per-output state shape (single-output)" begin
+    using SymbolicRegression
+    using SymbolicRegression.AdaptiveParsimonyModule:
+        AdaptiveParsimonyPlugin, AdaptiveParsimonyState, RunningSearchStatistics
+    using SymbolicRegression: Dataset, init_plugin_state, prepare_dispatch_state
+    using Test
+
+    opts = Options(; binary_operators=[+, *])
+    dataset = Dataset(randn(Float32, 2, 10), randn(Float32, 10))
+    plugin = AdaptiveParsimonyPlugin()
+
+    # init_plugin_state must operate per-output: one dataset in, one flat
+    # per-output state out — no internal nout-length array.
+    s = init_plugin_state(plugin, opts, dataset)
+    @test s isa AdaptiveParsimonyState
+    @test s.rss isa RunningSearchStatistics
+
+    # prepare_dispatch_state must produce the same shape (no output_index needed).
+    ws = prepare_dispatch_state(s, plugin, dataset)
+    @test ws isa AdaptiveParsimonyState
+    @test ws.rss isa RunningSearchStatistics
 end

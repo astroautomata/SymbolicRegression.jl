@@ -133,33 +133,24 @@ end
 """
     AdaptiveParsimonyState <: AbstractPluginState
 
-Mutable per-plugin state for [`AdaptiveParsimonyPlugin`](@ref). Holds a
-vector of `RunningSearchStatistics` instances, one per output.
-
-On the head node, `rss` has length `nout` (one slot per dataset). On a
-worker, after [`prepare_dispatch_state`](@ref) extracts the relevant
-slice, `rss` has length 1 — the worker only ever needs its own output's
-statistics.
+Per-output plugin state for [`AdaptiveParsimonyPlugin`](@ref). One instance
+per output (per dataset in multi-target regression); each instance owns a
+single `RunningSearchStatistics`.
 """
 mutable struct AdaptiveParsimonyState <: AbstractPluginState
-    rss::Vector{RunningSearchStatistics}
+    rss::RunningSearchStatistics
 end
 
-function init_plugin_state(::AdaptiveParsimonyPlugin, options, datasets)
-    return AdaptiveParsimonyState([
-        RunningSearchStatistics(; options=options) for _ in 1:length(datasets)
-    ])
+function init_plugin_state(::AdaptiveParsimonyPlugin, options, dataset)
+    return AdaptiveParsimonyState(RunningSearchStatistics(; options=options))
 end
 
 function prepare_dispatch_state(
-    head_state::AdaptiveParsimonyState,
-    ::AdaptiveParsimonyPlugin,
-    output_index::Int,
-    dataset,
+    head_state::AdaptiveParsimonyState, ::AdaptiveParsimonyPlugin, dataset
 )
-    snapshot = deepcopy(head_state.rss[output_index])::RunningSearchStatistics
+    snapshot = deepcopy(head_state.rss)::RunningSearchStatistics
     normalize_frequencies!(snapshot)
-    return AdaptiveParsimonyState([snapshot])
+    return AdaptiveParsimonyState(snapshot)
 end
 
 function tournament_cost_multiplier(
@@ -169,10 +160,9 @@ function tournament_cost_multiplier(
     options::AbstractOptions,
 ) where {T,L,N}
     p.tournament || return one(L)
-    rss = s.rss[1]
     sz = compute_complexity(member, options)
     frequency = if (0 < sz <= options.maxsize)
-        L(rss.normalized_frequencies[sz])
+        L(s.rss.normalized_frequencies[sz])
     else
         zero(L)
     end
@@ -187,40 +177,37 @@ function mutation_acceptance_multiplier(
     options::AbstractOptions,
 )
     p.mutation_acceptance || return 1.0
-    rss = s.rss[1]
     old_size = compute_complexity(parent_member, options)
     new_size = compute_complexity(new_tree, options)
     old_frequency = if (0 < old_size <= options.maxsize)
-        Float64(rss.normalized_frequencies[old_size])
+        Float64(s.rss.normalized_frequencies[old_size])
     else
         1e-6
     end
     new_frequency = if (0 < new_size <= options.maxsize)
-        Float64(rss.normalized_frequencies[new_size])
+        Float64(s.rss.normalized_frequencies[new_size])
     else
         1e-6
     end
     return old_frequency / new_frequency
 end
 
-# Head-side per-cycle hook: update frequencies for the returned population's
-# output, then slide the window to keep memory bounded.
+# Head-side per-cycle hook: update frequencies for the returned population,
+# then slide the window to keep memory bounded.
 function on_generation_end!(
     s::AdaptiveParsimonyState,
     ::AdaptiveParsimonyPlugin,
     search_state,
-    datasets,
+    dataset,
     options,
     ropt,
-    output_index::Int,
     returned_pop,
 )
-    rss = s.rss[output_index]
     for member in returned_pop.members
         sz = compute_complexity(member, options)
-        update_frequencies!(rss; size=sz)
+        update_frequencies!(s.rss; size=sz)
     end
-    move_window!(rss)
+    move_window!(s.rss)
     return nothing
 end
 
