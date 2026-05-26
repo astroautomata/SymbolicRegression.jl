@@ -264,13 +264,13 @@ end
     using Test
 
     # Collect MutationEvent values via a Channel
-    events_ch = Channel{MutationEvent}(10_000)
+    events_ch = Channel{MutationEvent{Float32}}(10_000)
 
     struct MutEvalPlugin <: AbstractPlugin
-        events_ch::Channel{MutationEvent}
+        events_ch::Channel{MutationEvent{Float32}}
     end
     mutable struct MutEvalPluginState <: AbstractPluginState
-        events_ch::Channel{MutationEvent}
+        events_ch::Channel{MutationEvent{Float32}}
     end
     SymbolicRegression.init_plugin_state(p::MutEvalPlugin, o, d) = MutEvalPluginState(
         p.events_ch
@@ -315,8 +315,8 @@ end
     for ev in events
         @test ev isa MutationEvent
         @test ev.accepted isa Bool
-        @test ev.before_loss isa Float64
-        @test ev.after_loss isa Float64
+        @test ev.before_loss isa Float32
+        @test ev.after_loss isa Float32
         @test isfinite(ev.before_loss)
     end
 

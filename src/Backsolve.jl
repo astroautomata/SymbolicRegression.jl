@@ -318,7 +318,7 @@ operator set, since the output is structurally a weighted sum.
     dataset::Dataset{T},
     options::AbstractOptions,
     nfeatures::Int;
-    mutation::Backsolve,
+    backsolve_options::Backsolve,
     population_for_backsolve=nothing,
 ) where {T<:STLSQ_DATA_TYPE}
     _has_weighted_sum_operators(options) || return nothing
@@ -329,14 +329,14 @@ operator set, since the output is structurally a weighted sum.
         options,
         nfeatures,
         population_for_backsolve;
-        max_library_size=mutation.max_library_size,
+        max_library_size=backsolve_options.max_library_size,
     )
 
     coefficients, stlsq_success = stlsq(
         basis.evaluated_terms,
         target_values;
-        lambda=mutation.lambda,
-        max_iter=mutation.max_iter,
+        lambda=backsolve_options.lambda,
+        max_iter=backsolve_options.max_iter,
     )
 
     if !stlsq_success

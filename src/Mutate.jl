@@ -124,6 +124,24 @@ function _set_weight!(
 end
 
 """
+    _scale_weight!(weights, ::Type{M}, factor)
+
+Multiply the weight of every entry whose mutation is `<: M` by `factor`
+(in place). Multiplicative sibling of [`_set_weight!`](@ref).
+"""
+function _scale_weight!(
+    weights::AbstractVector, ::Type{M}, factor::Real
+) where {M<:AbstractMutation}
+    for i in eachindex(weights)
+        m, w = weights[i]
+        if m isa M
+            weights[i] = m => w * Float64(factor)
+        end
+    end
+    return nothing
+end
+
+"""
     condition_mutation_weights!(weights, member::AbstractPopMember, options, curmaxsize, nfeatures)
 
 Adjust the mutation `weights` (a `Vector{Pair{AbstractMutation,Float64}}`)
@@ -214,13 +232,7 @@ function condition_mutate_constant!(
     curmaxsize::Int,
 )
     n_constants = count_scalar_constants(member.tree)
-    factor = min(8, n_constants) / 8.0
-    for i in eachindex(weights)
-        m, w = weights[i]
-        if m isa MutateConstant
-            weights[i] = m => w * factor
-        end
-    end
+    _scale_weight!(weights, MutateConstant, min(8, n_constants) / 8.0)
     return nothing
 end
 
@@ -357,9 +369,7 @@ function _next_generation(
                 options,
                 plugin_states,
                 mutation_choice,
-                MutationEvent(
-                    true, Float64(before_loss), Float64(mutation_result.member.loss)
-                ),
+                MutationEvent(true, before_loss, mutation_result.member.loss),
                 dataset,
             )
             return mutation_result.member::P, true, num_evals
@@ -386,7 +396,7 @@ function _next_generation(
             options,
             plugin_states,
             mutation_choice,
-            MutationEvent(false, Float64(before_loss), NaN),
+            MutationEvent(false, before_loss, convert(L, NaN)),
             dataset,
         )
         return (
@@ -417,7 +427,7 @@ function _next_generation(
             options,
             plugin_states,
             mutation_choice,
-            MutationEvent(false, Float64(before_loss), NaN),
+            MutationEvent(false, before_loss, convert(L, NaN)),
             dataset,
         )
         return (
@@ -455,7 +465,7 @@ function _next_generation(
             options,
             plugin_states,
             mutation_choice,
-            MutationEvent(false, Float64(before_loss), Float64(after_loss)),
+            MutationEvent(false, before_loss, after_loss),
             dataset,
         )
         return (
@@ -483,7 +493,7 @@ function _next_generation(
             options,
             plugin_states,
             mutation_choice,
-            MutationEvent(true, Float64(before_loss), Float64(after_loss)),
+            MutationEvent(true, before_loss, after_loss),
             dataset,
         )
         return (new_member, mutation_accepted, num_evals)
@@ -686,7 +696,7 @@ function mutate!(
         new_tree,
         dataset,
         options;
-        mutation=m,
+        backsolve_options=m,
         population_for_backsolve=population_for_backsolve,
     )
     @recorder recorder["type"] = "backsolve"

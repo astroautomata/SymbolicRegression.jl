@@ -223,9 +223,11 @@ once the accept/reject decision has been made inside `next_generation`.
 - `accepted::Bool`: `true` if the mutation was accepted (via
   `return_immediately` or annealing/fitness acceptance); `false` if rejected
   (constraint failure, NaN loss, or annealing/frequency rejection).
-- `before_loss::Float64`: loss of the parent member before mutation.
-- `after_loss::Float64`: loss after mutation. `NaN` if no valid evaluation
+- `before_loss::L`: loss of the parent member before mutation.
+- `after_loss::L`: loss after mutation. `NaN` if no valid evaluation
   occurred (constraint failure or NaN loss).
+
+`L` is the dataset's loss type (e.g. `Float32` or `Float64`).
 
 The mutation kind itself is passed as a separate dispatch arg to
 [`on_mutation_end!`](@ref), not stored on the event — that way plugin
@@ -233,10 +235,10 @@ authors can write type-specific methods.
 
 !!! warning "Experimental"
 """
-struct MutationEvent
+struct MutationEvent{L<:Real}
     accepted::Bool
-    before_loss::Float64
-    after_loss::Float64
+    before_loss::L
+    after_loss::L
 end
 
 """

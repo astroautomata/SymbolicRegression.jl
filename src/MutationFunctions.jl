@@ -653,7 +653,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    mutation,
+    backsolve_options,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     throw(
@@ -668,12 +668,12 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    mutation,
+    backsolve_options,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     tree = get_contents(ex)
     new_tree = backsolve_rewrite_random_node(
-        tree, dataset, options, rng; mutation, population_for_backsolve
+        tree, dataset, options, rng; backsolve_options, population_for_backsolve
     )
     return with_contents(ex, new_tree)
 end
@@ -683,7 +683,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    mutation,
+    backsolve_options,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     if !(T <: Union{AbstractFloat,Complex{<:AbstractFloat}})
@@ -713,7 +713,7 @@ function backsolve_rewrite_random_node(
         dataset,
         options,
         nfeatures;
-        mutation,
+        backsolve_options,
         population_for_backsolve,
     )
 
@@ -741,7 +741,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    mutation,
+    backsolve_options,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE,D}
     throw(

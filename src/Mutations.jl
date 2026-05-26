@@ -39,14 +39,31 @@ Base.@kwdef struct MutateConstant <: AbstractMutation
     probability_negate::Float64 = 0.01
 end
 
+"""Swap a random operator for another of the same arity."""
 struct MutateOperator <: AbstractMutation end
+
+"""Reassign a random variable leaf to a different input feature."""
 struct MutateFeature <: AbstractMutation end
+
+"""Swap the operands of a random binary operator."""
 struct SwapOperands <: AbstractMutation end
+
+"""Append a random new operator (with fresh leaves) at a random leaf."""
 struct AddNode <: AbstractMutation end
+
+"""Insert a random new operator between an existing node and its parent."""
 struct InsertNode <: AbstractMutation end
+
+"""Delete a random non-leaf node, replacing it with one of its children."""
 struct DeleteNode <: AbstractMutation end
+
+"""Form a shared-subtree connection between two nodes (graph-mode only)."""
 struct FormConnection <: AbstractMutation end
+
+"""Break a shared-subtree connection by deep-copying one of the references."""
 struct BreakConnection <: AbstractMutation end
+
+"""Rotate a random subtree (rebalancing the AST)."""
 struct RotateTree <: AbstractMutation end
 
 """
@@ -64,9 +81,16 @@ Base.@kwdef struct Backsolve <: AbstractMutation
     max_iter::Int = 10
 end
 
+"""Algebraically simplify the tree (e.g. fold constants)."""
 struct Simplify <: AbstractMutation end
+
+"""Replace the tree with a freshly generated random tree."""
 struct Randomize <: AbstractMutation end
+
+"""Run gradient-based constant optimization on the tree (reads optimizer settings from `options`)."""
 struct Optimize <: AbstractMutation end
+
+"""No-op mutation: copy the parent unchanged (acts as a sampling weight reserve)."""
 struct DoNothing <: AbstractMutation end
 
 """
