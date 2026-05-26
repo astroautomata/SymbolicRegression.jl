@@ -106,40 +106,32 @@ struct MutationResult{N<:AbstractExpression,P<:AbstractPopMember} <:
 end
 
 """
-    _set_weight!(weights, ::Type{M}, value)
+    _update_weight!(op, weights, ::Type{M})
 
-Set the weight of every entry whose mutation is `<: M` to `value` (in place).
-Helper for `condition_mutation_weights!`.
+For every entry whose mutation is `<: M`, replace its weight with `op(weight)`.
+Core helper used by `condition_mutation_weights!` plugin authors via the
+`_set_weight!` / `_scale_weight!` wrappers below.
 """
-function _set_weight!(
-    weights::AbstractVector, ::Type{M}, value::Real
-) where {M<:AbstractMutation}
-    for i in eachindex(weights)
-        m, _ = weights[i]
-        if m isa M
-            weights[i] = m => Float64(value)
-        end
-    end
-    return nothing
-end
-
-"""
-    _scale_weight!(weights, ::Type{M}, factor)
-
-Multiply the weight of every entry whose mutation is `<: M` by `factor`
-(in place). Multiplicative sibling of [`_set_weight!`](@ref).
-"""
-function _scale_weight!(
-    weights::AbstractVector, ::Type{M}, factor::Real
-) where {M<:AbstractMutation}
+function _update_weight!(
+    op::F, weights::AbstractVector, ::Type{M}
+) where {F,M<:AbstractMutation}
     for i in eachindex(weights)
         m, w = weights[i]
         if m isa M
-            weights[i] = m => w * Float64(factor)
+            weights[i] = m => op(w)
         end
     end
     return nothing
 end
+
+"""Set the weight of every `<: M` entry to `value` (in place)."""
+_set_weight!(weights::AbstractVector, ::Type{M}, value::Real) where {M<:AbstractMutation} =
+    _update_weight!(Returns(Float64(value)), weights, M)
+
+"""Multiply the weight of every `<: M` entry by `factor` (in place)."""
+_scale_weight!(
+    weights::AbstractVector, ::Type{M}, factor::Real
+) where {M<:AbstractMutation} = _update_weight!(w -> w * Float64(factor), weights, M)
 
 """
     condition_mutation_weights!(weights, member::AbstractPopMember, options, curmaxsize, nfeatures)
