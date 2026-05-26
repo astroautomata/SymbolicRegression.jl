@@ -154,9 +154,7 @@ function mutate_value(
     return val * mutate_factor(typeof(val), temperature, m, rng)
 end
 
-function mutate_factor(
-    ::Type{T}, temperature, m::MutateConstant, rng
-) where {T<:Number}
+function mutate_factor(::Type{T}, temperature, m::MutateConstant, rng) where {T<:Number}
     bottom = 1//10
     maxChange = m.perturbation_factor * temperature + 1 + bottom
     factor = T(maxChange^rand(rng, T))
