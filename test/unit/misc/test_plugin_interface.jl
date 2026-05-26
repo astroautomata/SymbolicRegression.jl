@@ -40,7 +40,7 @@
     @test on_generation_end!(s, p, nothing, nothing, opts, nothing, nothing) === nothing
     @test on_cycle_end!(s, p, nothing, nothing, nothing, opts) === nothing
     @test on_mutation_end!(
-        s, p, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
+        s, p, MutateConstant(), MutationEvent(true, 0.5, 0.4), nothing, opts
     ) === nothing
 
     # Factory defaults: init_member returns nothing, fork_worker_state
@@ -57,10 +57,10 @@
 
     # Conditioner default leaves weights untouched. `weights` is the mutated
     # arg → first; then state, then plugin.
-    w = MutationWeights()
-    before = (w.mutate_constant, w.add_node, w.delete_node)
+    w = copy(opts.mutations)
+    before = copy(w)
     @test condition_mutation_weights!(w, s, p, nothing, opts, 20, 2) === nothing
-    @test (w.mutate_constant, w.add_node, w.delete_node) == before
+    @test w == before
 end
 
 @testitem "Plugin interface: lifecycle hooks called for each plugin" begin
@@ -280,7 +280,12 @@ end
         head::MutEvalPluginState, ::MutEvalPlugin, dataset
     ) = head
     function SymbolicRegression.on_mutation_end!(
-        state::MutEvalPluginState, ::MutEvalPlugin, event::MutationEvent, dataset, opts
+        state::MutEvalPluginState,
+        ::MutEvalPlugin,
+        ::SymbolicRegression.AbstractMutation,
+        event::MutationEvent,
+        dataset,
+        opts,
     )
         put!(state.events_ch, event)
         return nothing

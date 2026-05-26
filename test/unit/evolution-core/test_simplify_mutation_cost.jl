@@ -24,8 +24,8 @@
     result = mutate!(
         copy(member.tree),
         member,
-        Val(:simplify),
-        MutationWeights(),
+        Simplify(),
+        options.mutations,
         options;
         recorder=RecordType(),
         dataset=dataset,
