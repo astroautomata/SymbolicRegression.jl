@@ -359,14 +359,18 @@ end
 end
 
 # Forward-declared per kwarg→plugin migration. Plugin modules (loaded above
-# Core) provide the only method.
-function default_adaptive_parsimony_plugins end
+# Core) provide the only method. Each returns either a plugin instance or
+# `nothing` (when the legacy kwarg is off).
+function default_adaptive_parsimony_plugin end
 
-# Append defaults whose type isn't already in the user tuple.
+# Append defaults whose type isn't already in the user tuple. Each default
+# may be `nothing` (auto-injected plugin disabled by the legacy kwarg) and
+# is filtered out.
 @unstable function _merge_with_default_plugins(
-    @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins::Tuple)
+    @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins...)
 )
-    novel = filter(dp -> !any(p -> p isa typeof(dp), user_plugins), default_plugins)
+    actual_defaults = filter(!isnothing, default_plugins)
+    novel = filter(dp -> !any(p -> p isa typeof(dp), user_plugins), actual_defaults)
     return (user_plugins..., novel...)
 end
 

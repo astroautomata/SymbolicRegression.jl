@@ -10,7 +10,7 @@ import ..CoreModule:
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     on_generation_end!,
-    default_adaptive_parsimony_plugins
+    default_adaptive_parsimony_plugin
 
 """
     RunningSearchStatistics
@@ -213,14 +213,12 @@ end
 
 @stable(
     default_union_limit = 2,
-    function default_adaptive_parsimony_plugins(;
+    function default_adaptive_parsimony_plugin(;
         use_frequency::Bool, use_frequency_in_tournament::Bool
     )
-        (use_frequency || use_frequency_in_tournament) || return ()
-        return (
-            AdaptiveParsimonyPlugin(;
-                tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency
-            ),
+        (use_frequency || use_frequency_in_tournament) || return nothing
+        return AdaptiveParsimonyPlugin(;
+            tournament=use_frequency_in_tournament, mutation_acceptance=use_frequency
         )
     end
 )
