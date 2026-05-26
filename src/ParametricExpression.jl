@@ -22,6 +22,7 @@ using ..CoreModule:
     DATA_TYPE,
     AbstractMutationWeights,
     MutateConstant,
+    MutateConstantContext,
     AbstractExpressionSpec,
     get_indices,
     ExpressionSpecModule as ES
@@ -173,19 +174,20 @@ end
 
 function MF.mutate_constant(
     ex::ParametricExpression{T},
-    temperature,
+    ctx::MutateConstantContext,
+    m::MutateConstant,
     options::AbstractOptions,
     rng::AbstractRNG=default_rng(),
 ) where {T<:DATA_TYPE}
     if rand(rng, Bool)
         # Normal mutation of inner constant
         tree = get_contents(ex)
-        return with_contents(ex, MF.mutate_constant(tree, temperature, options, rng))
+        return with_contents(ex, MF.mutate_constant(tree, ctx, m, options, rng))
     else
         # Mutate parameters
         parameter_index = rand(rng, 1:(options.expression_options.max_parameters))
         # We mutate all the parameters at once
-        factor = MF.mutate_factor(T, temperature, MutateConstant(), rng)
+        factor = MF.mutate_factor(T, ctx, m, rng)
         get_metadata(ex).parameters[parameter_index, :] .*= factor
         return ex
     end

@@ -20,7 +20,6 @@ using ..UtilsModule: argmin_fast
 function reg_evol_cycle(
     dataset::Dataset{T,L},
     pop::P,
-    temperature,
     curmaxsize::Int,
     options::AbstractOptions,
     record::RecordType;
@@ -43,7 +42,6 @@ function reg_evol_cycle(
                 parent -> next_generation(
                     dataset,
                     parent,
-                    temperature,
                     curmaxsize,
                     options;
                     tmp_recorder=mutation_recorder,

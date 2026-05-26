@@ -23,11 +23,10 @@
     tree = sin(x1 * 1.9 + 0.2) + x2 * x2
 
     member = PopMember(dataset, tree, options; deterministic=false)
-    temperature = 1.0
     maxsize = 20
 
     new_member, _, _ = next_generation(
-        dataset, member, temperature, maxsize, options; tmp_recorder=RecordType()
+        dataset, member, maxsize, options; tmp_recorder=RecordType()
     )
 
     resultant_constants, refs = get_scalar_constants(new_member.tree)

@@ -14,6 +14,8 @@
         init_member,
         tournament_cost_multiplier,
         mutation_acceptance_multiplier,
+        wrap_mutation_step,
+        on_cycle_start!,
         condition_mutation_weights!,
         MutationEvent,
         MutationWeights
@@ -21,9 +23,12 @@
 
     @test NoPluginState() isa AbstractPluginState
 
-    # No-plugin Options (legacy adaptive parsimony off, no auto-inject).
+    # No-plugin Options (all legacy auto-injects off).
     opts = Options(;
-        binary_operators=[+, *], use_frequency=false, use_frequency_in_tournament=false
+        binary_operators=[+, *],
+        use_frequency=false,
+        use_frequency_in_tournament=false,
+        annealing=false,
     )
     @test opts.plugins isa Tuple{}
 
@@ -53,7 +58,14 @@
 
     # Modifier defaults return 1.0 (multiplicative identity).
     @test tournament_cost_multiplier(s, p, nothing, opts) == 1.0
-    @test mutation_acceptance_multiplier(s, p, nothing, nothing, opts) == 1.0
+    @test mutation_acceptance_multiplier(s, p, nothing, nothing, 0.0, 0.0, opts) == 1.0
+
+    # wrap_mutation_step default is pass-through.
+    inner = parent -> (parent, true, 1.0)
+    @test wrap_mutation_step(s, p, :parent, inner) == (:parent, true, 1.0)
+
+    # on_cycle_start! default is no-op.
+    @test on_cycle_start!(s, p, 1, opts) === nothing
 
     # Conditioner default leaves weights untouched. `weights` is the mutated
     # arg → first; then state, then plugin.

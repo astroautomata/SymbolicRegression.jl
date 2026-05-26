@@ -30,13 +30,30 @@ abstract type AbstractMutation end
 """
     MutateConstant(; perturbation_factor=0.086, probability_negate=0.01)
 
-Perturb a random constant. `perturbation_factor` scales the magnitude
-(modulated by temperature); `probability_negate` is the chance of
-flipping the constant's sign.
+Perturb a random constant. `perturbation_factor` scales the magnitude;
+`probability_negate` is the chance of flipping the constant's sign.
+
+Per-call plugin modulation (e.g. `SimulatedAnnealingPlugin` shrinking the
+perturbation magnitude across an iteration) flows through
+[`MutateConstantContext`](@ref), not the immutable struct itself.
 """
 Base.@kwdef struct MutateConstant <: AbstractMutation
     perturbation_factor::Float64 = 0.086
     probability_negate::Float64 = 0.01
+end
+
+"""
+    MutateConstantContext
+
+Per-call mutable companion of [`MutateConstant`](@ref). Holds **only**
+the fields plugins are allowed to layer per-call modulation on top of
+(currently just `perturbation_factor`); static fields like
+`probability_negate` remain on the immutable mutation. The body of
+`mutate_constant` reads `perturbation_factor` from this context and any
+other field directly from the mutation.
+"""
+Base.@kwdef mutable struct MutateConstantContext
+    perturbation_factor::Float64
 end
 
 """Swap a random operator for another of the same arity."""

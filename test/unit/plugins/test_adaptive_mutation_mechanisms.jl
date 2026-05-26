@@ -29,26 +29,27 @@ end
     @test skip_in_adaptive_weights(SymbolicRegression.MutateOperator()) == false
 end
 
-@testitem "wrap_mutation_step: MutationRetryPlugin retries until accepted" begin
+@testitem "MutationLoopPlugin: retry portion retries until accepted" begin
     using SymbolicRegression
     using SymbolicRegression: NoPluginState, wrap_mutation_step
     using Test
 
-    # Inner thunk: first 2 calls reject, 3rd accepts.
     n_calls = Ref(0)
     inner =
         parent -> begin
             n_calls[] += 1
             (parent, n_calls[] >= 3, 1.0)
         end
-    p = MutationRetryPlugin(; attempts=4)
+    p = MutationLoopPlugin(;
+        retry_attempts=4, compound_probability=0.0, compound_max_steps=1
+    )
     member, accepted, num_evals = wrap_mutation_step(NoPluginState(), p, :parent, inner)
     @test accepted == true
     @test n_calls[] == 3
     @test num_evals == 3.0
 end
 
-@testitem "wrap_mutation_step: MutationRetryPlugin stops at budget when never accepted" begin
+@testitem "MutationLoopPlugin: retry stops at budget when never accepted" begin
     using SymbolicRegression
     using SymbolicRegression: NoPluginState, wrap_mutation_step
     using Test
@@ -59,14 +60,16 @@ end
             n_calls[] += 1
             (parent, false, 1.0)
         end
-    p = MutationRetryPlugin(; attempts=4)
+    p = MutationLoopPlugin(;
+        retry_attempts=4, compound_probability=0.0, compound_max_steps=1
+    )
     member, accepted, num_evals = wrap_mutation_step(NoPluginState(), p, :parent, inner)
     @test accepted == false
     @test n_calls[] == 4
     @test num_evals == 4.0
 end
 
-@testitem "wrap_mutation_step: CompoundMutationPlugin chains on success" begin
+@testitem "MutationLoopPlugin: compound portion chains on success" begin
     using SymbolicRegression
     using SymbolicRegression: NoPluginState, wrap_mutation_step
     using Random
@@ -78,7 +81,9 @@ end
             n_calls[] += 1
             (parent + 1, true, 1.0)
         end
-    p = CompoundMutationPlugin(; probability=1.0, max_steps=3)
+    p = MutationLoopPlugin(;
+        retry_attempts=1, compound_probability=1.0, compound_max_steps=3
+    )
     Random.seed!(0)
     member, accepted, num_evals = wrap_mutation_step(NoPluginState(), p, 0, inner)
     @test accepted == true
@@ -86,7 +91,7 @@ end
     @test member == 3
 end
 
-@testitem "wrap_mutation_step: CompoundMutationPlugin doesn't chain on rejection" begin
+@testitem "MutationLoopPlugin: compound doesn't chain on rejection" begin
     using SymbolicRegression
     using SymbolicRegression: NoPluginState, wrap_mutation_step
     using Test
@@ -97,7 +102,9 @@ end
             n_calls[] += 1
             (parent, false, 1.0)
         end
-    p = CompoundMutationPlugin(; probability=1.0, max_steps=3)
+    p = MutationLoopPlugin(;
+        retry_attempts=1, compound_probability=1.0, compound_max_steps=3
+    )
     member, accepted, num_evals = wrap_mutation_step(NoPluginState(), p, 0, inner)
     @test accepted == false
     @test n_calls[] == 1
@@ -152,7 +159,7 @@ end
     @test num_evals == 1.0
 end
 
-@testitem "Integration: full PySR p108 stack runs and returns a HoF" begin
+@testitem "Integration: all three mechanisms enabled, search runs and returns a HoF" begin
     using SymbolicRegression
     using Random
     using Test
@@ -172,8 +179,9 @@ end
         deterministic=true,
         plugins=(
             AdaptiveMutationWeightsPlugin(; smoothing=0.02, floor=0.05),
-            MutationRetryPlugin(; attempts=4),
-            CompoundMutationPlugin(; probability=0.25, max_steps=2),
+            MutationLoopPlugin(;
+                retry_attempts=4, compound_probability=0.25, compound_max_steps=2
+            ),
         ),
     )
     hof = equation_search(X, y; options=opts, niterations=3, parallelism=:serial)

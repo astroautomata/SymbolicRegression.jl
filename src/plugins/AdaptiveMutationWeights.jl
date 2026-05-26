@@ -26,9 +26,7 @@ multiplicative factor applied to that mutation's base weight, updated each
 mutation via an EMA over the smoothed success-ratio with a floor clamp.
 
 Statistics are local to one worker dispatch — no cross-population
-aggregation. This matches PySR's accepted p002 design; the
-cross-population-shared variant (PySR p178) regressed the benchmark and is
-not implemented here.
+aggregation.
 
 # Fields
 - `smoothing::Float64 = 0.02`: EMA factor for the multiplier update.

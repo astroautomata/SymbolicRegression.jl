@@ -10,7 +10,8 @@ using ..CoreModule:
     create_expression,
     batch,
     AbstractPluginState,
-    NoPluginState
+    NoPluginState,
+    on_cycle_start!
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: generate_reference
 using ..PopulationModule: Population, finalize_costs
@@ -34,20 +35,17 @@ function s_r_cycle(
 )::Tuple{
     P,HallOfFame{T,L,N},Float64
 } where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:Population{T,L,N}}
-    max_temp = 1.0
-    min_temp = 0.0
-    if !options.annealing
-        min_temp = max_temp
-    end
-    all_temperatures = ncycles > 1 ? LinRange(max_temp, min_temp, ncycles) : [max_temp]
     best_examples_seen = HallOfFame(options, dataset)
     num_evals = 0.0
 
     batched_dataset = options.batching ? batch(dataset, options.batch_size) : dataset
 
-    for temperature in all_temperatures
+    for cycle_idx in 1:ncycles
+        for (plugin, pstate) in zip(options.plugins, plugin_states)
+            on_cycle_start!(pstate, plugin, cycle_idx, options)
+        end
         pop, tmp_num_evals = reg_evol_cycle(
-            batched_dataset, pop, temperature, curmaxsize, options, record; plugin_states
+            batched_dataset, pop, curmaxsize, options, record; plugin_states
         )
         num_evals += tmp_num_evals
         for member in pop.members

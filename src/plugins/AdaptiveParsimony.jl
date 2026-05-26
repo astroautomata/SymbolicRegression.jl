@@ -174,6 +174,8 @@ function mutation_acceptance_multiplier(
     p::AdaptiveParsimonyPlugin,
     parent_member,
     new_tree,
+    before_cost,
+    after_cost,
     options::AbstractOptions,
 )
     p.mutation_acceptance || return 1.0

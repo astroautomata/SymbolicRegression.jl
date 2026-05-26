@@ -41,7 +41,10 @@ using ..MutationWeightsModule:
 using ..MutationsModule: MutationsModule
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
-using ..PluginModule: default_adaptive_parsimony_plugin, _merge_with_default_plugins
+using ..PluginModule:
+    default_adaptive_parsimony_plugin,
+    default_simulated_annealing_plugin,
+    _merge_with_default_plugins
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -1035,6 +1038,7 @@ $(OPTION_DESCRIPTIONS)
 
     plugin_tuple = _merge_with_default_plugins(
         plugins,
+        default_simulated_annealing_plugin(; annealing, alpha),
         default_adaptive_parsimony_plugin(; use_frequency, use_frequency_in_tournament),
     )
 
@@ -1082,7 +1086,6 @@ $(OPTION_DESCRIPTIONS)
         parsimony,
         dimensional_constraint_penalty,
         dimensionless_constants_only,
-        alpha,
         maxsize,
         maxdepth,
         Val(turbo),
@@ -1094,7 +1097,6 @@ $(OPTION_DESCRIPTIONS)
         _output_directory,
         populations,
         perturbation_factor,
-        annealing,
         batching,
         batch_size,
         set_mutation_weights,
