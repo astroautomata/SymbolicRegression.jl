@@ -128,13 +128,18 @@ function _update_weight!(
 end
 
 """Set the weight of every `<: M` entry to `value` (in place)."""
-_set_weight!(weights::AbstractVector, ::Type{M}, value::Real) where {M<:AbstractMutation} =
+function _set_weight!(
+    weights::AbstractVector, ::Type{M}, value::Real
+) where {M<:AbstractMutation}
     _update_weight!(Returns(Float64(value)), weights, M)
+end
 
 """Multiply the weight of every `<: M` entry by `factor` (in place)."""
-_scale_weight!(
+function _scale_weight!(
     weights::AbstractVector, ::Type{M}, factor::Real
-) where {M<:AbstractMutation} = _update_weight!(w -> w * Float64(factor), weights, M)
+) where {M<:AbstractMutation}
+    _update_weight!(w -> w * Float64(factor), weights, M)
+end
 
 """
     condition_mutation_weights!(weights, member::AbstractPopMember, options, curmaxsize, nfeatures)

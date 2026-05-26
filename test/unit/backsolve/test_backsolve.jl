@@ -146,9 +146,7 @@ end
     make_options(; kws...) = Options(;
         binary_operators=(+, *),
         unary_operators=(sin, cos),
-        backsolve=Backsolve(;
-            lambda=0.01, max_iter=10, max_library_size=500, kws...
-        ),
+        backsolve=Backsolve(; lambda=0.01, max_iter=10, max_library_size=500, kws...),
     )
     options = make_options()
 
@@ -373,9 +371,7 @@ end
     @test result === nothing
 
     make_options(; kws...) = Options(;
-        binary_operators=(+, *),
-        unary_operators=(sin,),
-        backsolve=Backsolve(; kws...),
+        binary_operators=(+, *), unary_operators=(sin,), backsolve=Backsolve(; kws...)
     )
     options = make_options(; lambda=1e10, max_iter=10)
 
