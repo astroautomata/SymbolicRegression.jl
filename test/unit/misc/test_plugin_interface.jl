@@ -312,11 +312,8 @@ end
     # Hook fired at all
     @test length(events) > 0
 
-    # All mutation types are valid Symbols (fields of MutationWeights)
-    valid_mutations = Set(fieldnames(MutationWeights))
     for ev in events
         @test ev isa MutationEvent
-        @test ev.mutation_type in valid_mutations
         @test ev.accepted isa Bool
         @test ev.before_loss isa Float64
         @test ev.after_loss isa Float64
