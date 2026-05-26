@@ -259,7 +259,7 @@ end
 
     nfeatures = max_features(dataset, options)
 
-    weights = deepcopy(options.mutations)
+    weights = copy(options.mutations)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
     for (plugin, pstate) in zip(options.plugins, plugin_states)
