@@ -270,6 +270,52 @@ end
 
     mutation_choice = sample_mutation(weights)
 
+    # Function barrier: dispatch once on the concrete type of `mutation_choice`,
+    # then every `mutate!` / `on_mutation_end!` call inside `_next_generation`
+    # is statically resolved.
+    return _next_generation(
+        mutation_choice,
+        dataset,
+        member,
+        temperature,
+        curmaxsize,
+        nfeatures,
+        before_cost,
+        before_loss,
+        parent_ref,
+        options,
+        tmp_recorder,
+        plugin_states,
+        population_for_backsolve,
+        num_evals,
+    )
+end
+
+function _next_generation(
+    mutation_choice::M,
+    dataset::D,
+    member::P,
+    temperature,
+    curmaxsize::Int,
+    nfeatures::Int,
+    before_cost,
+    before_loss,
+    parent_ref,
+    options::AbstractOptions,
+    tmp_recorder::RecordType,
+    plugin_states::Tuple,
+    population_for_backsolve,
+    num_evals::Float64,
+)::Tuple{
+    P,Bool,Float64
+} where {
+    T,
+    L,
+    D<:Dataset{T,L},
+    N<:AbstractExpression{T},
+    P<:AbstractPopMember{T,L,N},
+    M<:AbstractMutation,
+}
     successful_mutation = false
     attempts = 0
     max_attempts = 10
