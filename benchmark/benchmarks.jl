@@ -97,12 +97,7 @@ function create_utils_benchmark()
         let
             for member in members
                 next_generation(
-                    dataset,
-                    member,
-                    temperature,
-                    curmaxsize,
-                    options;
-                    tmp_recorder=recorder,
+                    dataset, member, temperature, curmaxsize, options; tmp_recorder=recorder
                 )
             end
         end,
