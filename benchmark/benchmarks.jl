@@ -1,6 +1,5 @@
 using BenchmarkTools
 using SymbolicRegression, BenchmarkTools, Random
-using SymbolicRegression.AdaptiveParsimonyModule: RunningSearchStatistics
 using SymbolicRegression.MutateModule: next_generation
 using SymbolicRegression.RecorderModule: RecordType
 using SymbolicRegression.PopulationModule: best_of_sample
@@ -86,12 +85,11 @@ function create_utils_benchmark()
     options = Options(; unary_operators=[sin, cos], binary_operators=[+, -, *, /])
 
     suite["best_of_sample"] = @benchmarkable(
-        best_of_sample(pop, rss, $options),
+        best_of_sample(pop, $options),
         setup = (
             nfeatures=1;
             dataset=Dataset(randn(nfeatures, 32), randn(32));
-            pop=Population(dataset; npop=100, nlength=20, options=($options), nfeatures);
-            rss=RunningSearchStatistics(; options=($options))
+            pop=Population(dataset; npop=100, nlength=20, options=($options), nfeatures)
         )
     )
 
@@ -103,7 +101,6 @@ function create_utils_benchmark()
                     member,
                     temperature,
                     curmaxsize,
-                    rss,
                     options;
                     tmp_recorder=recorder,
                 )
@@ -133,7 +130,6 @@ function create_utils_benchmark()
             recorder=RecordType();
             temperature=1.0;
             curmaxsize=20;
-            rss=RunningSearchStatistics(; options);
             trees=[
                 gen_random_tree_fixed_size(15, options, nfeatures, Float64) for _ in 1:100
             ];
