@@ -3,7 +3,8 @@ module PopMemberModule
 using DispatchDoctor: @unstable
 using DynamicExpressions: AbstractExpression, AbstractExpressionNode, string_tree
 import DynamicExpressions: constructorof, with_type_parameters
-using ..CoreModule: AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, create_expression
+using ..CoreModule:
+    AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, create_expression, AbstractMutation
 import ..CoreModule.OptionsModule: default_popmember_type
 import ..ComplexityModule: compute_complexity
 using ..UtilsModule: get_birth_order
@@ -213,7 +214,7 @@ function create_child(
     loss::L,
     options;
     complexity::Union{Int,Nothing}=nothing,
-    mutation_choice::Union{Symbol,Nothing}=nothing,
+    mutation_choice::Union{AbstractMutation,Nothing}=nothing,
     parent_ref,
 ) where {T,L,P<:PopMember{T,L}}
     actual_complexity = @something complexity compute_complexity(tree, options)
@@ -242,7 +243,7 @@ function create_child(
     loss::L,
     options;
     complexity::Union{Int,Nothing}=nothing,
-    mutation_choice::Union{Symbol,Nothing}=nothing,
+    mutation_choice::Union{AbstractMutation,Nothing}=nothing,
     parent_ref,
 ) where {T,L,P<:PopMember{T,L}}
     actual_complexity = @something complexity compute_complexity(tree, options)

@@ -13,6 +13,22 @@ using DynamicExpressions:
 using ..CoreModule:
     AbstractOptions,
     AbstractMutationWeights,
+    AbstractMutation,
+    MutateConstant,
+    MutateOperator,
+    MutateFeature,
+    SwapOperands,
+    AddNode,
+    InsertNode,
+    DeleteNode,
+    FormConnection,
+    BreakConnection,
+    RotateTree,
+    Backsolve,
+    Simplify,
+    Randomize,
+    Optimize,
+    DoNothing,
     Dataset,
     RecordType,
     sample_mutation,
@@ -90,23 +106,36 @@ struct MutationResult{N<:AbstractExpression,P<:AbstractPopMember} <:
 end
 
 """
-    condition_mutation_weights!(weights::AbstractMutationWeights, member::AbstractPopMember, options::AbstractOptions, curmaxsize::Int, nfeatures::Int)
+    _set_weight!(weights, ::Type{M}, value)
 
-Adjusts the mutation weights based on the properties of the current member and options.
+Set the weight of every entry whose mutation is `<: M` to `value` (in place).
+Helper for `condition_mutation_weights!`.
+"""
+function _set_weight!(
+    weights::AbstractVector, ::Type{M}, value::Real
+) where {M<:AbstractMutation}
+    for i in eachindex(weights)
+        m, _ = weights[i]
+        if m isa M
+            weights[i] = m => Float64(value)
+        end
+    end
+    return nothing
+end
 
-This function modifies the mutation weights to ensure that the mutations applied to the member are appropriate given its current state and the provided options. It can be overloaded to customize the behavior for different types of expressions or members.
+"""
+    condition_mutation_weights!(weights, member::AbstractPopMember, options, curmaxsize, nfeatures)
 
-Note that the weights were already copied, so you don't need to worry about mutation.
+Adjust the mutation `weights` (a `Vector{Pair{AbstractMutation,Float64}}`)
+based on the properties of the current member and options — e.g. disable
+operator-mutation when the tree has no operators, disable simplify when
+`options.should_simplify` is false, etc.
 
-# Arguments
-- `weights::AbstractMutationWeights`: The mutation weights to be adjusted.
-- `member::AbstractPopMember`: The current population member being mutated.
-- `options::AbstractOptions`: The options that guide the mutation process.
-- `curmaxsize::Int`: The current maximum size constraint for the member's expression tree.
-- `nfeatures::Int`: The number of features available in the dataset.
+Plugin overloads should use `_set_weight!(weights, MyMutation, w)` to
+modify the per-mutation weight in place.
 """
 function condition_mutation_weights!(
-    weights::AbstractMutationWeights,
+    weights::AbstractVector,
     member::P,
     options::AbstractOptions,
     curmaxsize::Int,
@@ -114,64 +143,56 @@ function condition_mutation_weights!(
 ) where {T,L,N<:AbstractExpression,P<:AbstractPopMember{T,L,N}}
     tree = get_tree(member.tree)
     if !preserve_sharing(typeof(member.tree))
-        weights.form_connection = 0.0
-        weights.break_connection = 0.0
+        _set_weight!(weights, FormConnection, 0.0)
+        _set_weight!(weights, BreakConnection, 0.0)
     end
     if tree.degree == 0
-        # If equation is too small, don't delete operators
-        # or simplify
-        weights.mutate_operator = 0.0
-        weights.swap_operands = 0.0
-        weights.delete_node = 0.0
-        weights.simplify = 0.0
+        _set_weight!(weights, MutateOperator, 0.0)
+        _set_weight!(weights, SwapOperands, 0.0)
+        _set_weight!(weights, DeleteNode, 0.0)
+        _set_weight!(weights, Simplify, 0.0)
         if !tree.constant
-            weights.optimize = 0.0
-            weights.mutate_constant = 0.0
+            _set_weight!(weights, Optimize, 0.0)
+            _set_weight!(weights, MutateConstant, 0.0)
         else
-            weights.mutate_feature = 0.0
+            _set_weight!(weights, MutateFeature, 0.0)
         end
         return nothing
     end
 
     if !any(node -> node.degree == 2, tree)
-        # swap is implemented only for binary ops
-        weights.swap_operands = 0.0
+        _set_weight!(weights, SwapOperands, 0.0)
     end
 
     condition_mutate_constant!(typeof(member.tree), weights, member, options, curmaxsize)
 
-    # Disable feature mutation if only one feature available
     if nfeatures <= 1
-        weights.mutate_feature = 0.0
+        _set_weight!(weights, MutateFeature, 0.0)
     end
 
     complexity = compute_complexity(member, options)
-
     if complexity >= curmaxsize
-        # If equation is too big, don't add new operators
-        weights.add_node = 0.0
-        weights.insert_node = 0.0
+        _set_weight!(weights, AddNode, 0.0)
+        _set_weight!(weights, InsertNode, 0.0)
     end
 
     if !options.should_simplify
-        weights.simplify = 0.0
+        _set_weight!(weights, Simplify, 0.0)
     end
 
     return nothing
 end
 
 """
-    condition_mutation_weights!(plugin, state, weights, member, options, curmaxsize, nfeatures)
+    condition_mutation_weights!(weights, state, plugin, member, options, curmaxsize, nfeatures)
 
 Plugin-dispatched method: called once per plugin in tuple order after the
-engine's legality conditioning. Plugins compose by sequential in-place
-mutation of `weights` (e.g. multiplicative adaptive multipliers, curriculum
-biases). Default is a no-op.
+engine's legality conditioning. Default is a no-op.
 
 !!! warning "Experimental"
 """
 function condition_mutation_weights!(
-    weights::AbstractMutationWeights,
+    weights::AbstractVector,
     ::AbstractPluginState,
     ::AbstractPlugin,
     member,
@@ -187,23 +208,32 @@ Use this to modify how `mutate_constant` changes for an expression type.
 """
 function condition_mutate_constant!(
     ::Type{<:AbstractExpression},
-    weights::AbstractMutationWeights,
+    weights::AbstractVector,
     member::AbstractPopMember,
     options::AbstractOptions,
     curmaxsize::Int,
 )
     n_constants = count_scalar_constants(member.tree)
-    weights.mutate_constant *= min(8, n_constants) / 8.0
-
+    factor = min(8, n_constants) / 8.0
+    for i in eachindex(weights)
+        m, w = weights[i]
+        if m isa MutateConstant
+            weights[i] = m => w * factor
+        end
+    end
     return nothing
 end
 
 # Go through one simulated options.annealing mutation cycle
 @inline function _fire_on_mutation_end!(
-    options::AbstractOptions, plugin_states::Tuple, event::MutationEvent, dataset
+    options::AbstractOptions,
+    plugin_states::Tuple,
+    mutation::AbstractMutation,
+    event::MutationEvent,
+    dataset,
 )
     for (plugin, pstate) in zip(options.plugins, plugin_states)
-        on_mutation_end!(pstate, plugin, event, dataset, options)
+        on_mutation_end!(pstate, plugin, mutation, event, dataset, options)
     end
     return nothing
 end
@@ -229,7 +259,7 @@ end
 
     nfeatures = max_features(dataset, options)
 
-    weights = copy(options.mutation_weights)
+    weights = copy(options.mutations)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
     for (plugin, pstate) in zip(options.plugins, plugin_states)
@@ -253,11 +283,11 @@ end
     while (!successful_mutation) && attempts < max_attempts
         rtree[] = copy_into!(node_storage, member.tree)
 
-        mutation_result = _dispatch_mutations!(
+        mutation_result = mutate!(
             rtree[],
             member,
             mutation_choice,
-            options.mutation_weights,
+            weights,
             options;
             recorder=tmp_recorder,
             temperature,
@@ -281,8 +311,8 @@ end
             _fire_on_mutation_end!(
                 options,
                 plugin_states,
+                mutation_choice,
                 MutationEvent(
-                    mutation_choice,
                     true,
                     Float64(before_loss),
                     Float64(mutation_result.member.loss),
@@ -312,7 +342,8 @@ end
         _fire_on_mutation_end!(
             options,
             plugin_states,
-            MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
+            mutation_choice,
+            MutationEvent(false, Float64(before_loss), NaN),
             dataset,
         )
         return (
@@ -342,7 +373,8 @@ end
         _fire_on_mutation_end!(
             options,
             plugin_states,
-            MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
+            mutation_choice,
+            MutationEvent(false, Float64(before_loss), NaN),
             dataset,
         )
         return (
@@ -379,9 +411,8 @@ end
         _fire_on_mutation_end!(
             options,
             plugin_states,
-            MutationEvent(
-                mutation_choice, false, Float64(before_loss), Float64(after_loss)
-            ),
+            mutation_choice,
+            MutationEvent(false, Float64(before_loss), Float64(after_loss)),
             dataset,
         )
         return (
@@ -408,65 +439,43 @@ end
         _fire_on_mutation_end!(
             options,
             plugin_states,
-            MutationEvent(mutation_choice, true, Float64(before_loss), Float64(after_loss)),
+            mutation_choice,
+            MutationEvent(true, Float64(before_loss), Float64(after_loss)),
             dataset,
         )
         return (new_member, mutation_accepted, num_evals)
     end
 end
 
-@generated function _dispatch_mutations!(
-    tree::AbstractExpression,
-    member::AbstractPopMember,
-    mutation_choice::Symbol,
-    weights::W,
-    options::AbstractOptions;
-    kws...,
-) where {W<:AbstractMutationWeights}
-    mutation_choices = fieldnames(W)
-    quote
-        Base.Cartesian.@nif(
-            $(length(mutation_choices)),
-            i -> mutation_choice == $(mutation_choices)[i],
-            i -> begin
-                @assert mutation_choice == $(mutation_choices)[i]
-                mutate!(
-                    tree, member, Val($(mutation_choices)[i]), weights, options; kws...
-                )
-            end,
-        )
-    end
-end
-
 """
     mutate!(
-        tree::N,
-        member::P,
-        ::Val{S},
-        mutation_weights::AbstractMutationWeights,
+        new_tree::N,
+        parent_member::P,
+        mutation::AbstractMutation,
+        mutations::AbstractVector{<:Pair{<:AbstractMutation,<:Real}},
         options::AbstractOptions;
         kws...,
-    ) where {N<:AbstractExpression,P<:AbstractPopMember,S}
+    ) where {N<:AbstractExpression,P<:AbstractPopMember}
 
-Perform a mutation on the given `tree` and `member` using the specified mutation type `S`.
-Various `kws` are provided to access other data needed for some mutations.
+Perform `mutation` on the offspring `new_tree` (a fresh scratch copy of the
+parent's tree). `parent_member` carries parent metadata (cost, loss, ref, etc.)
+that some mutations need.
 
-You may overload this function to handle new mutation types for new `AbstractMutationWeights` types.
+Add a new mutation by defining a struct subtyping
+[`AbstractMutation`](@ref) and a matching `mutate!` method.
 
 # Keywords
 
 - `temperature`: The temperature parameter for annealing-based mutations.
 - `dataset::Dataset`: The dataset used for scoring.
-- `cost`: The cost of the member before mutation.
-- `loss`: The loss of the member before mutation.
-- `curmaxsize`: The current maximum size constraint, which may be different from `options.maxsize`.
+- `cost`: The cost of `parent_member` before mutation.
+- `loss`: The loss of `parent_member` before mutation.
+- `curmaxsize`: The current maximum size constraint, which may differ from `options.maxsize`.
 - `nfeatures`: The number of features in the dataset.
-- `parent_ref`: Reference to the mutated member's parent (only used for logging purposes).
+- `parent_ref`: Reference to `parent_member`'s parent (used for lineage logging).
 - `recorder::RecordType`: A recorder to log mutation details.
 - `plugin_states::Tuple`: The active worker plugin states, in tuple order matching
-  `options.plugins`. If your mutation method needs one, you can destructure
-  inside via `for (p, s) in zip(options.plugins, plugin_states) ... end`, or
-  capture via `; plugin_states::Tuple, kws...`.
+  `options.plugins`.
 
 # Returns
 
@@ -477,184 +486,191 @@ rejecting the mutation. For example, a `simplify` operation will not change the 
 so it can always return immediately.
 """
 function mutate!(
-    ::N, ::P, ::Val{S}, ::AbstractMutationWeights, ::AbstractOptions; kws...
-) where {N<:AbstractExpression,P<:AbstractPopMember,S}
-    return error("Unknown mutation choice: $S")
+    ::N,
+    ::P,
+    m::AbstractMutation,
+    ::AbstractVector,
+    ::AbstractOptions;
+    kws...,
+) where {N<:AbstractExpression,P<:AbstractPopMember}
+    return error("Unknown mutation type: $(typeof(m))")
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:mutate_constant},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::MutateConstant,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     temperature,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = mutate_constant(tree, temperature, options)
+    new_tree = mutate_constant(new_tree, temperature, options)
     @recorder recorder["type"] = "mutate_constant"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:mutate_operator},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::MutateOperator,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = mutate_operator(tree, options)
+    new_tree = mutate_operator(new_tree, options)
     @recorder recorder["type"] = "mutate_operator"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:mutate_feature},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::MutateFeature,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = mutate_feature(tree, nfeatures)
+    new_tree = mutate_feature(new_tree, nfeatures)
     @recorder recorder["type"] = "mutate_feature"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:swap_operands},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::SwapOperands,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = swap_operands(tree)
+    new_tree = swap_operands(new_tree)
     @recorder recorder["type"] = "swap_operands"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:add_node},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::AddNode,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
     if rand() < 0.5
-        tree = append_random_op(tree, options, nfeatures)
+        new_tree = append_random_op(new_tree, options, nfeatures)
         @recorder recorder["type"] = "add_node:append"
     else
-        tree = prepend_random_op(tree, options, nfeatures)
+        new_tree = prepend_random_op(new_tree, options, nfeatures)
         @recorder recorder["type"] = "add_node:prepend"
     end
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:insert_node},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::InsertNode,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = insert_random_op(tree, options, nfeatures)
+    new_tree = insert_random_op(new_tree, options, nfeatures)
     @recorder recorder["type"] = "insert_node"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:delete_node},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::DeleteNode,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = delete_random_op!(tree)
+    new_tree = delete_random_op!(new_tree)
     @recorder recorder["type"] = "delete_node"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:form_connection},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::FormConnection,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = form_random_connection!(tree)
+    new_tree = form_random_connection!(new_tree)
     @recorder recorder["type"] = "form_connection"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:break_connection},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::BreakConnection,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = break_random_connection!(tree)
+    new_tree = break_random_connection!(new_tree)
     @recorder recorder["type"] = "break_connection"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:rotate_tree},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::RotateTree,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = randomly_rotate_tree!(tree)
+    new_tree = randomly_rotate_tree!(new_tree)
     @recorder recorder["type"] = "rotate_tree"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:backsolve},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    m::Backsolve,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
     population_for_backsolve=nothing,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    tree = backsolve_rewrite_random_node(
-        tree, dataset, options; population_for_backsolve=population_for_backsolve
+    new_tree = backsolve_rewrite_random_node(
+        new_tree, dataset, options;
+        backsolve_options=m.options,
+        population_for_backsolve=population_for_backsolve,
     )
     @recorder recorder["type"] = "backsolve"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 # Handle mutations that require early return
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:simplify},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::Simplify,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
@@ -662,23 +678,23 @@ function mutate!(
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
     @assert options.should_simplify
-    simplify_tree!(tree, options.operators)
-    tree = combine_operators(tree, options.operators)
-    simplified_complexity = compute_complexity(tree, options)
+    simplify_tree!(new_tree, options.operators)
+    new_tree = combine_operators(new_tree, options.operators)
+    simplified_complexity = compute_complexity(new_tree, options)
     simplified_cost = loss_to_cost(
-        member.loss,
+        parent_member.loss,
         dataset.use_baseline,
         dataset.baseline_loss,
-        tree,
+        new_tree,
         options,
         simplified_complexity,
     )
     @recorder recorder["type"] = "simplify"
     new_member = create_child(
-        member,
-        tree,
+        parent_member,
+        new_tree,
         simplified_cost,
-        member.loss,
+        parent_member.loss,
         options;
         complexity=simplified_complexity,
         parent_ref=parent_ref,
@@ -687,32 +703,32 @@ function mutate!(
 end
 
 function mutate!(
-    tree::N,
+    new_tree::N,
     ::P,
-    ::Val{:randomize},
-    ::AbstractMutationWeights,
+    ::Randomize,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     curmaxsize,
     nfeatures,
     kws...,
 ) where {T,N<:AbstractExpression{T},P<:AbstractPopMember}
-    tree = randomize_tree(tree, curmaxsize, options, nfeatures)
+    new_tree = randomize_tree(new_tree, curmaxsize, options, nfeatures)
     @recorder recorder["type"] = "randomize"
-    return MutationResult{N,P}(; tree=tree)
+    return MutationResult{N,P}(; tree=new_tree)
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:optimize},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::Optimize,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    cur_member, new_num_evals = optimize_constants(dataset, member, options)
+    cur_member, new_num_evals = optimize_constants(dataset, parent_member, options)
     @recorder recorder["type"] = "optimize"
     return MutationResult{N,P}(;
         member=cur_member, num_evals=new_num_evals, return_immediately=true
@@ -720,10 +736,10 @@ function mutate!(
 end
 
 function mutate!(
-    tree::N,
-    member::P,
-    ::Val{:do_nothing},
-    ::AbstractMutationWeights,
+    new_tree::N,
+    parent_member::P,
+    ::DoNothing,
+    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     parent_ref,
@@ -736,7 +752,7 @@ function mutate!(
     end
     return MutationResult{N,P}(;
         member=create_child(
-            member, tree, member.cost, member.loss, options; parent_ref=parent_ref
+            parent_member, new_tree, parent_member.cost, parent_member.loss, options; parent_ref=parent_ref
         ),
         return_immediately=true,
     )

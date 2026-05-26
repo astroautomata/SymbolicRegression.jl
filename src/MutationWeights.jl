@@ -1,5 +1,11 @@
 module MutationWeightsModule
 
+import ..MutationsModule:
+    AbstractMutation,
+    MutateConstant, MutateOperator, MutateFeature, SwapOperands,
+    AddNode, InsertNode, DeleteNode, FormConnection, BreakConnection,
+    RotateTree, Backsolve, Simplify, Randomize, Optimize, DoNothing
+
 using StatsBase: StatsBase
 
 """
@@ -136,10 +142,48 @@ let contents = [Expr(:., :w, QuoteNode(field)) for field in mutations]
     end
 end
 
-"""Sample a mutation, given the weightings."""
-function sample_mutation(w::AbstractMutationWeights)
-    weights = convert(Vector, w)
-    return StatsBase.sample(v_mutations, StatsBase.Weights(weights))
+const _MUTATION_FROM_SYMBOL = Dict{Symbol,AbstractMutation}(
+    :mutate_constant   => MutateConstant(),
+    :mutate_operator   => MutateOperator(),
+    :mutate_feature    => MutateFeature(),
+    :swap_operands     => SwapOperands(),
+    :rotate_tree       => RotateTree(),
+    :add_node          => AddNode(),
+    :insert_node       => InsertNode(),
+    :delete_node       => DeleteNode(),
+    :simplify          => Simplify(),
+    :randomize         => Randomize(),
+    :do_nothing        => DoNothing(),
+    :optimize          => Optimize(),
+    :backsolve         => Backsolve(),
+    :form_connection   => FormConnection(),
+    :break_connection  => BreakConnection(),
+)
+
+"""
+    _mutations_from_weights(w) -> Vector{Pair{AbstractMutation,Float64}}
+
+Backwards-compat converter: build the canonical mutation list from an
+`AbstractMutationWeights` instance (field name `:mutate_constant` → singleton
+`MutateConstant()`, etc.).
+"""
+function _mutations_from_weights(w::AbstractMutationWeights)
+    return Pair{AbstractMutation,Float64}[
+        _MUTATION_FROM_SYMBOL[k] => Float64(getfield(w, k)) for k in fieldnames(typeof(w))
+    ]
+end
+
+"""
+    sample_mutation(mutations) -> AbstractMutation
+
+Pick a mutation kind by weight. Returns the singleton instance.
+"""
+function sample_mutation(
+    mutations::AbstractVector{<:Pair{<:AbstractMutation,<:Real}}
+)
+    weights = [Float64(p.second) for p in mutations]
+    idx = StatsBase.sample(eachindex(mutations), StatsBase.Weights(weights))
+    return mutations[idx].first
 end
 
 end

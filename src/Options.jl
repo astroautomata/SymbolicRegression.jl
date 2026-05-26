@@ -36,7 +36,8 @@ using ..OperatorsModule:
     safe_acos,
     safe_acosh,
     safe_atanh
-using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
+using ..MutationWeightsModule: MutationWeightsModule, AbstractMutationWeights, MutationWeights
+using ..MutationsModule: MutationsModule
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
 using ..PluginModule: default_adaptive_parsimony_plugins, _merge_with_default_plugins
@@ -546,6 +547,9 @@ $(OPTION_DESCRIPTIONS)
         mutation_weights::Union{AbstractMutationWeights,AbstractVector,NamedTuple,Nothing} =
             nothing
     ),
+    @nospecialize(
+        mutations::Union{AbstractVector,Nothing} = nothing
+    ),
     @nospecialize(crossover_probability::Union{Real,Nothing} = nothing),
     @nospecialize(annealing::Union{Bool,Nothing} = nothing),
     @nospecialize(alpha::Union{Nothing,Real} = nothing),
@@ -612,8 +616,6 @@ $(OPTION_DESCRIPTIONS)
     perturbation_factor::Union{Nothing,Real}=nothing,
     probability_negate_constant::Union{Real,Nothing}=nothing,
     skip_mutation_failures::Bool=true,
-    ## Backsolve rewrite mutation:
-    backsolve::Union{BacksolveOptions,Nothing}=nothing,
     ## 6. Tournament Selection
     ## 7. Constant Optimization:
     optimizer_algorithm::Union{AbstractString,Optim.AbstractOptimizer}=Optim.BFGS(;
@@ -717,11 +719,12 @@ $(OPTION_DESCRIPTIONS)
         if k == :mutationWeights
             if typeof(kws[k]) <: AbstractVector
                 _mutation_weights = kws[k]
-                if length(_mutation_weights) < length(mutations)
+                n_fields = length(fieldnames(MutationWeights))
+                if length(_mutation_weights) < n_fields
                     # Pad with zeros:
                     _mutation_weights = vcat(
                         _mutation_weights,
-                        zeros(length(mutations) - length(_mutation_weights))
+                        zeros(n_fields - length(_mutation_weights))
                     )
                 end
                 mutation_weights = MutationWeights(_mutation_weights...)
@@ -1011,7 +1014,13 @@ $(OPTION_DESCRIPTIONS)
     end
 
     set_mutation_weights = create_mutation_weights(mutation_weights)
-    backsolve = something(backsolve, BacksolveOptions())
+    _resolved_mutations = if mutations === nothing
+        MutationWeightsModule._mutations_from_weights(set_mutation_weights)
+    else
+        Pair{MutationsModule.AbstractMutation,Float64}[
+            p.first => Float64(p.second) for p in mutations
+        ]
+    end
 
     plugin_tuple = _merge_with_default_plugins(
         plugins,
@@ -1078,6 +1087,7 @@ $(OPTION_DESCRIPTIONS)
         batching,
         batch_size,
         set_mutation_weights,
+        _resolved_mutations,
         crossover_probability,
         warmup_maxsize_by,
         use_frequency,
@@ -1122,7 +1132,6 @@ $(OPTION_DESCRIPTIONS)
         use_recorder,
         popmember_type,
         plugin_tuple,
-        backsolve,
     )
 
     return options

@@ -5,6 +5,7 @@ function create_expression end
 include("Utils.jl")
 include("ProgramConstants.jl")
 include("Dataset.jl")
+include("Mutations.jl")
 include("MutationWeights.jl")
 include("OptionsStruct.jl")
 include("Operators.jl")
@@ -26,6 +27,12 @@ using .DatasetModule:
     get_full_dataset,
     dataset_fraction
 using .MutationWeightsModule: AbstractMutationWeights, MutationWeights, sample_mutation
+using .MutationsModule:
+    AbstractMutation,
+    MutateConstant, MutateOperator, MutateFeature, SwapOperands,
+    AddNode, InsertNode, DeleteNode, FormConnection, BreakConnection,
+    RotateTree, Backsolve, Simplify, Randomize, Optimize, DoNothing,
+    default_mutations
 using .OptionsStructModule:
     AbstractOptions,
     Options,
