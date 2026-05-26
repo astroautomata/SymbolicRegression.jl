@@ -2,9 +2,21 @@ module MutationWeightsModule
 
 import ..MutationsModule:
     AbstractMutation,
-    MutateConstant, MutateOperator, MutateFeature, SwapOperands,
-    AddNode, InsertNode, DeleteNode, FormConnection, BreakConnection,
-    RotateTree, Backsolve, Simplify, Randomize, Optimize, DoNothing
+    MutateConstant,
+    MutateOperator,
+    MutateFeature,
+    SwapOperands,
+    AddNode,
+    InsertNode,
+    DeleteNode,
+    FormConnection,
+    BreakConnection,
+    RotateTree,
+    Backsolve,
+    Simplify,
+    Randomize,
+    Optimize,
+    DoNothing
 
 using StatsBase: StatsBase
 
@@ -143,21 +155,21 @@ let contents = [Expr(:., :w, QuoteNode(field)) for field in mutations]
 end
 
 const _MUTATION_FROM_SYMBOL = Dict{Symbol,AbstractMutation}(
-    :mutate_constant   => MutateConstant(),
-    :mutate_operator   => MutateOperator(),
-    :mutate_feature    => MutateFeature(),
-    :swap_operands     => SwapOperands(),
-    :rotate_tree       => RotateTree(),
-    :add_node          => AddNode(),
-    :insert_node       => InsertNode(),
-    :delete_node       => DeleteNode(),
-    :simplify          => Simplify(),
-    :randomize         => Randomize(),
-    :do_nothing        => DoNothing(),
-    :optimize          => Optimize(),
-    :backsolve         => Backsolve(),
-    :form_connection   => FormConnection(),
-    :break_connection  => BreakConnection(),
+    :mutate_constant => MutateConstant(),
+    :mutate_operator => MutateOperator(),
+    :mutate_feature => MutateFeature(),
+    :swap_operands => SwapOperands(),
+    :rotate_tree => RotateTree(),
+    :add_node => AddNode(),
+    :insert_node => InsertNode(),
+    :delete_node => DeleteNode(),
+    :simplify => Simplify(),
+    :randomize => Randomize(),
+    :do_nothing => DoNothing(),
+    :optimize => Optimize(),
+    :backsolve => Backsolve(),
+    :form_connection => FormConnection(),
+    :break_connection => BreakConnection(),
 )
 
 """
@@ -173,12 +185,19 @@ function _mutations_from_weights(w::AbstractMutationWeights)
     ]
 end
 
+using DispatchDoctor: @unstable
+
 """
     sample_mutation(mutations) -> AbstractMutation
 
 Pick a mutation kind by weight. Returns the singleton instance.
+
+Marked `@unstable` because the return type is `AbstractMutation` — the
+concrete subtype is selected at runtime by weighted sampling. The caller
+hands the result to `mutate!`, which dispatches per concrete type, so the
+instability is contained.
 """
-function sample_mutation(
+@unstable function sample_mutation(
     mutations::AbstractVector{<:Pair{<:AbstractMutation,<:Real}}
 )
     weights = [Float64(p.second) for p in mutations]

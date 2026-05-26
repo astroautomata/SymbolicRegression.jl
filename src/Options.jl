@@ -36,7 +36,8 @@ using ..OperatorsModule:
     safe_acos,
     safe_acosh,
     safe_atanh
-using ..MutationWeightsModule: MutationWeightsModule, AbstractMutationWeights, MutationWeights
+using ..MutationWeightsModule:
+    MutationWeightsModule, AbstractMutationWeights, MutationWeights
 using ..MutationsModule: MutationsModule
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
@@ -547,9 +548,7 @@ $(OPTION_DESCRIPTIONS)
         mutation_weights::Union{AbstractMutationWeights,AbstractVector,NamedTuple,Nothing} =
             nothing
     ),
-    @nospecialize(
-        mutations::Union{AbstractVector,Nothing} = nothing
-    ),
+    @nospecialize(mutations::Union{AbstractVector,Nothing} = nothing),
     @nospecialize(crossover_probability::Union{Real,Nothing} = nothing),
     @nospecialize(annealing::Union{Bool,Nothing} = nothing),
     @nospecialize(alpha::Union{Nothing,Real} = nothing),

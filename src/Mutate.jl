@@ -313,9 +313,7 @@ end
                 plugin_states,
                 mutation_choice,
                 MutationEvent(
-                    true,
-                    Float64(before_loss),
-                    Float64(mutation_result.member.loss),
+                    true, Float64(before_loss), Float64(mutation_result.member.loss)
                 ),
                 dataset,
             )
@@ -486,12 +484,7 @@ rejecting the mutation. For example, a `simplify` operation will not change the 
 so it can always return immediately.
 """
 function mutate!(
-    ::N,
-    ::P,
-    m::AbstractMutation,
-    ::AbstractVector,
-    ::AbstractOptions;
-    kws...,
+    ::N, ::P, m::AbstractMutation, ::AbstractVector, ::AbstractOptions; kws...
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
     return error("Unknown mutation type: $(typeof(m))")
 end
@@ -657,7 +650,9 @@ function mutate!(
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
     new_tree = backsolve_rewrite_random_node(
-        new_tree, dataset, options;
+        new_tree,
+        dataset,
+        options;
         backsolve_options=m.options,
         population_for_backsolve=population_for_backsolve,
     )
@@ -752,7 +747,12 @@ function mutate!(
     end
     return MutationResult{N,P}(;
         member=create_child(
-            parent_member, new_tree, parent_member.cost, parent_member.loss, options; parent_ref=parent_ref
+            parent_member,
+            new_tree,
+            parent_member.cost,
+            parent_member.loss,
+            options;
+            parent_ref=parent_ref,
         ),
         return_immediately=true,
     )

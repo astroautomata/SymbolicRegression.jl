@@ -668,7 +668,10 @@ function backsolve_rewrite_random_node(
 ) where {T<:DATA_TYPE}
     tree = get_contents(ex)
     new_tree = backsolve_rewrite_random_node(
-        tree, dataset, options, rng;
+        tree,
+        dataset,
+        options,
+        rng;
         backsolve_options=backsolve_options,
         population_for_backsolve=population_for_backsolve,
     )
@@ -705,7 +708,11 @@ function backsolve_rewrite_random_node(
 
     nfeatures = size(dataset.X, 1)
     new_node = fit_sparse_expression(
-        node_to_invert, target_values, dataset, options, nfeatures;
+        node_to_invert,
+        target_values,
+        dataset,
+        options,
+        nfeatures;
         backsolve_options=backsolve_options,
         population_for_backsolve=population_for_backsolve,
     )

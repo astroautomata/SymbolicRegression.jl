@@ -43,23 +43,23 @@ Base.@kwdef struct BacksolveOptions
     max_iter::Int = 10
 end
 
-struct MutateConstant   <: AbstractMutation end
-struct MutateOperator   <: AbstractMutation end
-struct MutateFeature    <: AbstractMutation end
-struct SwapOperands     <: AbstractMutation end
-struct AddNode          <: AbstractMutation end
-struct InsertNode       <: AbstractMutation end
-struct DeleteNode       <: AbstractMutation end
-struct FormConnection   <: AbstractMutation end
-struct BreakConnection  <: AbstractMutation end
-struct RotateTree       <: AbstractMutation end
+struct MutateConstant <: AbstractMutation end
+struct MutateOperator <: AbstractMutation end
+struct MutateFeature <: AbstractMutation end
+struct SwapOperands <: AbstractMutation end
+struct AddNode <: AbstractMutation end
+struct InsertNode <: AbstractMutation end
+struct DeleteNode <: AbstractMutation end
+struct FormConnection <: AbstractMutation end
+struct BreakConnection <: AbstractMutation end
+struct RotateTree <: AbstractMutation end
 Base.@kwdef struct Backsolve <: AbstractMutation
     options::BacksolveOptions = BacksolveOptions()
 end
-struct Simplify         <: AbstractMutation end
-struct Randomize        <: AbstractMutation end
-struct Optimize         <: AbstractMutation end
-struct DoNothing        <: AbstractMutation end
+struct Simplify <: AbstractMutation end
+struct Randomize <: AbstractMutation end
+struct Optimize <: AbstractMutation end
+struct DoNothing <: AbstractMutation end
 
 """
     default_mutations() -> Vector{Pair{AbstractMutation,Float64}}
@@ -72,19 +72,19 @@ function default_mutations()
     return Pair{AbstractMutation,Float64}[
         MutateConstant() => 0.0353,
         MutateOperator() => 3.63,
-        MutateFeature()  => 0.1,
-        SwapOperands()   => 0.00608,
-        RotateTree()     => 1.42,
-        AddNode()        => 0.0771,
-        InsertNode()     => 2.44,
-        DeleteNode()     => 0.369,
-        Simplify()       => 0.00148,
-        Randomize()      => 0.00695,
-        DoNothing()      => 0.431,
-        Optimize()       => 0.0,
-        Backsolve()      => 0.0,
+        MutateFeature() => 0.1,
+        SwapOperands() => 0.00608,
+        RotateTree() => 1.42,
+        AddNode() => 0.0771,
+        InsertNode() => 2.44,
+        DeleteNode() => 0.369,
+        Simplify() => 0.00148,
+        Randomize() => 0.00695,
+        DoNothing() => 0.431,
+        Optimize() => 0.0,
+        Backsolve() => 0.0,
         FormConnection() => 0.5,
-        BreakConnection()=> 0.1,
+        BreakConnection() => 0.1,
     ]
 end
 

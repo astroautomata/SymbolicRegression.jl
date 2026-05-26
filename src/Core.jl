@@ -29,9 +29,21 @@ using .DatasetModule:
 using .MutationWeightsModule: AbstractMutationWeights, MutationWeights, sample_mutation
 using .MutationsModule:
     AbstractMutation,
-    MutateConstant, MutateOperator, MutateFeature, SwapOperands,
-    AddNode, InsertNode, DeleteNode, FormConnection, BreakConnection,
-    RotateTree, Backsolve, Simplify, Randomize, Optimize, DoNothing,
+    MutateConstant,
+    MutateOperator,
+    MutateFeature,
+    SwapOperands,
+    AddNode,
+    InsertNode,
+    DeleteNode,
+    FormConnection,
+    BreakConnection,
+    RotateTree,
+    Backsolve,
+    Simplify,
+    Randomize,
+    Optimize,
+    DoNothing,
     default_mutations
 using .OptionsStructModule:
     AbstractOptions,
