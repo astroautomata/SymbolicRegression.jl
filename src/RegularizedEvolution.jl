@@ -8,7 +8,8 @@ using ..CoreModule:
     DATA_TYPE,
     LOSS_TYPE,
     AbstractPluginState,
-    NoPluginState
+    NoPluginState,
+    wrap_mutation_step
 using ..PopulationModule: Population, best_of_sample
 using ..MutateModule: next_generation, crossover_generation
 using ..RecorderModule: @recorder
@@ -32,16 +33,31 @@ function reg_evol_cycle(
         if rand() > options.crossover_probability
             allstar = best_of_sample(pop, options; plugin_states)
             mutation_recorder = RecordType()
-            baby, mutation_accepted, tmp_num_evals = next_generation(
-                dataset,
-                allstar,
-                temperature,
-                curmaxsize,
-                options;
-                tmp_recorder=mutation_recorder,
-                plugin_states,
-                population_for_backsolve=pop,
-            )
+
+            # Plugins compose around `next_generation` as middleware via
+            # `wrap_mutation_step(state, plugin, parent, next_step)`. Build
+            # the innermost thunk that runs one `next_generation` call,
+            # then wrap from the inside out so plugin tuple order is the
+            # outer-to-inner middleware order.
+            base_step =
+                parent -> next_generation(
+                    dataset,
+                    parent,
+                    temperature,
+                    curmaxsize,
+                    options;
+                    tmp_recorder=mutation_recorder,
+                    plugin_states,
+                    population_for_backsolve=pop,
+                )
+            wrapped_step = base_step
+            for (plugin, pstate) in
+                Iterators.reverse(zip(options.plugins, plugin_states))
+                inner = wrapped_step
+                wrapped_step =
+                    parent -> wrap_mutation_step(pstate, plugin, parent, inner)
+            end
+            baby, mutation_accepted, tmp_num_evals = wrapped_step(allstar)
             num_evals += tmp_num_evals
 
             if !mutation_accepted && options.skip_mutation_failures

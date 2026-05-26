@@ -106,7 +106,11 @@ using .PluginModule:
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     fork_worker_state,
+    wrap_mutation_step,
     invoke_init_member,
-    default_adaptive_parsimony_plugins
+    default_adaptive_parsimony_plugin,
+    default_adaptive_mutation_weights_plugin,
+    default_mutation_retry_plugin,
+    default_compound_mutation_plugin
 
 end

@@ -348,15 +348,49 @@ end
     end
 end
 
-# Forward-declared per kwarg→plugin migration. Plugin modules (loaded above
-# Core) provide the only method.
-function default_adaptive_parsimony_plugins end
+"""
+    wrap_mutation_step(state, plugin, parent_member, next_step) -> (member, accepted, num_evals)
 
-# Append defaults whose type isn't already in the user tuple.
+Middleware-style hook around `next_generation`. The engine builds a thunk
+`next_step(parent) -> (member, accepted, num_evals)` that runs one call to
+`next_generation` against `parent`. The plugin may call `next_step` zero,
+one, or many times — with the original parent (retry), with the previous
+result (chain), with a different member (ensemble), or skip it entirely.
+It returns the final tuple to its caller.
+
+Plugins compose as nested middleware in `options.plugins` order:
+plugin 1's `wrap` wraps plugin 2's wrap wraps... wraps `next_generation`.
+Plugin 1 sees the composed behavior of plugins 2+ as `next_step`. Use this
+shape for retry, compound bursts, MCMC-style acceptance criteria,
+ensemble voting, or any control-flow extension that needs to call
+`next_generation` more than once per cycle.
+
+Default is a single pass-through: `next_step(parent_member)`.
+
+!!! warning "Experimental"
+"""
+@unstable function wrap_mutation_step(
+    ::AbstractPluginState, ::AbstractPlugin, parent_member, next_step::F
+) where {F}
+    return next_step(parent_member)
+end
+
+# Forward-declared per kwarg→plugin migration. Plugin modules (loaded above
+# Core) provide the only method. Each returns either a plugin instance or
+# `nothing` (when the legacy kwarg is off).
+function default_adaptive_parsimony_plugin end
+function default_adaptive_mutation_weights_plugin end
+function default_mutation_retry_plugin end
+function default_compound_mutation_plugin end
+
+# Append defaults whose type isn't already in the user tuple. Each default
+# may be `nothing` (auto-injected plugin disabled by the legacy kwarg) and
+# is filtered out.
 @unstable function _merge_with_default_plugins(
-    @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins::Tuple)
+    @nospecialize(user_plugins::Tuple), @nospecialize(default_plugins...)
 )
-    novel = filter(dp -> !any(p -> p isa typeof(dp), user_plugins), default_plugins)
+    actual_defaults = filter(!isnothing, default_plugins)
+    novel = filter(dp -> !any(p -> p isa typeof(dp), user_plugins), actual_defaults)
     return (user_plugins..., novel...)
 end
 
