@@ -21,6 +21,7 @@ using ..CoreModule:
     SubDataset,
     DATA_TYPE,
     AbstractMutationWeights,
+    MutateConstant,
     AbstractExpressionSpec,
     get_indices,
     ExpressionSpecModule as ES
@@ -184,7 +185,7 @@ function MF.mutate_constant(
         # Mutate parameters
         parameter_index = rand(rng, 1:(options.expression_options.max_parameters))
         # We mutate all the parameters at once
-        factor = MF.mutate_factor(T, temperature, options, rng)
+        factor = MF.mutate_factor(T, temperature, options, MutateConstant(), rng)
         get_metadata(ex).parameters[parameter_index, :] .*= factor
         return ex
     end

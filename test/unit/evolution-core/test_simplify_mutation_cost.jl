@@ -25,7 +25,6 @@
         copy(member.tree),
         member,
         Simplify(),
-        options.mutations,
         options;
         recorder=RecordType(),
         dataset=dataset,

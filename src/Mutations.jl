@@ -3,10 +3,10 @@ module MutationsModule
 """
     AbstractMutation
 
-A mutation kind is a singleton struct subtyping `AbstractMutation`. The
-engine dispatches the per-cycle `mutate!` method on the mutation's type;
-weight sampling, plugin observation hooks, and `condition_mutation_weights!`
-all key off the type.
+A mutation kind is a struct (often `Base.@kwdef` for per-mutation config)
+subtyping `AbstractMutation`. The engine dispatches the per-cycle `mutate!`
+method on the mutation's type; weight sampling, plugin observation hooks,
+and `condition_mutation_weights!` all key off the type.
 
 To add a new mutation kind, define a struct + a `mutate!` method:
 
@@ -14,7 +14,7 @@ To add a new mutation kind, define a struct + a `mutate!` method:
 struct MyMutation <: AbstractMutation end
 
 function SymbolicRegression.mutate!(
-    new_tree, parent_member, ::MyMutation, mutations, options; kws...
+    new_tree, parent_member, ::MyMutation, options; kws...
 )
     # ... modify new_tree ...
     return MutationResult(; tree=new_tree)
@@ -24,26 +24,21 @@ end
 Then include it in `Options(; mutations = [default_mutations()..., MyMutation() => 0.1])`.
 
 !!! warning "Experimental"
-    Per-mutation config (e.g. `MutateConstant(perturbation_factor=0.1)`) is
-    not yet supported; config still lives on `Options`. Migration is planned.
 """
 abstract type AbstractMutation end
 
 """
-    BacksolveOptions(; max_library_size=500, lambda=0.01, max_iter=10)
+    MutateConstant(; perturbation_factor=0.086, probability_negate=0.01)
 
-Config for the [`Backsolve`](@ref) mutation's sparse-expression fit.
-
-!!! warning
-    Experimental. May change in minor version increments.
+Perturb a random constant. `perturbation_factor` scales the magnitude
+(modulated by temperature); `probability_negate` is the chance of
+flipping the constant's sign.
 """
-Base.@kwdef struct BacksolveOptions
-    max_library_size::Int = 500
-    lambda::Float64 = 0.01
-    max_iter::Int = 10
+Base.@kwdef struct MutateConstant <: AbstractMutation
+    perturbation_factor::Float64 = 0.086
+    probability_negate::Float64 = 0.01
 end
 
-struct MutateConstant <: AbstractMutation end
 struct MutateOperator <: AbstractMutation end
 struct MutateFeature <: AbstractMutation end
 struct SwapOperands <: AbstractMutation end
@@ -53,9 +48,26 @@ struct DeleteNode <: AbstractMutation end
 struct FormConnection <: AbstractMutation end
 struct BreakConnection <: AbstractMutation end
 struct RotateTree <: AbstractMutation end
+
+"""
+    Backsolve(; max_library_size=500, lambda=0.01, max_iter=10)
+
+Invert a random non-root node by solving for its target values, then
+replace it with a sparse-expression fit (STLSQ).
+
+!!! warning
+    Experimental. May change in minor version increments.
+"""
 Base.@kwdef struct Backsolve <: AbstractMutation
-    options::BacksolveOptions = BacksolveOptions()
+    max_library_size::Int = 500
+    lambda::Float64 = 0.01
+    max_iter::Int = 10
 end
+
+# Compat alias so existing `using SymbolicRegression: BacksolveOptions`
+# imports keep resolving; the config now lives directly on `Backsolve`.
+const BacksolveOptions = Backsolve
+
 struct Simplify <: AbstractMutation end
 struct Randomize <: AbstractMutation end
 struct Optimize <: AbstractMutation end
@@ -64,9 +76,10 @@ struct DoNothing <: AbstractMutation end
 """
     default_mutations() -> Vector{Pair{AbstractMutation,Float64}}
 
-Default mutation list with the historical `MutationWeights` weights, in the
-same order as `fieldnames(MutationWeights)` so backwards-compat conversion
-from `MutationWeights` is straightforward.
+Default mutation list with the historical `MutationWeights` weights. The
+weights match `MutationWeights`' field defaults but the order is keyed by
+type, not by the field-name order — conversion from `MutationWeights` is
+done by `_mutations_from_weights` via an explicit symbol → type mapping.
 """
 function default_mutations()
     return Pair{AbstractMutation,Float64}[

@@ -259,7 +259,7 @@ end
 
     nfeatures = max_features(dataset, options)
 
-    weights = copy(options.mutations)
+    weights = deepcopy(options.mutations)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
     for (plugin, pstate) in zip(options.plugins, plugin_states)
@@ -287,7 +287,6 @@ end
             rtree[],
             member,
             mutation_choice,
-            weights,
             options;
             recorder=tmp_recorder,
             temperature,
@@ -450,7 +449,6 @@ end
         new_tree::N,
         parent_member::P,
         mutation::AbstractMutation,
-        mutations::AbstractVector{<:Pair{<:AbstractMutation,<:Real}},
         options::AbstractOptions;
         kws...,
     ) where {N<:AbstractExpression,P<:AbstractPopMember}
@@ -484,7 +482,7 @@ rejecting the mutation. For example, a `simplify` operation will not change the 
 so it can always return immediately.
 """
 function mutate!(
-    ::N, ::P, m::AbstractMutation, ::AbstractVector, ::AbstractOptions; kws...
+    ::N, ::P, m::AbstractMutation, ::AbstractOptions; kws...
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
     return error("Unknown mutation type: $(typeof(m))")
 end
@@ -492,14 +490,13 @@ end
 function mutate!(
     new_tree::N,
     parent_member::P,
-    ::MutateConstant,
-    ::AbstractVector,
+    m::MutateConstant,
     options::AbstractOptions;
     recorder::RecordType,
     temperature,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    new_tree = mutate_constant(new_tree, temperature, options)
+    new_tree = mutate_constant(new_tree, temperature, options, m)
     @recorder recorder["type"] = "mutate_constant"
     return MutationResult{N,P}(; tree=new_tree)
 end
@@ -508,7 +505,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::MutateOperator,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -522,7 +518,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::MutateFeature,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
@@ -537,7 +532,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::SwapOperands,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -551,7 +545,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::AddNode,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
@@ -571,7 +564,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::InsertNode,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     nfeatures,
@@ -586,7 +578,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::DeleteNode,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -600,7 +591,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::FormConnection,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -614,7 +604,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::BreakConnection,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -628,7 +617,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::RotateTree,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     kws...,
@@ -642,7 +630,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     m::Backsolve,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
@@ -653,7 +640,7 @@ function mutate!(
         new_tree,
         dataset,
         options;
-        backsolve_options=m.options,
+        backsolve_options=m,
         population_for_backsolve=population_for_backsolve,
     )
     @recorder recorder["type"] = "backsolve"
@@ -665,7 +652,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::Simplify,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
@@ -701,7 +687,6 @@ function mutate!(
     new_tree::N,
     ::P,
     ::Randomize,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     curmaxsize,
@@ -717,7 +702,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::Optimize,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     dataset::Dataset,
@@ -734,7 +718,6 @@ function mutate!(
     new_tree::N,
     parent_member::P,
     ::DoNothing,
-    ::AbstractVector,
     options::AbstractOptions;
     recorder::RecordType,
     parent_ref,

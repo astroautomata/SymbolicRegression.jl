@@ -18,7 +18,8 @@ using DynamicExpressions:
     set_child!,
     max_degree
 using Statistics: median
-using ..CoreModule: AbstractOptions, DATA_TYPE, init_value, sample_value, Dataset
+using ..CoreModule:
+    AbstractOptions, DATA_TYPE, init_value, sample_value, Dataset, MutateConstant
 using ..EvaluateInverseModule: eval_inverse_tree_array, is_bad_array
 using ..BacksolveModule: fit_sparse_expression
 
@@ -123,11 +124,12 @@ function mutate_constant(
     ex::AbstractExpression{T},
     temperature,
     options::AbstractOptions,
+    m::MutateConstant=MutateConstant(),
     rng::AbstractRNG=default_rng(),
 ) where {T<:DATA_TYPE}
     tree, context = get_contents_for_mutation(ex, rng)
     ex = with_contents_for_mutation(
-        ex, mutate_constant(tree, temperature, options, rng), context
+        ex, mutate_constant(tree, temperature, options, m, rng), context
     )
     return ex
 end
@@ -135,31 +137,34 @@ function mutate_constant(
     tree::AbstractExpressionNode{T},
     temperature,
     options::AbstractOptions,
+    m::MutateConstant=MutateConstant(),
     rng::AbstractRNG=default_rng(),
 ) where {T<:DATA_TYPE}
-    # T is between 0 and 1.
-
     if !(has_constants(tree))
         return tree
     end
     node = rand(rng, NodeSampler(; tree, filter=t -> (t.degree == 0 && t.constant)))
-    node.val = mutate_value(rng, node.val, temperature, options)
+    node.val = mutate_value(rng, node.val, temperature, options, m)
     return tree
 end
 
-function mutate_value(rng::AbstractRNG, val::Number, temperature, options)
-    return val * mutate_factor(typeof(val), temperature, options, rng)
+function mutate_value(
+    rng::AbstractRNG, val::Number, temperature, options, m::MutateConstant=MutateConstant()
+)
+    return val * mutate_factor(typeof(val), temperature, options, m, rng)
 end
 
-function mutate_factor(::Type{T}, temperature, options, rng) where {T<:Number}
+function mutate_factor(
+    ::Type{T}, temperature, options, m::MutateConstant, rng
+) where {T<:Number}
     bottom = 1//10
-    maxChange = options.perturbation_factor * temperature + 1 + bottom
+    maxChange = m.perturbation_factor * temperature + 1 + bottom
     factor = T(maxChange^rand(rng, T))
     makeConstBigger = rand(rng, Bool)
 
     factor = makeConstBigger ? factor : 1 / factor
 
-    if rand(rng) > options.probability_negate_constant
+    if rand(rng) > m.probability_negate
         factor *= -1
     end
     return factor
@@ -668,12 +673,7 @@ function backsolve_rewrite_random_node(
 ) where {T<:DATA_TYPE}
     tree = get_contents(ex)
     new_tree = backsolve_rewrite_random_node(
-        tree,
-        dataset,
-        options,
-        rng;
-        backsolve_options=backsolve_options,
-        population_for_backsolve=population_for_backsolve,
+        tree, dataset, options, rng; backsolve_options, population_for_backsolve
     )
     return with_contents(ex, new_tree)
 end
@@ -713,8 +713,8 @@ function backsolve_rewrite_random_node(
         dataset,
         options,
         nfeatures;
-        backsolve_options=backsolve_options,
-        population_for_backsolve=population_for_backsolve,
+        backsolve_options,
+        population_for_backsolve,
     )
 
     if new_node !== nothing

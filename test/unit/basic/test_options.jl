@@ -30,14 +30,12 @@ end
 @testitem "Test backsolve options" begin
     using SymbolicRegression
 
-    # Backsolve config now lives on the Backsolve mutation, not on Options.
+    # Backsolve config is inlined on the Backsolve mutation now.
     default_backsolve = first(p.first for p in Options().mutations if p.first isa Backsolve)
-    @test default_backsolve.options == BacksolveOptions()
+    @test default_backsolve == Backsolve()
 
-    custom = Options(;
-        mutations=[Backsolve(; options=BacksolveOptions(; lambda=0.2)) => 1.0]
-    )
-    @test custom.mutations[1].first.options.lambda == 0.2
+    custom = Options(; mutations=[Backsolve(; lambda=0.2) => 1.0])
+    @test custom.mutations[1].first.lambda == 0.2
 end
 
 @testitem "Test operators parameter conflicts" begin

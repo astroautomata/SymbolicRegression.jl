@@ -57,8 +57,8 @@
 
     # Conditioner default leaves weights untouched. `weights` is the mutated
     # arg → first; then state, then plugin.
-    w = copy(opts.mutations)
-    before = copy(w)
+    w = deepcopy(opts.mutations)
+    before = deepcopy(w)
     @test condition_mutation_weights!(w, s, p, nothing, opts, 20, 2) === nothing
     @test w == before
 end

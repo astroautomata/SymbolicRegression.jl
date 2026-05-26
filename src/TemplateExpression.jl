@@ -38,6 +38,7 @@ using ..CoreModule:
     Dataset,
     CoreModule as CM,
     AbstractMutationWeights,
+    MutateConstant,
     has_units,
     DATA_TYPE,
     AbstractExpressionSpec,
@@ -960,7 +961,10 @@ function MF.mutate_constant(
             rng, 1:num_params, num_params_to_mutate; replace=false
         )
         parameters = get_metadata(ex).parameters[key_to_mutate]::ParamVector
-        factors = [MF.mutate_factor(T, temperature, options, rng) for _ in idx_to_mutate]
+        factors = [
+            MF.mutate_factor(T, temperature, options, MutateConstant(), rng) for
+            _ in idx_to_mutate
+        ]
         @inbounds for (i, f) in zip(idx_to_mutate, factors)
             parameters._data[i] *= f
         end

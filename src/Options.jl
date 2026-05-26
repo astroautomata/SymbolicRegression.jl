@@ -1014,7 +1014,19 @@ $(OPTION_DESCRIPTIONS)
 
     set_mutation_weights = create_mutation_weights(mutation_weights)
     _resolved_mutations = if mutations === nothing
-        MutationWeightsModule._mutations_from_weights(set_mutation_weights)
+        base = MutationWeightsModule._mutations_from_weights(set_mutation_weights)
+        # Backwards compat: plumb `perturbation_factor` and
+        # `probability_negate_constant` kwargs into the default MutateConstant.
+        for i in eachindex(base)
+            if base[i].first isa MutationsModule.MutateConstant
+                base[i] =
+                    MutationsModule.MutateConstant(;
+                        perturbation_factor=Float64(perturbation_factor),
+                        probability_negate=Float64(probability_negate_constant),
+                    ) => base[i].second
+            end
+        end
+        base
     else
         Pair{MutationsModule.AbstractMutation,Float64}[
             p.first => Float64(p.second) for p in mutations
