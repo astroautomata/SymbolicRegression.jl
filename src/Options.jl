@@ -41,7 +41,7 @@ using ..MutationWeightsModule:
 using ..MutationsModule: MutationsModule
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, operator_specialization
-using ..PluginModule: default_adaptive_parsimony_plugins, _merge_with_default_plugins
+using ..PluginModule: default_adaptive_parsimony_plugin, _merge_with_default_plugins
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -1035,7 +1035,7 @@ $(OPTION_DESCRIPTIONS)
 
     plugin_tuple = _merge_with_default_plugins(
         plugins,
-        default_adaptive_parsimony_plugins(; use_frequency, use_frequency_in_tournament),
+        default_adaptive_parsimony_plugin(; use_frequency, use_frequency_in_tournament),
     )
 
     @assert print_precision > 0

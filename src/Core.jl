@@ -107,6 +107,6 @@ using .PluginModule:
     mutation_acceptance_multiplier,
     fork_worker_state,
     invoke_init_member,
-    default_adaptive_parsimony_plugins
+    default_adaptive_parsimony_plugin
 
 end
