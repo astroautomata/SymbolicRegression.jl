@@ -9,8 +9,6 @@ using LossFunctions: SupervisedLoss
 import ..MutationWeightsModule: AbstractMutationWeights
 using ..MutationsModule: AbstractMutation
 
-using ..MutationsModule: BacksolveOptions
-
 """
 This struct defines how complexity is calculated.
 

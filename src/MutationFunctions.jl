@@ -144,18 +144,18 @@ function mutate_constant(
         return tree
     end
     node = rand(rng, NodeSampler(; tree, filter=t -> (t.degree == 0 && t.constant)))
-    node.val = mutate_value(rng, node.val, temperature, options, m)
+    node.val = mutate_value(rng, node.val, temperature, m)
     return tree
 end
 
 function mutate_value(
-    rng::AbstractRNG, val::Number, temperature, options, m::MutateConstant=MutateConstant()
+    rng::AbstractRNG, val::Number, temperature, m::MutateConstant=MutateConstant()
 )
-    return val * mutate_factor(typeof(val), temperature, options, m, rng)
+    return val * mutate_factor(typeof(val), temperature, m, rng)
 end
 
 function mutate_factor(
-    ::Type{T}, temperature, options, m::MutateConstant, rng
+    ::Type{T}, temperature, m::MutateConstant, rng
 ) where {T<:Number}
     bottom = 1//10
     maxChange = m.perturbation_factor * temperature + 1 + bottom
@@ -653,7 +653,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    backsolve_options,
+    mutation,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     throw(
@@ -668,12 +668,12 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    backsolve_options,
+    mutation,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     tree = get_contents(ex)
     new_tree = backsolve_rewrite_random_node(
-        tree, dataset, options, rng; backsolve_options, population_for_backsolve
+        tree, dataset, options, rng; mutation, population_for_backsolve
     )
     return with_contents(ex, new_tree)
 end
@@ -683,7 +683,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    backsolve_options,
+    mutation,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE}
     if !(T <: Union{AbstractFloat,Complex{<:AbstractFloat}})
@@ -713,7 +713,7 @@ function backsolve_rewrite_random_node(
         dataset,
         options,
         nfeatures;
-        backsolve_options,
+        mutation,
         population_for_backsolve,
     )
 
@@ -741,7 +741,7 @@ function backsolve_rewrite_random_node(
     dataset::Dataset{T},
     options::AbstractOptions,
     rng::AbstractRNG=default_rng();
-    backsolve_options,
+    mutation,
     population_for_backsolve=nothing,
 ) where {T<:DATA_TYPE,D}
     throw(

@@ -198,10 +198,9 @@ hands the result to `mutate!`, which dispatches per concrete type, so the
 instability is contained.
 """
 @unstable function sample_mutation(
-    mutations::AbstractVector{<:Pair{<:AbstractMutation,<:Real}}
+    mutations::AbstractVector{Pair{AbstractMutation,Float64}}
 )
-    weights = [Float64(p.second) for p in mutations]
-    idx = StatsBase.sample(eachindex(mutations), StatsBase.Weights(weights))
+    idx = StatsBase.sample(eachindex(mutations), StatsBase.Weights(map(last, mutations)))
     return mutations[idx].first
 end
 

@@ -146,7 +146,7 @@ end
     make_options(; kws...) = Options(;
         binary_operators=(+, *),
         unary_operators=(sin, cos),
-        backsolve=BacksolveOptions(;
+        backsolve=Backsolve(;
             lambda=0.01, max_iter=10, max_library_size=500, kws...
         ),
     )
@@ -279,7 +279,7 @@ end
     options = Options(;
         binary_operators=(+, *),
         unary_operators=(sin, cos),
-        backsolve=BacksolveOptions(; lambda=0.01, max_iter=10, max_library_size=500),
+        backsolve=Backsolve(; lambda=0.01, max_iter=10, max_library_size=500),
     )
 
     X = Float64[1.0 2.0 3.0 4.0; 0.5 1.0 1.5 2.0]  # 2 features x 4 samples
@@ -319,7 +319,7 @@ end
     sr_options() = Options(;
         binary_operators=(+, *, -),
         unary_operators=(sin, cos),
-        backsolve=BacksolveOptions(; lambda=0.01, max_iter=10, max_library_size=500),
+        backsolve=Backsolve(; lambda=0.01, max_iter=10, max_library_size=500),
     )
 
     X = Float64[1.0 2.0 3.0 4.0; 0.5 1.0 1.5 2.0]  # 2 features x 4 samples
@@ -360,7 +360,7 @@ end
     options_empty = Options(;
         binary_operators=(),
         unary_operators=(),
-        backsolve=BacksolveOptions(; lambda=0.01, max_iter=10),
+        backsolve=Backsolve(; lambda=0.01, max_iter=10),
     )
 
     X = Float64[1.0 2.0 3.0]
@@ -375,7 +375,7 @@ end
     make_options(; kws...) = Options(;
         binary_operators=(+, *),
         unary_operators=(sin,),
-        backsolve=BacksolveOptions(; kws...),
+        backsolve=Backsolve(; kws...),
     )
     options = make_options(; lambda=1e10, max_iter=10)
 

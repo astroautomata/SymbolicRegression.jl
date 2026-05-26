@@ -64,10 +64,6 @@ Base.@kwdef struct Backsolve <: AbstractMutation
     max_iter::Int = 10
 end
 
-# Compat alias so existing `using SymbolicRegression: BacksolveOptions`
-# imports keep resolving; the config now lives directly on `Backsolve`.
-const BacksolveOptions = Backsolve
-
 struct Simplify <: AbstractMutation end
 struct Randomize <: AbstractMutation end
 struct Optimize <: AbstractMutation end

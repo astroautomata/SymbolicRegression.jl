@@ -962,8 +962,7 @@ function MF.mutate_constant(
         )
         parameters = get_metadata(ex).parameters[key_to_mutate]::ParamVector
         factors = [
-            MF.mutate_factor(T, temperature, options, MutateConstant(), rng) for
-            _ in idx_to_mutate
+            MF.mutate_factor(T, temperature, MutateConstant(), rng) for _ in idx_to_mutate
         ]
         @inbounds for (i, f) in zip(idx_to_mutate, factors)
             parameters._data[i] *= f

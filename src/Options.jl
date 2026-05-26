@@ -40,7 +40,7 @@ using ..MutationWeightsModule:
     MutationWeightsModule, AbstractMutationWeights, MutationWeights
 using ..MutationsModule: MutationsModule
 import ..OptionsStructModule: Options
-using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
+using ..OptionsStructModule: ComplexityMapping, operator_specialization
 using ..PluginModule: default_adaptive_parsimony_plugins, _merge_with_default_plugins
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:

@@ -686,7 +686,7 @@ function mutate!(
         new_tree,
         dataset,
         options;
-        backsolve_options=m,
+        mutation=m,
         population_for_backsolve=population_for_backsolve,
     )
     @recorder recorder["type"] = "backsolve"

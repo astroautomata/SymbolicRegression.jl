@@ -49,7 +49,6 @@ using .OptionsStructModule:
     AbstractOptions,
     Options,
     ComplexityMapping,
-    BacksolveOptions,
     specialized_options,
     operator_specialization,
     WarmStartIncompatibleError,

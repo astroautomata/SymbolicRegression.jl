@@ -5,7 +5,7 @@ using DispatchDoctor: @unstable
 using DynamicExpressions:
     AbstractExpressionNode, constructorof, eval_tree_array, get_tree, string_tree
 
-using ..CoreModule: AbstractOptions, DATA_TYPE, Dataset, BacksolveOptions
+using ..CoreModule: AbstractOptions, DATA_TYPE, Dataset, Backsolve
 
 const STLSQ_DATA_TYPE = Union{AbstractFloat,Complex{<:AbstractFloat}}
 
@@ -318,7 +318,7 @@ operator set, since the output is structurally a weighted sum.
     dataset::Dataset{T},
     options::AbstractOptions,
     nfeatures::Int;
-    backsolve_options::BacksolveOptions,
+    mutation::Backsolve,
     population_for_backsolve=nothing,
 ) where {T<:STLSQ_DATA_TYPE}
     _has_weighted_sum_operators(options) || return nothing
@@ -329,14 +329,14 @@ operator set, since the output is structurally a weighted sum.
         options,
         nfeatures,
         population_for_backsolve;
-        max_library_size=backsolve_options.max_library_size,
+        max_library_size=mutation.max_library_size,
     )
 
     coefficients, stlsq_success = stlsq(
         basis.evaluated_terms,
         target_values;
-        lambda=backsolve_options.lambda,
-        max_iter=backsolve_options.max_iter,
+        lambda=mutation.lambda,
+        max_iter=mutation.max_iter,
     )
 
     if !stlsq_success
