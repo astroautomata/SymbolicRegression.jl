@@ -811,34 +811,32 @@ function DA.violates_dimensional_constraints(
     return false
 end
 function MM.condition_mutation_weights!(
-    @nospecialize(weights::AbstractMutationWeights),
+    weights::AbstractVector,
     @nospecialize(member::P),
     @nospecialize(options::AbstractOptions),
     curmaxsize::Int,
     nfeatures::Int,
 ) where {T,L,N<:TemplateExpression,P<:AbstractPopMember{T,L,N}}
     if !preserve_sharing(typeof(member.tree))
-        weights.form_connection = 0.0
-        weights.break_connection = 0.0
+        MM._set_weight!(weights, MM.FormConnection, 0.0)
+        MM._set_weight!(weights, MM.BreakConnection, 0.0)
     end
 
     MM.condition_mutate_constant!(typeof(member.tree), weights, member, options, curmaxsize)
 
-    # Disable feature mutation if only one feature available
     if nfeatures <= 1
-        weights.mutate_feature = 0.0
+        MM._set_weight!(weights, MM.MutateFeature, 0.0)
     end
 
     complexity = ComplexityModule.compute_complexity(member, options)
 
     if complexity >= curmaxsize
-        # If equation is too big, don't add new operators
-        weights.add_node = 0.0
-        weights.insert_node = 0.0
+        MM._set_weight!(weights, MM.AddNode, 0.0)
+        MM._set_weight!(weights, MM.InsertNode, 0.0)
     end
 
     if !options.should_simplify
-        weights.simplify = 0.0
+        MM._set_weight!(weights, MM.Simplify, 0.0)
     end
     return nothing
 end
@@ -898,7 +896,7 @@ end
 
 function MM.condition_mutate_constant!(
     ::Type{<:TemplateExpression},
-    weights::AbstractMutationWeights,
+    weights::AbstractVector,
     member::AbstractPopMember,
     options::AbstractOptions,
     curmaxsize::Int,

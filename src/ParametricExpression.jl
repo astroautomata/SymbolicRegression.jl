@@ -101,7 +101,7 @@ end
 
 function MM.condition_mutate_constant!(
     ::Type{<:ParametricExpression},
-    weights::AbstractMutationWeights,
+    weights::AbstractVector,
     member::AbstractPopMember,
     options::AbstractOptions,
     curmaxsize::Int,
