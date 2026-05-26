@@ -51,8 +51,9 @@ mutable struct SimulatedAnnealingState <: AbstractPluginState
     temperature::Float64
 end
 
-init_plugin_state(::SimulatedAnnealingPlugin, options, dataset) =
+function init_plugin_state(::SimulatedAnnealingPlugin, options, dataset)
     SimulatedAnnealingState(1.0)
+end
 
 function on_cycle_start!(
     s::SimulatedAnnealingState,

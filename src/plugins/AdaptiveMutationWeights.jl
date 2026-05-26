@@ -83,9 +83,7 @@ end
 
 # Fresh stats per worker dispatch (per-population locality; no cross-pop merge).
 function fork_worker_state(
-    head_state::AdaptiveMutationWeightsState,
-    ::AdaptiveMutationWeightsPlugin,
-    dataset,
+    head_state::AdaptiveMutationWeightsState, ::AdaptiveMutationWeightsPlugin, dataset
 )
     n = length(head_state.multipliers)
     return AdaptiveMutationWeightsState(zeros(n), zeros(n), ones(n))

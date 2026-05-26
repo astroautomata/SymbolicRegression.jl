@@ -97,7 +97,8 @@ end
     p_tournament_off = AdaptiveParsimonyPlugin(; tournament=false, mutation_acceptance=true)
     p_mut_off = AdaptiveParsimonyPlugin(; tournament=true, mutation_acceptance=false)
     @test tournament_cost_multiplier(worker_state, p_tournament_off, m1, opts) == 1.0
-    @test mutation_acceptance_multiplier(worker_state, p_mut_off, m1, n5, 0.0, 0.0, opts) == 1.0
+    @test mutation_acceptance_multiplier(worker_state, p_mut_off, m1, n5, 0.0, 0.0, opts) ==
+        1.0
 
     # Out-of-range complexity (size > maxsize) → frequency = 0 → tournament multiplier
     # = exp(scaling * 0) = 1.0. Hits the "size out of range" branch.

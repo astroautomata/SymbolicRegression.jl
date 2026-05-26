@@ -455,7 +455,6 @@ function default_adaptive_mutation_weights_plugin end
 function default_mutation_loop_plugin end
 function default_simulated_annealing_plugin end
 
-
 # Append defaults whose type isn't already in the user tuple. Each default
 # may be `nothing` (auto-injected plugin disabled by the legacy kwarg) and
 # is filtered out.

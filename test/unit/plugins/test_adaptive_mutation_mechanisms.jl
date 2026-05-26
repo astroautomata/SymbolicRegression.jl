@@ -11,9 +11,7 @@
         unary_operators=[sin],
         plugins=(AdaptiveMutationWeightsPlugin(),),
     )
-    s = SymbolicRegression.init_plugin_state(
-        AdaptiveMutationWeightsPlugin(), opts, nothing
-    )
+    s = SymbolicRegression.init_plugin_state(AdaptiveMutationWeightsPlugin(), opts, nothing)
     @test length(s.attempts) == length(opts.mutations)
     @test all(s.multipliers .== 1.0)
 end
@@ -35,11 +33,10 @@ end
     using Test
 
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent, n_calls[] >= 3, 1.0)
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent, n_calls[] >= 3, 1.0)
+    end
     p = MutationLoopPlugin(;
         retry_attempts=4, compound_probability=0.0, compound_max_steps=1
     )
@@ -55,11 +52,10 @@ end
     using Test
 
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent, false, 1.0)
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent, false, 1.0)
+    end
     p = MutationLoopPlugin(;
         retry_attempts=4, compound_probability=0.0, compound_max_steps=1
     )
@@ -76,11 +72,10 @@ end
     using Test
 
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent + 1, true, 1.0)
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent + 1, true, 1.0)
+    end
     p = MutationLoopPlugin(;
         retry_attempts=1, compound_probability=1.0, compound_max_steps=3
     )
@@ -97,11 +92,10 @@ end
     using Test
 
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent, false, 1.0)
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent, false, 1.0)
+    end
     p = MutationLoopPlugin(;
         retry_attempts=1, compound_probability=1.0, compound_max_steps=3
     )
@@ -117,11 +111,10 @@ end
 
     struct _NoopMidPlugin <: AbstractPlugin end
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent, true, 2.0)
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent, true, 2.0)
+    end
     member, accepted, num_evals = wrap_mutation_step(
         NoPluginState(), _NoopMidPlugin(), :parent, inner
     )
@@ -147,11 +140,10 @@ end
     end
 
     n_calls = Ref(0)
-    inner =
-        parent -> begin
-            n_calls[] += 1
-            (parent, true, Float64(n_calls[]))
-        end
+    inner = parent -> begin
+        n_calls[] += 1
+        (parent, true, Float64(n_calls[]))
+    end
     member, accepted, num_evals = wrap_mutation_step(
         NoPluginState(), BestOfTwoPlugin(), :p, inner
     )
