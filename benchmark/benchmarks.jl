@@ -94,6 +94,10 @@ function create_utils_benchmark()
     # Switch on `hasfield(Options, :plugins)` so this script benchmarks
     # cleanly against both versions.
     new_engine_sig = hasfield(Options, :plugins)
+    # `annealing` field moves off `Options` in the adaptive-mutation-mechanisms
+    # refactor (it becomes plugin config); when absent, `next_generation`
+    # no longer takes a `temperature` arg either.
+    has_temperature = hasfield(Options, :annealing)
 
     suite["best_of_sample"] = if new_engine_sig
         @benchmarkable(
@@ -116,7 +120,7 @@ function create_utils_benchmark()
         )
     end
 
-    suite["next_generation_x100"] = if new_engine_sig
+    suite["next_generation_x100"] = if new_engine_sig && has_temperature
         @benchmarkable(
             let
                 for member in members
@@ -167,6 +171,52 @@ function create_utils_benchmark()
             ]
         )
     )
+    elseif new_engine_sig && !has_temperature
+        @benchmarkable(
+            let
+                for member in members
+                    next_generation(
+                        dataset, member, curmaxsize, options; tmp_recorder=recorder
+                    )
+                end
+            end,
+            setup = (
+                nfeatures=1;
+                dataset=Dataset(randn(nfeatures, 32), randn(32));
+                mutation_weights=MutationWeights(;
+                    mutate_constant=1.0,
+                    mutate_operator=1.0,
+                    swap_operands=1.0,
+                    rotate_tree=1.0,
+                    add_node=1.0,
+                    insert_node=1.0,
+                    simplify=0.0,
+                    randomize=0.0,
+                    do_nothing=0.0,
+                    form_connection=0.0,
+                    break_connection=0.0,
+                );
+                options=Options(;
+                    unary_operators=[sin, cos],
+                    binary_operators=[+, -, *, /],
+                    mutation_weights,
+                );
+                recorder=RecordType();
+                curmaxsize=20;
+                trees=[
+                    gen_random_tree_fixed_size(15, options, nfeatures, Float64) for
+                    _ in 1:100
+                ];
+                expressions=[
+                    Expression(tree; operators=options.operators, variable_names=["x1"])
+                    for tree in trees
+                ];
+                members=[
+                    PopMember(dataset, expression, options; deterministic=false) for
+                    expression in expressions
+                ]
+            )
+        )
     else
         @benchmarkable(
             let
