@@ -101,7 +101,9 @@ function create_utils_benchmark()
             setup = (
                 nfeatures=1;
                 dataset=Dataset(randn(nfeatures, 32), randn(32));
-                pop=Population(dataset; npop=100, nlength=20, options=($options), nfeatures)
+                pop=Population(
+                    dataset; npop=100, nlength=20, options=($options), nfeatures
+                )
             )
         )
     else
@@ -110,7 +112,9 @@ function create_utils_benchmark()
             setup = (
                 nfeatures=1;
                 dataset=Dataset(randn(nfeatures, 32), randn(32));
-                pop=Population(dataset; npop=100, nlength=20, options=($options), nfeatures);
+                pop=Population(
+                    dataset; npop=100, nlength=20, options=($options), nfeatures
+                );
                 rss=RunningSearchStatistics(; options=($options))
             )
         )
@@ -134,39 +138,39 @@ function create_utils_benchmark()
                 nfeatures=1;
                 dataset=Dataset(randn(nfeatures, 32), randn(32));
                 mutation_weights=MutationWeights(;
-                mutate_constant=1.0,
-                mutate_operator=1.0,
-                swap_operands=1.0,
-                rotate_tree=1.0,
-                add_node=1.0,
-                insert_node=1.0,
-                simplify=0.0,
-                randomize=0.0,
-                do_nothing=0.0,
-                form_connection=0.0,
-                break_connection=0.0,
-            );
-            options=Options(;
-                unary_operators=[sin, cos],
-                binary_operators=[+, -, *, /],
-                mutation_weights,
-            );
-            recorder=RecordType();
-            temperature=1.0;
-            curmaxsize=20;
-            trees=[
-                gen_random_tree_fixed_size(15, options, nfeatures, Float64) for _ in 1:100
-            ];
-            expressions=[
-                Expression(tree; operators=options.operators, variable_names=["x1"]) for
-                tree in trees
-            ];
-            members=[
-                PopMember(dataset, expression, options; deterministic=false) for
-                expression in expressions
-            ]
+                    mutate_constant=1.0,
+                    mutate_operator=1.0,
+                    swap_operands=1.0,
+                    rotate_tree=1.0,
+                    add_node=1.0,
+                    insert_node=1.0,
+                    simplify=0.0,
+                    randomize=0.0,
+                    do_nothing=0.0,
+                    form_connection=0.0,
+                    break_connection=0.0,
+                );
+                options=Options(;
+                    unary_operators=[sin, cos],
+                    binary_operators=[+, -, *, /],
+                    mutation_weights,
+                );
+                recorder=RecordType();
+                temperature=1.0;
+                curmaxsize=20;
+                trees=[
+                    gen_random_tree_fixed_size(15, options, nfeatures, Float64) for
+                    _ in 1:100
+                ];
+                expressions=[
+                    Expression(tree; operators=options.operators, variable_names=["x1"]) for tree in trees
+                ];
+                members=[
+                    PopMember(dataset, expression, options; deterministic=false) for
+                    expression in expressions
+                ]
+            )
         )
-    )
     else
         @benchmarkable(
             let
@@ -212,8 +216,7 @@ function create_utils_benchmark()
                     _ in 1:100
                 ];
                 expressions=[
-                    Expression(tree; operators=options.operators, variable_names=["x1"])
-                    for tree in trees
+                    Expression(tree; operators=options.operators, variable_names=["x1"]) for tree in trees
                 ];
                 members=[
                     PopMember(dataset, expression, options; deterministic=false) for
