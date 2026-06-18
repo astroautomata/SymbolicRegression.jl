@@ -523,7 +523,7 @@ function DE.set_scalar_constants!(e::TemplateExpression, constants, refs)
         i = cursor[]
         c = constants[i:(i + n - 1)]
         DE.set_scalar_constants!(tree, c, r.ref)
-        cursor[] = i + n
+        return cursor[] = i + n
     end
     if has_params(e)
         num_parameters = get_metadata(e).structure.num_parameters
@@ -613,8 +613,11 @@ function _template_gradient_metadata(grad)
     return hasproperty(grad, :metadata) ? getproperty(grad, :metadata) : get_metadata(grad)
 end
 function _template_gradient_parameters(metadata)
-    return hasproperty(metadata, :parameters) ? getproperty(metadata, :parameters) :
-           getproperty(getproperty(metadata, :_data), :parameters)
+    return if hasproperty(metadata, :parameters)
+        getproperty(metadata, :parameters)
+    else
+        getproperty(getproperty(metadata, :_data), :parameters)
+    end
 end
 function _template_inner_gradient(grad, ::TemplateExpression, key::Symbol)
     return getproperty(_template_gradient_trees(grad), key)
@@ -1098,7 +1101,7 @@ function DE.simplify_tree!(
 end
 function has_constants(tree::AbstractExpression)
     any(get_tree(tree)) do node
-        node.degree == 0 && node.constant
+        return node.degree == 0 && node.constant
     end
 end
 has_constants(ex::TemplateExpression) = any(has_constants, values(get_contents(ex)))
@@ -1143,9 +1146,7 @@ function DE.count_scalar_constants(ex::TemplateExpression)
     else
         0
     end
-    return (
-        sum(DE.count_scalar_constants, values(get_contents(ex))) + parameter_count
-    )
+    return (sum(DE.count_scalar_constants, values(get_contents(ex))) + parameter_count)
 end
 function CO.count_constants_for_optimization(ex::TemplateExpression)
     return length(first(CO.get_constants_for_optimization(ex)))
@@ -1189,7 +1190,7 @@ function has_invalid_variables(ex::TemplateExpression)
     any(keys(raw_contents)) do key
         tree = raw_contents[key]
         max_feature = num_features[key]
-        contains_features_greater_than(tree, max_feature)
+        return contains_features_greater_than(tree, max_feature)
     end
 end
 function contains_features_greater_than(tree::AbstractExpression, max_feature)
@@ -1197,7 +1198,7 @@ function contains_features_greater_than(tree::AbstractExpression, max_feature)
 end
 function contains_features_greater_than(tree::AbstractExpressionNode, max_feature)
     any(tree) do node
-        node.degree == 0 && !node.constant && node.feature > max_feature
+        return node.degree == 0 && !node.constant && node.feature > max_feature
     end
 end
 
@@ -1368,7 +1369,7 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
                 kws...,
             )
 
-            DE.constructorof(inner_expression_type)(
+            return DE.constructorof(inner_expression_type)(
                 parsed_expr.tree;
                 operators,
                 variable_names=nothing,

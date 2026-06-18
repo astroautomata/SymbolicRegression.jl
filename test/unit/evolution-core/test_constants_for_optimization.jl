@@ -84,9 +84,8 @@ end
             )
         ),
     )
-    @test SymbolicRegression.extract_gradient_for_optimization(
-        structural_grad, template
-    ) == [0.5, 0.25]
+    @test SymbolicRegression.extract_gradient_for_optimization(structural_grad, template) ==
+        [0.5, 0.25]
 end
 
 @testitem "Template constants hooks can expose candidate-local state" begin

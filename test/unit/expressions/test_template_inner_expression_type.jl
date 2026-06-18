@@ -217,9 +217,7 @@ end
     @test with_contents_states[1].value == states[1].value
 
     rebuilt = SymbolicRegression.MutationFunctionsModule.with_contents_for_mutation(
-        template,
-        SharedExpression(Node{Float64}(; val=4.0); operators),
-        :f,
+        template, SharedExpression(Node{Float64}(; val=4.0); operators), :f
     )
     rebuilt_states = map(inner -> get_metadata(inner).state, values(get_contents(rebuilt)))
     @test rebuilt_states[1] === rebuilt_states[2]

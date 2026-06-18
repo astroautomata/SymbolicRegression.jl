@@ -4,9 +4,7 @@ using DynamicExpressions: DynamicExpressions as DE
 using SymbolicRegression: SymbolicRegression as SR
 using Mooncake: Mooncake
 
-function SR.ComposableExpressionModule._composable_gradient_tree(
-    gradient::Mooncake.Tangent
-)
+function SR.ComposableExpressionModule._composable_gradient_tree(gradient::Mooncake.Tangent)
     return gradient.fields.tree
 end
 

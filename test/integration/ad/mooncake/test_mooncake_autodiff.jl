@@ -1,6 +1,7 @@
 @testitem "Expression constant optimization with Mooncake" begin
     using SymbolicRegression
-    using SymbolicRegression.ConstantOptimizationModule: EvaluatorContext, optimize_constants
+    using SymbolicRegression.ConstantOptimizationModule:
+        EvaluatorContext, optimize_constants
     using DynamicExpressions:
         DynamicExpressions,
         AbstractExpressionNode,
@@ -86,7 +87,7 @@
 
     @testset "TemplateExpression" begin
         spec = @template_spec(expressions = (f, g)) do x, y, z
-            f(x, y) + 2.0 * g(3.0 * z)
+            return f(x, y) + 2.0 * g(3.0 * z)
         end
         options = Options(; default_args..., expression_spec=spec)
 
@@ -129,7 +130,7 @@
 
     @testset "TemplateExpression with parameters" begin
         spec = @template_spec(expressions = (f, g), parameters = (p=1,),) do x, y, z, w
-            f(x, y) + g(3.0 * z) + p[1] * w
+            return f(x, y) + g(3.0 * z) + p[1] * w
         end
         options = Options(; default_args..., expression_spec=spec)
 
@@ -185,12 +186,11 @@
 
     @testset "TemplateExpression with custom inner fallback" begin
         spec = @template_spec(expressions = (f,), parameters = (p=1,),) do x
-            f(x) + p[1]
+            return f(x) + p[1]
         end
         options = Options(; default_args..., expression_spec=spec)
         wrapped_node = Node{Float64}(;
-            op=3,
-            children=(Node{Float64}(; val=1.2), Node{Float64}(; feature=1)),
+            op=3, children=(Node{Float64}(; val=1.2), Node{Float64}(; feature=1))
         )
         init_tree = TemplateExpression(
             (; f=MooncakeWrappedExpression(wrapped_node; operators=options.operators));

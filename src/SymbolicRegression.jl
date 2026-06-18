@@ -1420,7 +1420,7 @@ using ConstructionBase: ConstructionBase as _
 include("precompile.jl")
 redirect_stdout(devnull) do
     redirect_stderr(devnull) do
-        do_precompilation(Val(:precompile))
+        return do_precompilation(Val(:precompile))
     end
 end
 
