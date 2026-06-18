@@ -2,13 +2,46 @@ module SymbolicRegressionMooncakeExt
 
 using DynamicExpressions: DynamicExpressions as DE
 using SymbolicRegression: SymbolicRegression as SR
-using SymbolicRegression.ConstantOptimizationModule: count_constants_for_optimization
 using Mooncake: Mooncake
+
+function SR.ComposableExpressionModule._composable_gradient_tree(
+    gradient::Mooncake.Tangent
+)
+    return gradient.fields.tree
+end
+
+function SR.ComposableExpressionModule._extract_composable_gradient_for_optimization(
+    gradient::Mooncake.Tangent, ex::SR.ComposableExpression
+)
+    return DE.extract_gradient(gradient, ex)
+end
+
+function SR.TemplateExpressionModule._template_inner_gradient(
+    gradient::Mooncake.Tangent, ::SR.TemplateExpression, key::Symbol
+)
+    tree_gradient = getproperty(gradient.fields.trees, key)
+    @assert(
+        !(tree_gradient isa Mooncake.NoTangent),
+        "Unexpected input type: $(tree_gradient)::$(typeof(tree_gradient))"
+    )
+    return tree_gradient
+end
+
+function SR.TemplateExpressionModule._template_parameter_gradient_data(
+    gradient::Mooncake.Tangent, ::SR.TemplateExpression, key::Symbol
+)
+    param_gradient = getproperty(gradient.fields.metadata.fields._data.parameters, key)
+    @assert(
+        !(param_gradient isa Mooncake.NoTangent),
+        "Unexpected input type: $(param_gradient)::$(typeof(param_gradient))"
+    )
+    return param_gradient.fields._data
+end
 
 function DE.extract_gradient(
     gradient::Mooncake.Tangent, ex::SR.TemplateExpression{T}
 ) where {T}
-    n_const = count_constants_for_optimization(ex)
+    n_const = DE.count_scalar_constants(ex)
     out = Array{T}(undef, n_const)
     i = firstindex(out)
     for (tree_gradient, tree) in zip(values(gradient.fields.trees), values(ex.trees))

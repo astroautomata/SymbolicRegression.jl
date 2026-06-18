@@ -1,10 +1,19 @@
 @testitem "Expression constant optimization with Mooncake" begin
     using SymbolicRegression
-    using SymbolicRegression.ConstantOptimizationModule: optimize_constants
-    using DynamicExpressions: get_scalar_constants
+    using SymbolicRegression.ConstantOptimizationModule: EvaluatorContext, optimize_constants
+    using DynamicExpressions:
+        DynamicExpressions,
+        AbstractExpressionNode,
+        AbstractOperatorEnum,
+        EvalOptions,
+        Metadata,
+        extract_gradient,
+        get_contents,
+        get_scalar_constants
+    using SymbolicRegression: AbstractComposableExpression
     using StableRNGs: StableRNG
     using Mooncake
-    using DifferentiationInterface: AutoMooncake
+    using DifferentiationInterface: AutoMooncake, value_and_gradient
 
     backend = AutoMooncake(; config=nothing)
     default_args = (;
@@ -16,6 +25,32 @@
         optimizer_probability=1.0,
         optimizer_iterations=1000,
     )
+
+    struct MooncakeWrappedExpression{T,N<:AbstractExpressionNode{T},D} <:
+           AbstractComposableExpression{T,N}
+        tree::N
+        metadata::Metadata{D}
+    end
+
+    function MooncakeWrappedExpression(
+        tree::AbstractExpressionNode{T};
+        operators::Union{AbstractOperatorEnum,Nothing}=nothing,
+        variable_names::Union{AbstractVector{<:AbstractString},Nothing}=nothing,
+        eval_options::Union{EvalOptions,Nothing}=nothing,
+    ) where {T}
+        return MooncakeWrappedExpression(
+            tree, Metadata((; operators, variable_names, eval_options))
+        )
+    end
+
+    DynamicExpressions.constructorof(::Type{<:MooncakeWrappedExpression}) =
+        MooncakeWrappedExpression
+
+    function DynamicExpressions.extract_gradient(
+        gradient::Mooncake.Tangent, ex::MooncakeWrappedExpression
+    )
+        return extract_gradient(gradient.fields.tree, get_contents(ex))
+    end
 
     @testset "Expression" begin
         options = Options(; default_args...)
@@ -129,6 +164,15 @@
         @test length(get_scalar_constants(true_tree)[1]) == 5
 
         member = PopMember(dataset, init_tree, options; deterministic=false)
+
+        ctx = EvaluatorContext(dataset, options)
+        _, gradient = value_and_gradient(ctx, backend, init_tree)
+        gradient_constants = SymbolicRegression.extract_gradient_for_optimization(
+            gradient, init_tree
+        )
+        @test length(gradient_constants) == 5
+        @test all(isfinite, gradient_constants)
+
         optimized_member, num_evals = optimize_constants(
             dataset, copy(member), options; rng=rng
         )
@@ -137,5 +181,35 @@
         @test num_evals > 0
 
         @test get_metadata(optimized_member.tree).parameters.p ≈ [0.9]
+    end
+
+    @testset "TemplateExpression with custom inner fallback" begin
+        spec = @template_spec(expressions = (f,), parameters = (p=1,),) do x
+            f(x) + p[1]
+        end
+        options = Options(; default_args..., expression_spec=spec)
+        wrapped_node = Node{Float64}(;
+            op=3,
+            children=(Node{Float64}(; val=1.2), Node{Float64}(; feature=1)),
+        )
+        init_tree = TemplateExpression(
+            (; f=MooncakeWrappedExpression(wrapped_node; operators=options.operators));
+            spec.structure,
+            options.operators,
+            parameters=(; p=[0.5]),
+        )
+
+        rng = StableRNG(2)
+        X = rand(rng, 1, 16)
+        y = @. 1.4 * X[1, :] + 0.7
+        dataset = Dataset(X, y)
+
+        ctx = EvaluatorContext(dataset, options)
+        _, gradient = value_and_gradient(ctx, backend, init_tree)
+        gradient_constants = SymbolicRegression.extract_gradient_for_optimization(
+            gradient, init_tree
+        )
+        @test length(gradient_constants) == 2
+        @test all(isfinite, gradient_constants)
     end
 end

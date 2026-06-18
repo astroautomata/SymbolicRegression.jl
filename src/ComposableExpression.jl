@@ -119,6 +119,16 @@ end
 function CO.count_constants_for_optimization(ex::AbstractComposableExpression)
     return CO.count_constants_for_optimization(convert(Expression, ex))
 end
+function _composable_gradient_tree(grad)
+    return hasproperty(grad, :tree) ? getproperty(grad, :tree) : get_contents(grad)
+end
+function _extract_composable_gradient_for_optimization(grad, ex::ComposableExpression)
+    tree_grad = _composable_gradient_tree(grad)
+    return DE.extract_gradient((; tree=tree_grad, metadata=nothing), convert(Expression, ex))
+end
+function CO.extract_gradient_for_optimization(grad, ex::ComposableExpression)
+    return _extract_composable_gradient_for_optimization(grad, ex)
+end
 
 struct PreallocatedComposableExpression{N}
     tree::N

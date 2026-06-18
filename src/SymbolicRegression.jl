@@ -214,6 +214,10 @@ using Compat: @compat, Fix
         on_cycle_start!,
         prepare_mutation_context,
         condition_mutation!,
+        NoTemplateSharedState, template_shared_state, get_template_shared_state,
+        copy_template_shared_state, attach_template_shared_state,
+        get_template_constants_for_optimization, set_template_constants_for_optimization!,
+        extract_template_gradient_for_optimization,
     )
 )
 #! format: on
@@ -425,7 +429,19 @@ using .SearchUtilsModule:
     infer_popmember_type
 using .LoggingModule: AbstractSRLogger, SRLogger, get_logger
 using .TemplateExpressionModule:
-    TemplateExpression, TemplateStructure, TemplateExpressionSpec, ParamVector, has_params
+    TemplateExpression,
+    TemplateStructure,
+    TemplateExpressionSpec,
+    ParamVector,
+    has_params,
+    NoTemplateSharedState,
+    template_shared_state,
+    get_template_shared_state,
+    copy_template_shared_state,
+    attach_template_shared_state,
+    get_template_constants_for_optimization,
+    set_template_constants_for_optimization!,
+    extract_template_gradient_for_optimization
 using .TemplateExpressionModule: ValidVector, TemplateReturnError
 using .ComposableExpressionModule:
     AbstractComposableExpression,
