@@ -51,7 +51,7 @@ jobs:
             julia-version: "1.10"
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: "Set up Julia"
         uses: julia-actions/setup-julia@v3
         with:
@@ -112,7 +112,7 @@ jobs:
           - julia-version: "1"
             group: ad/mooncake
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: "Set up Julia"
         uses: julia-actions/setup-julia@v3
         with:
@@ -148,7 +148,7 @@ jobs:
     needs: [unit, integration]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Download all coverage artifacts
         uses: actions/download-artifact@v8
         with:
