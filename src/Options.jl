@@ -497,7 +497,7 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
 
 Construct options for `equation_search` and other functions.
 The current arguments have been tuned using the median values from
-https://github.com/MilesCranmer/PySR/discussions/115.
+https://github.com/astroautomata/PySR/discussions/115.
 
 # Arguments
 $(OPTION_DESCRIPTIONS)

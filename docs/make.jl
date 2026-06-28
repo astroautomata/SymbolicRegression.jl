@@ -40,7 +40,7 @@ hero:
       link: /api
     - theme: alt
       text: View on GitHub
-      link: https://github.com/MilesCranmer/SymbolicRegression.jl
+      link: https://github.com/astroautomata/SymbolicRegression.jl
   image:
     src: /logo.png
     alt: SymbolicRegression.jl
@@ -121,10 +121,10 @@ readme = replace(readme, r"\*\*Contents\*\*:.*?(?=## )"s => s"") # Remove Conten
 readme = replace(readme, r"## Contributors ✨.*$"s => s"") # Remove Contributors section onwards
 readme = replace( # Convert video URL to proper video tag wrapped in @raw html for VitePress
     readme,
-    r"https://github.com/MilesCranmer/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0" => """```@raw html
+    r"https://github.com/astroautomata/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0" => """```@raw html
 <div align="center">
 <video width="800" height="600" controls>
-<source src="https://github.com/MilesCranmer/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0" type="video/mp4">
+<source src="https://github.com/astroautomata/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0" type="video/mp4">
 </video>
 </div>
 ```""",
@@ -286,7 +286,7 @@ else
     # Default astroautomata deployment
     deploy_decision = Documenter.deploy_folder(
         deploy_config;
-        repo="github.com/MilesCranmer/SymbolicRegression.jl",
+        repo="github.com/astroautomata/SymbolicRegression.jl",
         devbranch="master",
         devurl="dev",
         push_preview=true,
@@ -322,7 +322,7 @@ makedocs(;
     clean=get(ENV, "DOCUMENTER_PRODUCTION", "false") == "true",
     warnonly=[:docs_block, :cross_references, :missing_docs],
     format=DocumenterVitepress.MarkdownVitepress(;
-        repo="github.com/MilesCranmer/SymbolicRegression.jl",
+        repo="github.com/astroautomata/SymbolicRegression.jl",
         devbranch="master",
         devurl="dev",
         deploy_url=nothing,
@@ -422,7 +422,7 @@ deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
 
 if deployment_target == "astroautomata"
     DocumenterVitepress.deploydocs(;
-        repo="github.com/MilesCranmer/SymbolicRegression.jl.git",
+        repo="github.com/astroautomata/SymbolicRegression.jl.git",
         push_preview=true,
         target="build",
         devbranch="master",

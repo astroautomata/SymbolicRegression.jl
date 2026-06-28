@@ -614,7 +614,7 @@ function choose_best(;
     trees, losses::Vector{L}, scores, complexities, options=nothing
 ) where {L<:LOSS_TYPE}
     # Same as in PySR:
-    # https://github.com/MilesCranmer/PySR/blob/e74b8ad46b163c799908b3aa4d851cf8457c79ef/pysr/sr.py#L2318-L2332
+    # https://github.com/astroautomata/PySR/blob/e74b8ad46b163c799908b3aa4d851cf8457c79ef/pysr/sr.py#L2318-L2332
     # threshold = 1.5 * minimum_loss
     # Then, we get max score of those below the threshold.
     if !isnothing(options) && options.loss_scale == :linear
@@ -652,7 +652,7 @@ MMI.metadata_pkg(
     AbstractSymbolicRegressor;
     name="SymbolicRegression",
     uuid="8254be44-1295-4e6a-a16d-46603ac705cb",
-    url="https://github.com/MilesCranmer/SymbolicRegression.jl",
+    url="https://github.com/astroautomata/SymbolicRegression.jl",
     julia=true,
     license="Apache-2.0",
     is_wrapper=false,

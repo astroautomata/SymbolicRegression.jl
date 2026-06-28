@@ -3,7 +3,7 @@
 
 SymbolicRegression.jl searches for symbolic expressions which optimize a particular objective.
 
-https://github.com/MilesCranmer/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0
+https://github.com/astroautomata/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0
 
 <table>
 <thead>
@@ -18,7 +18,7 @@ https://github.com/MilesCranmer/SymbolicRegression.jl/assets/7593028/f5b68f1f-98
 <tr>
 <td align="center"><a href="https://juliahub.com/ui/Packages/SymbolicRegression/X2eIS"><img src="https://juliahub.com/docs/SymbolicRegression/version.svg" alt="version"></a></td>
 <td align="center"><a href="https://ai.damtp.cam.ac.uk/symbolicregression/dev/"><img src="https://img.shields.io/badge/docs-dev-blue.svg" alt="Dev"></a></td>
-<td align="center"><a href="https://github.com/MilesCranmer/PySR/discussions"><img src="https://img.shields.io/badge/discussions-github-informational" alt="Discussions"></a></td>
+<td align="center"><a href="https://github.com/astroautomata/PySR/discussions"><img src="https://img.shields.io/badge/discussions-github-informational" alt="Discussions"></a></td>
 <td align="center"><a href="https://arxiv.org/abs/2305.01582"><img src="https://img.shields.io/badge/arXiv-2305.01582-b31b1b" alt="Paper"></a></td>
 </tr>
 <tr>
@@ -28,15 +28,15 @@ https://github.com/MilesCranmer/SymbolicRegression.jl/assets/7593028/f5b68f1f-98
 <td align="center"></td>
 </tr>
 <tr>
-<td align="center"><a href=".github/workflows/CI.yml"><img src="https://github.com/MilesCranmer/SymbolicRegression.jl/workflows/CI/badge.svg" alt="CI"></a></td>
-<td align="center"><a href="https://coveralls.io/github/MilesCranmer/SymbolicRegression.jl?branch=master"><img src="https://coveralls.io/repos/github/MilesCranmer/SymbolicRegression.jl/badge.svg?branch=master" alt="Coverage Status"></a></td>
+<td align="center"><a href=".github/workflows/CI.yml"><img src="https://github.com/astroautomata/SymbolicRegression.jl/workflows/CI/badge.svg" alt="CI"></a></td>
+<td align="center"><a href="https://coveralls.io/github/astroautomata/SymbolicRegression.jl?branch=master"><img src="https://coveralls.io/repos/github/astroautomata/SymbolicRegression.jl/badge.svg?branch=master" alt="Coverage Status"></a></td>
 <td align="center"></td>
 <td align="center"></td>
 </tr>
 </tbody>
 </table>
 
-Check out [PySR](https://github.com/MilesCranmer/PySR) for
+Check out [PySR](https://github.com/astroautomata/PySR) for
 a Python frontend.
 [Cite this software](https://arxiv.org/abs/2305.01582)
 
@@ -276,7 +276,7 @@ end
 ## Contributors ✨
 
 We are eager to welcome new contributors!
-If you have an idea for a new feature, don't hesitate to share it on the [issues](https://github.com/MilesCranmer/SymbolicRegression.jl/issues) page or [forums](https://github.com/MilesCranmer/PySR/discussions).
+If you have an idea for a new feature, don't hesitate to share it on the [issues](https://github.com/astroautomata/SymbolicRegression.jl/issues) page or [forums](https://github.com/astroautomata/PySR/discussions).
 
 <!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
 <!-- prettier-ignore-start -->
