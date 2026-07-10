@@ -31,19 +31,26 @@ function create_search_benchmark()
         maxsize=30,
         verbosity=0,
         progress=false,
-        mutation_weights=MutationWeights(),
+        mutation_weights=MutationWeights(;
+            mutate_constant=0.0353,
+            mutate_operator=3.63,
+            mutate_feature=0.1,
+            swap_operands=0.0,
+            rotate_tree=1.42,
+            add_node=0.0771,
+            insert_node=2.44,
+            delete_node=0.369,
+            simplify=0.00148,
+            randomize=0.00695,
+            do_nothing=0.431,
+            optimize=0.0,
+            backsolve=0.0,
+            form_connection=0.0,
+            break_connection=0.0,
+        ),
         loss=(pred, target) -> (pred - target)^2,
         extra_kws...,
     )
-    if hasfield(MutationWeights, :swap_operands)
-        option_kws.mutation_weights.swap_operands = 0.0
-    end
-    if hasfield(MutationWeights, :form_connection)
-        option_kws.mutation_weights.form_connection = 0.0
-    end
-    if hasfield(MutationWeights, :break_connection)
-        option_kws.mutation_weights.break_connection = 0.0
-    end
     seeds = 1:3
     niterations = 30
     # We create an equation that cannot be found exactly, so the search
@@ -84,7 +91,9 @@ end
 function create_utils_benchmark()
     suite = BenchmarkGroup()
 
-    options = Options(; unary_operators=[sin, cos], binary_operators=[+, -, *, /])
+    options = Options(;
+        defaults=v"1.0.0", unary_operators=[sin, cos], binary_operators=[+, -, *, /]
+    )
 
     suite["best_of_sample"] = @benchmarkable(
         best_of_sample(pop, rss, $options),
@@ -116,6 +125,7 @@ function create_utils_benchmark()
             mutation_weights=MutationWeights(;
                 mutate_constant=1.0,
                 mutate_operator=1.0,
+                mutate_feature=0.1,
                 swap_operands=1.0,
                 rotate_tree=1.0,
                 add_node=1.0,
@@ -127,6 +137,7 @@ function create_utils_benchmark()
                 break_connection=0.0,
             );
             options=Options(;
+                defaults=v"1.0.0",
                 unary_operators=[sin, cos],
                 binary_operators=[+, -, *, /],
                 mutation_weights,
@@ -173,6 +184,7 @@ function create_utils_benchmark()
     suite["compute_complexity_x10"] = let s = BenchmarkGroup()
         for T in (Float64, Int, nothing)
             options = Options(;
+                defaults=v"1.0.0",
                 unary_operators=[sin, cos],
                 binary_operators=[+, -, *, /],
                 complexity_of_constants=T === nothing ? T : T(1),
@@ -227,6 +239,7 @@ function create_utils_benchmark()
 
     ntrees = 10
     options = Options(;
+        defaults=v"1.0.0",
         unary_operators=[sin, cos],
         binary_operators=[+, -, *, /],
         maxsize=30,

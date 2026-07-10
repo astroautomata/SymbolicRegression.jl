@@ -65,6 +65,8 @@ end
     @test current_mutation_weights == convert(Vector, v2_defaults.mutation_weights)
     @test current_mutation_weights == convert(Vector, MutationWeights())
     @test current_mutation_weights != convert(Vector, pre_v2_defaults.mutation_weights)
+    @test pre_v2_defaults.mutation_weights.mutate_feature == 0.1
+    @test v2_defaults.mutation_weights.mutate_feature == 0.15
 
     # These used to be hardcoded constructor defaults, so this checks the
     # versioned bundle is not silently masked before OptionsStruct construction.
