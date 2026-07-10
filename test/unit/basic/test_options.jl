@@ -42,7 +42,6 @@ end
         :ncycles_per_iteration,
         :adaptive_parsimony_scaling,
         :use_frequency,
-        :use_frequency_in_tournament,
         :optimizer_nrestarts,
         :optimizer_probability,
         :optimizer_iterations,
@@ -58,6 +57,9 @@ end
     for field in changed_fields
         @test getproperty(pre_v2_defaults, field) != getproperty(v2_defaults, field)
     end
+    @test current_defaults.use_frequency_in_tournament
+    @test v2_defaults.use_frequency_in_tournament
+    @test pre_v2_defaults.use_frequency_in_tournament
 
     current_mutation_weights = convert(Vector, current_defaults.mutation_weights)
     @test current_mutation_weights == convert(Vector, v2_defaults.mutation_weights)
