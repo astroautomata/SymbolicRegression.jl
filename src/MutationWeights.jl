@@ -104,17 +104,17 @@ will be normalized to sum to 1.0 after initialization.
 - [`AbstractMutationWeights`](@ref SymbolicRegression.CoreModule.MutationWeightsModule.AbstractMutationWeights): Use to define custom mutation weight types.
 """
 Base.@kwdef mutable struct MutationWeights <: AbstractMutationWeights
-    mutate_constant::Float64 = 0.0353
-    mutate_operator::Float64 = 3.63
-    mutate_feature::Float64 = 0.1
-    swap_operands::Float64 = 0.00608
-    rotate_tree::Float64 = 1.42
-    add_node::Float64 = 0.0771
-    insert_node::Float64 = 2.44
-    delete_node::Float64 = 0.369
-    simplify::Float64 = 0.00148
-    randomize::Float64 = 0.00695
-    do_nothing::Float64 = 0.431
+    mutate_constant::Float64 = 0.0346
+    mutate_operator::Float64 = 0.01
+    mutate_feature::Float64 = 0.15
+    swap_operands::Float64 = 0.80
+    rotate_tree::Float64 = 0.20
+    add_node::Float64 = 4.70
+    insert_node::Float64 = 0.06
+    delete_node::Float64 = 2.10
+    simplify::Float64 = 0.0020
+    randomize::Float64 = 0.0001
+    do_nothing::Float64 = 0.26
     optimize::Float64 = 0.0
     backsolve::Float64 = 0.0
     form_connection::Float64 = 0.5

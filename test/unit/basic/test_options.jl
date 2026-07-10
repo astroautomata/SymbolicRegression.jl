@@ -59,6 +59,11 @@ end
         @test getproperty(pre_v2_defaults, field) != getproperty(v2_defaults, field)
     end
 
+    current_mutation_weights = convert(Vector, current_defaults.mutation_weights)
+    @test current_mutation_weights == convert(Vector, v2_defaults.mutation_weights)
+    @test current_mutation_weights == convert(Vector, MutationWeights())
+    @test current_mutation_weights != convert(Vector, pre_v2_defaults.mutation_weights)
+
     # These used to be hardcoded constructor defaults, so this checks the
     # versioned bundle is not silently masked before OptionsStruct construction.
     for (version, defaults) in ((v"1.0.0", pre_v2_defaults), (v"2.0.0-alpha", v2_defaults))
