@@ -225,7 +225,7 @@ We also need to manually define the `loss_type`, since it's not inferrable from
 binary_operators = (concat, interleave)
 unary_operators = (head, tail, reverse)
 hparams = (;
-    defaults=v"1.0.0",
+    defaults=v"1.0.0",  #src
     batching=true,
     batch_size=32,
     maxsize=20,

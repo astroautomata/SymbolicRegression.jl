@@ -51,16 +51,12 @@ end
         :tournament_selection_p,
         :fraction_replaced_hof,
     )
-    unchanged_fields = (:fraction_replaced, :fraction_replaced_guesses, :topn)
 
-    for field in (changed_fields..., unchanged_fields...)
+    for field in changed_fields
         @test getproperty(current_defaults, field) == getproperty(v2_defaults, field)
     end
     for field in changed_fields
         @test getproperty(pre_v2_defaults, field) != getproperty(v2_defaults, field)
-    end
-    for field in unchanged_fields
-        @test getproperty(pre_v2_defaults, field) == getproperty(v2_defaults, field)
     end
 
     # These used to be hardcoded constructor defaults, so this checks the

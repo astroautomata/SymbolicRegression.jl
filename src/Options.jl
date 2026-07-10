@@ -1271,10 +1271,7 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
             optimizer_f_calls_limit=3000,
             tournament_selection_n=10,
             tournament_selection_p=0.74,
-            fraction_replaced=0.00036,
             fraction_replaced_hof=0.5,
-            fraction_replaced_guesses=0.001,
-            topn=12,
         )
     end
 
