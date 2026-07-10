@@ -30,7 +30,7 @@
         # Test that mutate_feature is included in MutationWeights
         weights = MutationWeights()
         @test hasfield(typeof(weights), :mutate_feature)
-        @test weights.mutate_feature == 0.1
+        @test weights.mutate_feature == 0.15
     end
 
     @testset "get_nfeatures_for_mutation API" begin
