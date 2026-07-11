@@ -438,10 +438,10 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     an instance of `AbstractADType` (see `ADTypes.jl`).
     Default is `nothing`, which means `Optim.jl` will estimate gradients (likely
     with finite differences). You can also pass a symbolic version of the backend
-    type, such as `:Zygote` for Zygote.jl, `:ForwardDiff` for ForwardDiff.jl,
-    or experimental/partially-supported bridges such as `:Enzyme` for Enzyme.jl or
-    `:Mooncake` for Mooncake.jl. Most backends will not
-    work due to incompatibilities, though support for some is gradually being added.
+    type, such as `:Enzyme` for Enzyme.jl, `:ForwardDiff` for ForwardDiff.jl,
+    `:Zygote` for Zygote.jl, or experimental/partially-supported bridges such as
+    `:Mooncake` for Mooncake.jl. Most backends will not work due to incompatibilities,
+    though support for some is gradually being added.
 - `perturbation_factor`: When mutating a constant, either
     multiply or divide by (1+perturbation_factor)^(rand()+1).
 - `probability_negate_constant`: Probability of negating a constant in the equation
