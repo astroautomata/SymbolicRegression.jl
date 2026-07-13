@@ -310,6 +310,8 @@ using .CoreModule.UtilsModule: get_birth_order
 using .PopulationModule: Population, best_sub_pop, record_population, best_of_sample
 using .HallOfFameModule:
     HallOfFame, calculate_pareto_frontier, string_dominating_pareto_curve
+using .ConstantOptimizationModule: optimize_constants
+using Optim: Optim
 using .MutateModule: mutate!, condition_mutation_weights!, MutationResult
 using .SingleIterationModule: s_r_cycle, optimize_and_simplify_population
 using .ProgressBarsModule: WrappedProgressBar
@@ -1165,6 +1167,9 @@ function _format_output(
     options::AbstractOptions,
 )
     nout = length(datasets)
+    if options.final_optimizer_iterations > 0
+        _final_constant_optimization!(state, datasets, options)
+    end
     out_hof = if ropt.dim_out == 1
         embed_metadata(only(state.halls_of_fame), options, only(datasets))
     else
@@ -1175,6 +1180,25 @@ function _format_output(
     else
         return out_hof
     end
+end
+
+function _final_constant_optimization!(state, datasets, options)
+    final_opts = Optim.Options(;
+        iterations=options.final_optimizer_iterations,
+        f_calls_limit=options.optimizer_options.f_calls_limit,
+        show_warnings=false,
+    )
+    for j in eachindex(datasets, state.halls_of_fame)
+        dataset = datasets[j]
+        hof = state.halls_of_fame[j]
+        for i in eachindex(hof.members, hof.exists)
+            hof.exists[i] || continue
+            optimize_constants(
+                dataset, hof.members[i], options; optimizer_options_override=final_opts
+            )
+        end
+    end
+    return nothing
 end
 
 @stable default_mode = "disable" function _dispatch_s_r_cycle(

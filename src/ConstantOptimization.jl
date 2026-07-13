@@ -31,19 +31,16 @@ end
     member::P,
     options::AbstractOptions;
     rng::AbstractRNG=default_rng(),
+    optimizer_options_override::Union{Nothing,Optim.Options}=nothing,
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
     can_optimize(member.tree, options) || return (member, 0.0)
     nconst = count_constants_for_optimization(member.tree)
     nconst == 0 && return (member, 0.0)
+    opt_opts = something(optimizer_options_override, options.optimizer_options)
     if nconst == 1 && !(T <: Complex)
         algorithm = Optim.Newton(; linesearch=LineSearches.BackTracking())
         return _optimize_constants(
-            dataset,
-            member,
-            specialized_options(options),
-            algorithm,
-            options.optimizer_options,
-            rng,
+            dataset, member, specialized_options(options), algorithm, opt_opts, rng
         )
     end
     return _optimize_constants(
@@ -53,7 +50,7 @@ end
         # We use specialized options here due to Enzyme being
         # more particular about dynamic dispatch
         options.optimizer_algorithm,
-        options.optimizer_options,
+        opt_opts,
         rng,
     )
 end

@@ -280,6 +280,7 @@ struct Options{
     use_recorder::Bool
     popmember_type::Type{PM}
     backsolve::BacksolveOptions
+    final_optimizer_iterations::Int
 end
 
 function Base.print(io::IO, @nospecialize(options::Options))

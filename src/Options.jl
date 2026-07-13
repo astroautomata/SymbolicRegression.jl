@@ -434,6 +434,11 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     we refer to the documentation on `Optim.Options` from the `Optim.jl` package.
     Options can be provided here as `NamedTuple`, e.g. `(iterations=16,)`, as a
     `Dict`, e.g. Dict(:x_tol => 1.0e-32,), or as an `Optim.Options` instance.
+- `final_optimizer_iterations`: Number of BFGS iterations for a post-search
+    constant optimization pass on the final Pareto frontier equations.
+    Set to 0 to disable (the default). When >0, each hall-of-fame member is
+    re-optimized with this many iterations, which can improve constants that
+    the search-time optimization (with fewer iterations) did not fully converge.
 - `autodiff_backend`: The backend to use for differentiation, which should be
     an instance of `AbstractADType` (see `ADTypes.jl`).
     Default is `nothing`, which means `Optim.jl` will estimate gradients (likely
@@ -658,6 +663,7 @@ $(OPTION_DESCRIPTIONS)
     use_recorder::Bool=false,
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
+    final_optimizer_iterations::Int=0,
     ### Not search options; just construction options:
     define_helper_functions::Bool=true,
     #########################################
@@ -1012,6 +1018,7 @@ $(OPTION_DESCRIPTIONS)
     backsolve = something(backsolve, BacksolveOptions())
 
     @assert print_precision > 0
+    @assert final_optimizer_iterations >= 0
 
     _autodiff_backend = if autodiff_backend isa Union{Nothing,AbstractADType}
         autodiff_backend
@@ -1114,6 +1121,7 @@ $(OPTION_DESCRIPTIONS)
         use_recorder,
         popmember_type,
         backsolve,
+        final_optimizer_iterations,
     )
 
     return options
