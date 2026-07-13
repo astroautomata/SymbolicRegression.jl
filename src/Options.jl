@@ -1,5 +1,20 @@
 module OptionsModule
 
+abstract type AbstractHallOfFameCriteria end
+
+struct HallOfFameCriteria{N} <: AbstractHallOfFameCriteria
+    extra_axes::NTuple{N,Symbol}
+end
+
+function HallOfFameCriteria(extra_axes::Vararg{Symbol,N}) where {N}
+    any(==(:complexity), extra_axes) && throw(
+        ArgumentError("Do not include :complexity in HallOfFameCriteria; it is implicit."),
+    )
+    length(extra_axes) == length(unique(extra_axes)) ||
+        throw(ArgumentError("HallOfFameCriteria extra_axes must be unique"))
+    return HallOfFameCriteria{N}(extra_axes)
+end
+
 using DispatchDoctor: @unstable
 using Optim: Optim
 using DynamicExpressions:
@@ -656,6 +671,7 @@ $(OPTION_DESCRIPTIONS)
     una_constraints=nothing,
     terminal_width::Union{Nothing,Integer}=nothing,
     use_recorder::Bool=false,
+    hall_of_fame_criteria::AbstractHallOfFameCriteria=HallOfFameCriteria(),
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
     ### Not search options; just construction options:
@@ -1038,6 +1054,7 @@ $(OPTION_DESCRIPTIONS)
         expression_type,
         typeof(expression_options),
         typeof(set_mutation_weights),
+        typeof(hall_of_fame_criteria),
         popmember_type,
         turbo,
         bumper,
@@ -1112,6 +1129,7 @@ $(OPTION_DESCRIPTIONS)
         deterministic,
         define_helper_functions,
         use_recorder,
+        hall_of_fame_criteria,
         popmember_type,
         backsolve,
     )

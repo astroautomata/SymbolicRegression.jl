@@ -108,11 +108,15 @@ end
 
     # Create a simple test case with negative loss
     hof = HallOfFame(options_log, dataset)
-    hof.members[1].tree = Expression(
-        Node{Float64}(; feature=1); operators=nothing, variable_names=nothing
+    member = PopMember(
+        Expression(Node{Float64}(; feature=1); operators=nothing, variable_names=nothing),
+        1.0,
+        -1.0,
+        options_log,
+        1;
+        deterministic=false,
     )
-    hof.members[1].loss = -1.0
-    hof.exists[1] = true
+    hof.cells[1][()] = copy(member)
 
     # With :log scale, should throw a DomainError with a helpful message
     err = try
@@ -150,11 +154,15 @@ end
 
     # Create a minimal Hall of Fame with one element
     hof = HallOfFame(options_log, dataset)
-    hof.members[1].tree = Expression(
-        Node{Float64}(; feature=1); operators=nothing, variable_names=nothing
+    member = PopMember(
+        Expression(Node{Float64}(; feature=1); operators=nothing, variable_names=nothing),
+        1.0,
+        0.5,
+        options_log,
+        1;
+        deterministic=false,
     )
-    hof.members[1].loss = 0.5
-    hof.exists[1] = true
+    hof.cells[1][()] = copy(member)
 
     # Test with log scale (should show Score column)
     output_log = string_dominating_pareto_curve(hof, dataset, options_log)

@@ -201,7 +201,7 @@ end
     fit!(mach)
     # Ensure that the hall of fame is empty:
     _, hof = mach.fitresult.state
-    hof.exists .= false
+    foreach(empty!, hof.cells)
     # Recompute the report:
     mach.report[:fit] = SymbolicRegression.MLJInterfaceModule.full_report(
         model, mach.fitresult
@@ -220,7 +220,7 @@ end
     # Ensure that the hall of fame is empty:
     _, hofs = mach.fitresult.state
     foreach(hofs) do hof
-        hof.exists .= false
+        foreach(empty!, hof.cells)
     end
     mach.report[:fit] = SymbolicRegression.MLJInterfaceModule.full_report(
         model, mach.fitresult

@@ -4,10 +4,9 @@ using ADTypes: AutoEnzyme
 using DynamicExpressions: AbstractExpression, string_tree, simplify_tree!, combine_operators
 using ..UtilsModule: @threads_if
 using ..CoreModule: AbstractOptions, Dataset, RecordType, create_expression, batch
-using ..ComplexityModule: compute_complexity
-using ..PopMemberModule: generate_reference
+using ..PopMemberModule: AbstractPopMember, generate_reference
 using ..PopulationModule: Population, finalize_costs
-using ..HallOfFameModule: HallOfFame
+using ..HallOfFameModule: HallOfFame, update_hall_of_fame!
 using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..RegularizedEvolutionModule: reg_evol_cycle
 using ..LossFunctionsModule: eval_cost
@@ -26,8 +25,15 @@ function s_r_cycle(
     options::AbstractOptions,
     record::RecordType,
 )::Tuple{
-    P,HallOfFame{T,L,N},Float64
-} where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:Population{T,L,N}}
+    P,HallOfFame{T,L,N,PM},Float64
+} where {
+    T,
+    L,
+    D<:Dataset{T,L},
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    P<:Population{T,L,N,PM},
+}
     max_temp = 1.0
     min_temp = 0.0
     if !options.annealing
@@ -51,14 +57,7 @@ function s_r_cycle(
         )
         num_evals += tmp_num_evals
         for member in pop.members
-            size = compute_complexity(member, options)
-            if 0 < size <= options.maxsize && (
-                !best_examples_seen.exists[size] ||
-                member.cost < best_examples_seen.members[size].cost
-            )
-                best_examples_seen.exists[size] = true
-                best_examples_seen.members[size] = copy(member)
-            end
+            update_hall_of_fame!(best_examples_seen, member, options)
         end
     end
 
