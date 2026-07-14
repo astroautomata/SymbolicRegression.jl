@@ -603,7 +603,13 @@ function DE.string_tree(
     expressions = get_contents(ex)
     num_features = get_metadata(ex).structure.num_features
     total_num_features = max(values(num_features)...)
-    variable_names = ['#' * string(i) for i in 1:total_num_features]
+    real_variable_names = get_metadata(ex).variable_names
+    variable_names = if real_variable_names !== nothing &&
+        length(real_variable_names) >= total_num_features
+        real_variable_names[1:total_num_features]
+    else
+        ['#' * string(i) for i in 1:total_num_features]
+    end
     parameters = has_params(ex) ? get_metadata(ex).parameters : NamedTuple()
     all_keys = (keys(num_features)..., keys(parameters)...)
     colors = _colors(Val(length(all_keys)))
