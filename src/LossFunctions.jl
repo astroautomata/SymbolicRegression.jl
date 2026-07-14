@@ -47,14 +47,8 @@ function _loss(
 end
 
 function _weighted_loss(
-    x::AbstractArray{T}, y::AbstractArray{T}, w::AbstractArray{W}, loss::LT
-) where {T,W,LT<:Union{Function,SupervisedLoss}}
-    if W !== T && !(W <: Real)
-        return error(
-            "Element type of `x` is $(T), element type of `y` is $(T), and element type of `w` is $(W). " *
-            "The weight type must either match `x`/`y`, or be a subtype of `Real`.",
-        )
-    end
+    x::AbstractArray{T}, y::AbstractArray{T}, w::AbstractArray, loss::LT
+) where {T,LT<:Union{Function,SupervisedLoss}}
     if loss isa SupervisedLoss
         return sum(loss, x, y, w; normalize=true)
     else

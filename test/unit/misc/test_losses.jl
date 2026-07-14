@@ -72,16 +72,4 @@
 
         @test _weighted_loss(x, y, w, L2DistLoss()) isa Real
     end
-
-    # Non-real, non-matching weight element types still error
-    let
-        x = randn(MersenneTwister(0), Float32, 100)
-        y = randn(MersenneTwister(1), Float32, 100)
-        w = randn(MersenneTwister(2), ComplexF64, 100)
-
-        @test_throws(
-            "must either match `x`/`y`, or be a subtype of `Real`",
-            _weighted_loss(x, y, w, L1DistLoss())
-        )
-    end
 end
