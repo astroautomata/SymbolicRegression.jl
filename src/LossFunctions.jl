@@ -47,7 +47,7 @@ function _loss(
 end
 
 function _weighted_loss(
-    x::AbstractArray{T}, y::AbstractArray{T}, w::AbstractArray, loss::LT
+    x::AbstractArray{T}, y::AbstractArray{T}, w::AbstractArray{T}, loss::LT
 ) where {T,LT<:Union{Function,SupervisedLoss}}
     if loss isa SupervisedLoss
         return sum(loss, x, y, w; normalize=true)

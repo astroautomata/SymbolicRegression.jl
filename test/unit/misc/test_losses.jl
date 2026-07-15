@@ -63,13 +63,28 @@
             "Element type of `x` is Float32,", _weighted_loss(x, y, w, L1DistLoss())
         )
     end
+end
 
-    # Real weights are allowed alongside complex `x`/`y`
-    let
-        x = randn(MersenneTwister(0), ComplexF64, 100)
-        y = randn(MersenneTwister(1), ComplexF64, 100)
-        w = abs.(randn(MersenneTwister(2), Float64, 100))
+@testitem "Real weights are promoted alongside complex-valued data" begin
+    # Regression test for #477: `weights` used to be required to have the
+    # exact same element type as `X`/`y`, so real-valued weights couldn't be
+    # used with complex-valued data even though there's no numerical reason
+    # to forbid it. `equation_search` now converts `weights` to match `X`/`y`'s
+    # element type before the search starts.
+    using SymbolicRegression
+    using SymbolicRegression: calculate_pareto_frontier
 
-        @test _weighted_loss(x, y, w, L2DistLoss()) isa Real
-    end
+    n = 20
+    X = reshape(range(0, 1, n), 1, n) .+ 0im
+    y = vec(@. X + X^2 * im)
+    weights = ones(length(y))  # real, while X/y are ComplexF64
+
+    options = Options(; binary_operators=[+, *], populations=4)
+    hof = equation_search(
+        X, y; niterations=1, options, parallelism=:serial, weights=weights
+    )
+    dominating = calculate_pareto_frontier(hof)
+
+    @test !isempty(dominating)
+    @test all(m -> isfinite(m.loss), dominating)
 end
