@@ -115,17 +115,17 @@ end
     # zero-valued constant away from zero, so guesses depending on nonzero
     # parameters were effectively unoptimizable.
     using SymbolicRegression
-    using SymbolicRegression: calculate_pareto_frontier
+    using SymbolicRegression: calculate_pareto_frontier, get_metadata
     using Random: MersenneTwister
     using Test
 
-    structure = TemplateStructure{(:f,),(:p1,)}(
-        ((; f), (; p1), (x, cat)) -> f(x, p1[cat]); num_parameters=(; p1=4)
-    )
+    template = @template_spec(expressions=(f,), parameters=(p1=4,)) do x, cat
+        f(x, p1[cat])
+    end
     options = Options(;
         binary_operators=[+, -, *, /],
         unary_operators=[sqrt],
-        expression_spec=TemplateExpressionSpec(; structure),
+        expression_spec=template,
         optimizer_nrestarts=8,
         deterministic=true,
         seed=0,
@@ -153,9 +153,14 @@ end
     )
     dominating = calculate_pareto_frontier(hof)
 
-    # Before the fix, the parameters stay at their zero-initialized values,
-    # the `1/p1[cat]` term blows up, and loss never leaves Inf.
-    @test any(m -> isfinite(m.loss) && m.loss < 1e-6, dominating)
+    # Before the fix, the parameters stay at their zero-initialized values
+    # (the `1/p1[cat]` term blows up and loss never leaves Inf), so check
+    # directly that the recovered parameters are close to the true values,
+    # rather than relying on an opaque loss threshold.
+    best = argmin(m -> m.loss, dominating)
+    recovered_p1 = get_metadata(best.tree).parameters.p1._data
+    @test isfinite(best.loss)
+    @test maximum(abs.(recovered_p1 .- p1_true)) < 1e-3
 end
 
 @testitem "NamedTuple guesses with different variable names" begin
