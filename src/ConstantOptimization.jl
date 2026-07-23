@@ -58,6 +58,58 @@ By default this forwards to `extract_gradient`.
 """
 extract_gradient_for_optimization(grad, ex::AbstractExpression) = extract_gradient(grad, ex)
 
+"""
+    count_optimizable_parameters(ex, options)
+
+Return the number of parameters from `ex` that should be optimized under `options`.
+
+By default this forwards to [`count_constants_for_optimization`](@ref). Custom
+expression integrations may overload this method to make parameter selection depend
+on the active options.
+"""
+function count_optimizable_parameters(ex, options)
+    return count_constants_for_optimization(ex)
+end
+
+"""
+    get_optimizable_parameters(ex, options) -> x0, refs
+
+Flatten the parameters from `ex` that should be optimized under `options` into `x0`.
+The returned `refs` object is passed unchanged to
+[`set_optimizable_parameters!`](@ref) and
+[`extract_optimizable_gradient`](@ref).
+
+By default this forwards to [`get_constants_for_optimization`](@ref).
+"""
+function get_optimizable_parameters(ex, options)
+    return get_constants_for_optimization(ex)
+end
+
+"""
+    set_optimizable_parameters!(ex, x, refs)
+
+Set the optimizable parameters of `ex` from `x`, using the opaque `refs` object
+returned by [`get_optimizable_parameters`](@ref).
+
+By default this forwards to [`set_constants_for_optimization!`](@ref).
+"""
+function set_optimizable_parameters!(ex, x, refs)
+    return set_constants_for_optimization!(ex, x, refs)
+end
+
+"""
+    extract_optimizable_gradient(grad, ex, refs)
+
+Extract the gradient of the selected parameters in the same order returned by
+[`get_optimizable_parameters`](@ref). The `refs` object is the exact object returned
+by that call, allowing custom integrations to preserve an active parameter subset.
+
+By default this forwards to [`extract_gradient_for_optimization`](@ref).
+"""
+function extract_optimizable_gradient(grad, ex, refs)
+    return extract_gradient_for_optimization(grad, ex)
+end
+
 @unstable function optimize_constants(
     dataset::Dataset{T,L},
     member::P,
@@ -65,7 +117,7 @@ extract_gradient_for_optimization(grad, ex::AbstractExpression) = extract_gradie
     rng::AbstractRNG=default_rng(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
     can_optimize(member.tree, options) || return (member, 0.0)
-    x0, refs = get_constants_for_optimization(member.tree)
+    x0, refs = get_optimizable_parameters(member.tree, options)
     nconst = length(x0)
     nconst == 0 && return (member, 0.0)
     if nconst == 1 && !(T <: Complex)
@@ -112,7 +164,7 @@ end
 function _optimize_constants(
     dataset, member::P, options, algorithm, optimizer_options, rng
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
-    x0, refs = get_constants_for_optimization(member.tree)
+    x0, refs = get_optimizable_parameters(member.tree, options)
     return _optimize_constants(
         dataset, member, x0, refs, options, algorithm, optimizer_options, rng
     )
@@ -146,7 +198,7 @@ function _optimize_constants_inner(
     end
 
     if result.minimum < baseline
-        set_constants_for_optimization!(member.tree, result.minimizer, refs)
+        set_optimizable_parameters!(member.tree, result.minimizer, refs)
         member.loss = f(result.minimizer; regularization=true)
         member.cost = loss_to_cost(
             member.loss, dataset.use_baseline, dataset.baseline_loss, member, options
@@ -155,7 +207,7 @@ function _optimize_constants_inner(
         num_evals += eval_fraction
     else
         # Reset to original state
-        set_constants_for_optimization!(member.tree, x0, refs)
+        set_optimizable_parameters!(member.tree, x0, refs)
     end
 
     return member, num_evals
@@ -175,7 +227,7 @@ struct Evaluator{N<:AbstractExpression,R,C<:EvaluatorContext} <: Function
     ctx::C
 end
 function (e::Evaluator)(x::AbstractVector; regularization=false)
-    set_constants_for_optimization!(e.tree, x, e.refs)
+    set_optimizable_parameters!(e.tree, x, e.refs)
     return e.ctx(e.tree; regularization)
 end
 
@@ -203,11 +255,11 @@ end
 
 function (g::GradEvaluator{<:Any,AD})(_, G, x::AbstractVector) where {AD}
     AD isa AutoEnzyme && error("Please load the `Enzyme.jl` package.")
-    set_constants_for_optimization!(g.e.tree, x, g.e.refs)
+    set_optimizable_parameters!(g.e.tree, x, g.e.refs)
     maybe_prep = isnothing(g.prep) ? () : (g.prep,)
     (val, grad) = value_and_gradient(g.e.ctx, maybe_prep..., g.backend, g.e.tree)
     if G !== nothing && grad !== nothing
-        G .= extract_gradient_for_optimization(grad, g.e.tree)
+        G .= extract_optimizable_gradient(grad, g.e.tree, g.e.refs)
     end
     return val
 end

@@ -204,6 +204,8 @@ using Compat: @compat, Fix
         AbstractComposableExpression,
         optimize_constants, get_constants_for_optimization,
         set_constants_for_optimization!, extract_gradient_for_optimization,
+        count_optimizable_parameters, get_optimizable_parameters,
+        set_optimizable_parameters!, extract_optimizable_gradient,
         AbstractPlugin, MutationEvent,
         init_plugin_state,
         on_search_start!, on_search_end!,
@@ -374,7 +376,11 @@ using .ConstantOptimizationModule:
     optimize_constants,
     get_constants_for_optimization,
     set_constants_for_optimization!,
-    extract_gradient_for_optimization
+    extract_gradient_for_optimization,
+    count_optimizable_parameters,
+    get_optimizable_parameters,
+    set_optimizable_parameters!,
+    extract_optimizable_gradient
 using .PopMemberModule:
     AbstractPopMember, PopMember, reset_birth!, popmember_type, expression_type
 using .CoreModule.UtilsModule: get_birth_order

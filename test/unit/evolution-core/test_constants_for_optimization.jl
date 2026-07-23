@@ -1,14 +1,16 @@
-@testitem "Optimizable parameter hooks aggregate constants and template parameters" begin
+@testitem "Generic optimizable hooks aggregate constants and template parameters" begin
     using DynamicExpressions
     using SymbolicRegression
 
     operators = OperatorEnum(; unary_operators=(), binary_operators=(+, *))
     variable_names = ["x1"]
+    options = Options(; operators)
 
     expr = parse_expression("x1 + 2.0"; operators, variable_names)
-    flat = SymbolicRegression.get_constants_for_optimization(expr)[1]
+    flat = SymbolicRegression.get_optimizable_parameters(expr, options)[1]
     @test flat == [2.0]
     @test length(flat) == 1
+    @test SymbolicRegression.count_optimizable_parameters(expr, options) == 1
 
     structure = TemplateStructure{(:f,),(:p,)}(
         ((; f), (; p), (x,)) -> f(x) * p[1]; num_parameters=(; p=1)
@@ -21,12 +23,56 @@
         parameters=(; p=[2.0]),
     )
 
-    params, refs = SymbolicRegression.get_constants_for_optimization(template)
+    params, refs = SymbolicRegression.get_optimizable_parameters(template, options)
     @test params == [3.0, 2.0]
     @test length(params) == 2
+    @test SymbolicRegression.count_optimizable_parameters(template, options) == 2
 
-    SymbolicRegression.set_constants_for_optimization!(template, [4.0, 5.0], refs)
-    @test SymbolicRegression.get_constants_for_optimization(template)[1] == [4.0, 5.0]
+    SymbolicRegression.set_optimizable_parameters!(template, [4.0, 5.0], refs)
+    @test SymbolicRegression.get_optimizable_parameters(template, options)[1] == [4.0, 5.0]
+end
+
+@testitem "Generic optimizable hooks are options- and refs-aware" begin
+    using SymbolicRegression
+
+    mutable struct OptimizableBox{T}
+        values::Vector{T}
+    end
+    struct OptimizableBoxRefs
+        indices::Vector{Int}
+    end
+
+    function SymbolicRegression.count_optimizable_parameters(box::OptimizableBox, options)
+        return count(options.active)
+    end
+    function SymbolicRegression.get_optimizable_parameters(box::OptimizableBox, options)
+        refs = OptimizableBoxRefs(findall(options.active))
+        return box.values[refs.indices], refs
+    end
+    function SymbolicRegression.set_optimizable_parameters!(
+        box::OptimizableBox, x, refs::OptimizableBoxRefs
+    )
+        box.values[refs.indices] = x
+        return box
+    end
+    function SymbolicRegression.extract_optimizable_gradient(
+        grad, ::OptimizableBox, refs::OptimizableBoxRefs
+    )
+        return grad[refs.indices]
+    end
+
+    box = OptimizableBox([1.0, 2.0, 3.0])
+    options = (; active=Bool[true, false, true])
+    params, refs = SymbolicRegression.get_optimizable_parameters(box, options)
+
+    @test SymbolicRegression.count_optimizable_parameters(box, options) == 2
+    @test params == [1.0, 3.0]
+    @test refs.indices == [1, 3]
+    @test SymbolicRegression.extract_optimizable_gradient([0.1, 0.2, 0.3], box, refs) ==
+        [0.1, 0.3]
+
+    SymbolicRegression.set_optimizable_parameters!(box, [4.0, 5.0], refs)
+    @test box.values == [4.0, 2.0, 5.0]
 end
 
 @testitem "Default optimize_constants handles custom optimizable expression state" begin
@@ -144,6 +190,18 @@ end
         loss_function_expression=loss,
         parsimony=0.0,
     )
+
+    generic_params, generic_refs = SymbolicRegression.get_optimizable_parameters(
+        wrapped, options
+    )
+    @test generic_params == initial_params
+    @test SymbolicRegression.extract_optimizable_gradient(
+        gradient, wrapped, generic_refs
+    ) == [-0.5, 0.75]
+    SymbolicRegression.set_optimizable_parameters!(wrapped, [1.5, -0.5], generic_refs)
+    @test SymbolicRegression.get_constants_for_optimization(wrapped)[1] == [1.5, -0.5]
+    SymbolicRegression.set_optimizable_parameters!(wrapped, initial_params, generic_refs)
+
     initial_loss = loss(wrapped, dataset, options)
     member = PopMember(wrapped, initial_loss, initial_loss, options, 1; deterministic=true)
 
