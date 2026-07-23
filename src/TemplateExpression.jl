@@ -605,8 +605,11 @@ function EB.extra_init_params(
     else
         # COV_EXCL_START
         if prototype === nothing
-            NamedTuple{keys(num_parameters)}(
-                map(n -> ParamVector(randn(T, (n,))), values(num_parameters))
+            _initialize_template_parameters(
+                default_rng(),
+                T,
+                num_parameters,
+                options.expression_options.parameter_initializer,
             )
         else
             _copy(get_metadata(prototype).parameters::NamedTuple)
@@ -616,6 +619,49 @@ function EB.extra_init_params(
     # We also need to include the operators here to be consistent with `create_expression`.
     return (; options.operators, options.expression_options..., parameters)
 end
+
+function _initialize_template_parameters(
+    rng::AbstractRNG, ::Type{T}, num_parameters::NamedTuple, parameter_initializer::Nothing
+) where {T}
+    return NamedTuple{keys(num_parameters)}(
+        map(n -> ParamVector(randn(rng, T, (n,))), values(num_parameters))
+    )
+end
+function _initialize_template_parameters(
+    rng::AbstractRNG, ::Type{T}, num_parameters::NamedTuple, parameter_initializer
+) where {T}
+    initialized = parameter_initializer(rng, T, num_parameters)
+    initialized isa NamedTuple || throw(
+        ArgumentError(
+            "`parameter_initializer` must return a `NamedTuple`, got $(typeof(initialized))",
+        ),
+    )
+
+    expected_keys = keys(num_parameters)
+    initialized_keys = keys(initialized)
+    issetequal(initialized_keys, expected_keys) || throw(
+        ArgumentError(
+            "`parameter_initializer` returned keys $(initialized_keys), expected $(expected_keys)",
+        ),
+    )
+
+    parameters = map(expected_keys, values(num_parameters)) do key, expected_length
+        parameter = initialized[key]
+        parameter isa AbstractVector || throw(
+            ArgumentError(
+                "`parameter_initializer` must return an `AbstractVector` for parameter `$(key)`, got $(typeof(parameter))",
+            ),
+        )
+        length(parameter) == expected_length || throw(
+            DimensionMismatch(
+                "`parameter_initializer` returned $(length(parameter)) values for parameter `$(key)`, expected $(expected_length)",
+            ),
+        )
+        return ParamVector(Vector{T}(parameter))
+    end
+    return NamedTuple{expected_keys}(parameters)
+end
+
 function EB.sort_params(params::NamedTuple, ::Type{<:TemplateExpression})
     return (; params.structure, params.operators, params.variable_names, params.parameters)
 end
@@ -1038,16 +1084,32 @@ end
     TemplateExpressionSpec <: AbstractExpressionSpec
 
 (Experimental) Specification for template expressions with pre-defined structure.
+
+# Fields
+- `structure`: The `TemplateStructure` defining how inner expressions and parameters
+    are combined.
+- `inner_expression_type`: The expression type used for each inner expression.
+- `inner_expression_options`: Additional keyword arguments passed to inner expressions.
+- `parameter_initializer`: Optional function called as
+    `parameter_initializer(rng, T, num_parameters)` when creating a new candidate.
+    It must return a `NamedTuple` with the same keys and vector lengths as
+    `num_parameters`. By default, template parameters are initialized with `randn`.
 """
-struct TemplateExpressionSpec{ST<:TemplateStructure,IET,IEO<:NamedTuple} <:
+struct TemplateExpressionSpec{ST<:TemplateStructure,IET,IEO<:NamedTuple,PI} <:
        AbstractExpressionSpec
     structure::ST
     inner_expression_type::Type{IET}
     inner_expression_options::IEO
-    function TemplateExpressionSpec{ST,IET,IEO}(
-        structure, inner_expression_type, inner_expression_options
-    ) where {ST<:TemplateStructure,IET,IEO<:NamedTuple}
-        return new{ST,IET,IEO}(structure, inner_expression_type, inner_expression_options)
+    parameter_initializer::PI
+    function TemplateExpressionSpec{ST,IET,IEO,PI}(
+        structure, inner_expression_type, inner_expression_options, parameter_initializer
+    ) where {ST<:TemplateStructure,IET,IEO<:NamedTuple,PI}
+        return new{ST,IET,IEO,PI}(
+            structure,
+            inner_expression_type,
+            inner_expression_options,
+            parameter_initializer,
+        )
     end
 end
 # Positional form. `::Type{IET}` with a positional default binds IET in the
@@ -1057,18 +1119,22 @@ function TemplateExpressionSpec(
     structure::TemplateStructure,
     (::Type{IET})=ComposableExpression,
     inner_expression_options::NamedTuple=NamedTuple(),
+    parameter_initializer=nothing,
 ) where {IET}
-    return TemplateExpressionSpec{typeof(structure),IET,typeof(inner_expression_options)}(
-        structure, IET, inner_expression_options
+    return TemplateExpressionSpec{
+        typeof(structure),IET,typeof(inner_expression_options),typeof(parameter_initializer)
+    }(
+        structure, IET, inner_expression_options, parameter_initializer
     )
 end
 @unstable function TemplateExpressionSpec(;
     structure::TemplateStructure,
     inner_expression_type::Type=ComposableExpression,
     inner_expression_options::NamedTuple=NamedTuple(),
+    parameter_initializer=nothing,
 )
     return TemplateExpressionSpec(
-        structure, inner_expression_type, inner_expression_options
+        structure, inner_expression_type, inner_expression_options, parameter_initializer
     )
 end
 
@@ -1077,12 +1143,22 @@ ES.get_expression_type(::TemplateExpressionSpec) = TemplateExpression
 # Explicit NamedTuple type pins `inner_expression_type` as `Type{IET}`
 # (a `(; ...)` shorthand widens it to `Type`, killing inference).
 function ES.get_expression_options(
-    spec::TemplateExpressionSpec{ST,IET,IEO}
-) where {ST,IET,IEO}
+    spec::TemplateExpressionSpec{ST,IET,IEO,PI}
+) where {ST,IET,IEO,PI}
     return NamedTuple{
-        (:structure, :inner_expression_type, :inner_expression_options),
-        Tuple{ST,Type{IET},IEO},
-    }((spec.structure, spec.inner_expression_type, spec.inner_expression_options))
+        (
+            :structure,
+            :inner_expression_type,
+            :inner_expression_options,
+            :parameter_initializer,
+        ),
+        Tuple{ST,Type{IET},IEO,PI},
+    }((
+        spec.structure,
+        spec.inner_expression_type,
+        spec.inner_expression_options,
+        spec.parameter_initializer,
+    ),)
 end
 ES.get_node_type(::TemplateExpressionSpec) = Node
 # COV_EXCL_STOP
