@@ -40,6 +40,38 @@
     @test px.tournament == false  # user's instance wins
 end
 
+@testitem "Plugin collections: vectors normalize and defaults are overridable" begin
+    using SymbolicRegression
+    using SymbolicRegression: AbstractPlugin
+    using Test
+
+    struct DefaultProbePlugin <: AbstractPlugin
+        value::Int
+    end
+
+    opts_vector = Options(;
+        binary_operators=[+, *],
+        use_frequency=false,
+        use_frequency_in_tournament=false,
+        plugins=[DefaultProbePlugin(1)],
+    )
+    @test opts_vector.plugins === (DefaultProbePlugin(1),)
+
+    opts_no_defaults = Options(; binary_operators=[+, *], default_plugins=())
+    @test isempty(opts_no_defaults.plugins)
+
+    opts_custom_defaults = Options(;
+        binary_operators=[+, *],
+        plugins=[DefaultProbePlugin(1)],
+        default_plugins=[DefaultProbePlugin(2), AdaptiveParsimonyPlugin()],
+    )
+    @test opts_custom_defaults isa Options
+    @test opts_custom_defaults.plugins isa Tuple
+    @test opts_custom_defaults.plugins[1] === DefaultProbePlugin(1)
+    @test count(p -> p isa DefaultProbePlugin, opts_custom_defaults.plugins) == 1
+    @test count(p -> p isa AdaptiveParsimonyPlugin, opts_custom_defaults.plugins) == 1
+end
+
 @testitem "AdaptiveParsimonyPlugin: hook outputs match the legacy formula" begin
     using SymbolicRegression
     using SymbolicRegression:

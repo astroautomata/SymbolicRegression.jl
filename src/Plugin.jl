@@ -6,7 +6,7 @@ using DispatchDoctor: @unstable
 # Hook naming taxonomy
 # ────────────────────────────────────────────────────────────────────────────
 #
-# All plugin hooks belong to one of six categories. The name's verb/suffix
+# All plugin hooks belong to one of five categories. The name's verb/suffix
 # tells you the contract; the docstring tells you the semantics.
 #
 #   `on_X_start!` / `on_X_end!`   — Observer. Engine fires; plugin reacts.
@@ -23,11 +23,6 @@ using DispatchDoctor: @unstable
 #                                   on top of its own. Composes by sequential
 #                                   in-place mutation in tuple order.
 #
-#   `decide_X`                    — Decider. Returns a `Symbol` / enum the
-#                                   engine acts on. Composes by precedence:
-#                                   first non-default response in tuple order
-#                                   wins. Use for control-flow forks.
-#
 #   `init_X`                      — Factory (one-time). Called once per
 #                                   (plugin, output) at startup. Returns a
 #                                   new instance.
@@ -37,7 +32,7 @@ using DispatchDoctor: @unstable
 #                                   for the worker.
 #
 # When adding a new hook: pick a category, follow the verb shape. If the name
-# feels ambiguous, the contract probably isn't one of these six — rethink
+# feels ambiguous, the contract probably isn't one of these five — rethink
 # whether you need a new category or are forcing the feature into the wrong
 # shape.
 #

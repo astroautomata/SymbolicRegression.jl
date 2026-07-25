@@ -1198,12 +1198,7 @@ function _tear_down!(
     options::AbstractOptions,
 )
     close_reader!(state.stdin_reader)
-    # Drain in-flight workers so `on_search_end!` sees the full worker output
-    # (e.g. so plugins can `take!` from worker-written Channels).
-    if ropt.parallelism == :multiprocessing
-        # TODO: We should unwrap the error monitors here
-        state.we_created_procs && rmprocs(state.procs)
-    elseif ropt.parallelism == :multithreading
+    if ropt.parallelism in (:multiprocessing, :multithreading)
         nout = length(state.worker_output)
         for j in 1:nout, i in eachindex(state.worker_output[j])
             wait(state.worker_output[j][i])
@@ -1213,6 +1208,10 @@ function _tear_down!(
         for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
             on_search_end!(pstate, plugin, state, datasets[j], options, ropt)
         end
+    end
+    if ropt.parallelism == :multiprocessing
+        # TODO: We should unwrap the error monitors here
+        state.we_created_procs && rmprocs(state.procs)
     end
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
