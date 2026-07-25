@@ -26,8 +26,7 @@ using ..CoreModule:
     RecordType,
     max_features,
     create_expression,
-    init_value,
-    NoPluginState
+    init_value
 using ..ComplexityModule: compute_complexity
 using ..PopulationModule: Population
 using ..PopMemberModule: PopMember, AbstractPopMember

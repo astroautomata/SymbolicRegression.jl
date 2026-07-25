@@ -1,8 +1,7 @@
 module RegularizedEvolutionModule
 
 using DynamicExpressions: string_tree
-using ..CoreModule:
-    AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE, NoPluginState
+using ..CoreModule: AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE
 using ..PopulationModule: Population, best_of_sample
 using ..MutateModule: next_generation, crossover_generation
 using ..RecorderModule: @recorder

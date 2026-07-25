@@ -19,7 +19,6 @@ using ..CoreModule:
     max_features,
     dataset_fraction,
     AbstractPlugin,
-    NoPluginState,
     MutationEvent,
     on_mutation_end!,
     mutation_acceptance_multiplier

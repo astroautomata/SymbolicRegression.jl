@@ -98,14 +98,6 @@ so the state needs no particular supertype.
 abstract type AbstractPlugin end
 
 """
-    NoPluginState
-
-Default no-op plugin state, returned by the fallback `init_plugin_state` when
-a plugin doesn't override it.
-"""
-struct NoPluginState end
-
-"""
     init_plugin_state(plugin::AbstractPlugin, options, dataset) -> state
 
 Create the mutable per-output state for `plugin`. Called once per
@@ -118,12 +110,12 @@ SymbolicRegression.init_plugin_state(p::MyPlugin, options, dataset) =
     MyPluginState(p.config)
 ```
 
-Default returns `NoPluginState()`.
+Default returns `nothing`.
 
 !!! warning "Experimental"
 """
 function init_plugin_state(::AbstractPlugin, options, dataset)
-    return NoPluginState()
+    return nothing
 end
 
 """

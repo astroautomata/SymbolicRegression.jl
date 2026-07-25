@@ -10,7 +10,6 @@ using ..CoreModule:
     RecordType,
     DATA_TYPE,
     LOSS_TYPE,
-    NoPluginState,
     init_member,
     invoke_init_member,
     tournament_cost_multiplier

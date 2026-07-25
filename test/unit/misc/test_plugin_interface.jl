@@ -2,7 +2,6 @@
     using SymbolicRegression
     import SymbolicRegression:
         AbstractPlugin,
-        NoPluginState,
         init_plugin_state,
         fork_worker_state,
         on_search_start!,
@@ -26,8 +25,8 @@
     # Dummy plugin exercises every default hook contract.
     struct DummyPlugin <: AbstractPlugin end
     p = DummyPlugin()
-    @test init_plugin_state(p, opts, nothing) isa NoPluginState
-    s = NoPluginState()
+    @test init_plugin_state(p, opts, nothing) === nothing
+    s = nothing
 
     # Observers default to no-op (return nothing). Hooks follow the convention
     # (state, plugin, ...) so the mutated `state` is first.
@@ -40,12 +39,12 @@
     ) === nothing
 
     # Factory defaults: init_member returns nothing, fork_worker_state
-    # deepcopies the head state. (NoPluginState is an empty singleton, so
-    # `===` returns true after deepcopy — we just check the type.)
+    # deepcopies the head state.
     @test init_member(s, p, nothing, opts) === nothing
-    head = NoPluginState()
+    head = Ref(3)
     snap = fork_worker_state(head, p, nothing)
-    @test snap isa NoPluginState
+    @test snap[] == head[]
+    @test snap !== head
 
     # Modifier defaults return 1.0 (multiplicative identity).
     @test tournament_cost_multiplier(s, p, nothing, opts) == 1.0

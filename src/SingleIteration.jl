@@ -3,8 +3,7 @@ module SingleIterationModule
 using ADTypes: AutoEnzyme
 using DynamicExpressions: AbstractExpression, string_tree, simplify_tree!, combine_operators
 using ..UtilsModule: @threads_if
-using ..CoreModule:
-    AbstractOptions, Dataset, RecordType, create_expression, batch, NoPluginState
+using ..CoreModule: AbstractOptions, Dataset, RecordType, create_expression, batch
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: generate_reference
 using ..PopulationModule: Population, finalize_costs
