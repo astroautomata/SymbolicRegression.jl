@@ -1,4 +1,4 @@
-name: CI
+name: CI Extended
 
 on:
   push:
@@ -6,19 +6,28 @@ on:
       - master
       - release-*
     paths:
-      - "**"
+      - "src/**"
+      - "ext/**"
+      - "test/**"
+      - "Project.toml"
+      - "coverage.jl"
+      - ".github/workflows/CI*.yml"
   pull_request:
     branches:
       - master
       - release-*
     paths:
-      - "**"
+      - "src/**"
+      - "ext/**"
+      - "test/**"
+      - "Project.toml"
+      - "coverage.jl"
+      - ".github/workflows/CI*.yml"
   workflow_dispatch:
+
 concurrency:
-  # Skip intermediate builds: always.
-  # Cancel intermediate builds: only if it is a pull request build.
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   unit:
@@ -49,9 +58,19 @@ jobs:
             julia-version: "1.10"
           - os: windows-latest
             julia-version: "1.10"
+          # Already covered by the required CI workflow
+          - os: ubuntu-latest
+            julia-version: "1"
+            group: basic
+          - os: macOS-latest
+            julia-version: "1"
+            group: basic
+          - os: windows-latest
+            julia-version: "1"
+            group: basic
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: "Set up Julia"
         uses: julia-actions/setup-julia@v3
         with:
@@ -88,7 +107,6 @@ jobs:
     name: i/${{ matrix.group }}-${{ matrix.julia-version }}-ubuntu-latest
     runs-on: ubuntu-latest
     timeout-minutes: 60
-    continue-on-error: ${{ matrix.group == 'ad/enzyme' }}
     strategy:
       fail-fast: false
       matrix:
@@ -112,7 +130,7 @@ jobs:
           - julia-version: "1"
             group: ad/mooncake
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: "Set up Julia"
         uses: julia-actions/setup-julia@v3
         with:
@@ -148,14 +166,14 @@ jobs:
     needs: [unit, integration]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - name: Download all coverage artifacts
         uses: actions/download-artifact@v8
         with:
           pattern: coverage-*
           path: coverage
       - name: Upload to Codecov
-        uses: codecov/codecov-action@v6
+        uses: codecov/codecov-action@v7
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
           directory: ./coverage

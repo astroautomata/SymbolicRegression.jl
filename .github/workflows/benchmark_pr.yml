@@ -4,11 +4,16 @@ on:
   pull_request_target:
     branches:
       - master
+    paths:
+      - "src/**"
+      - "ext/**"
+      - "benchmark/**"
+      - "Project.toml"
+      - ".github/workflows/benchmark_pr.yml"
+
 concurrency:
-  # Skip intermediate builds: always.
-  # Cancel intermediate builds: only if it is a pull request build.
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request_target' }}
 
 permissions:
   pull-requests: write

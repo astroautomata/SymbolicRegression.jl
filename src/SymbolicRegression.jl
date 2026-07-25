@@ -473,6 +473,9 @@ which is useful for debugging and profiling.
     should be changeable.
 - `return_state::Union{Bool, Nothing}=nothing`: Whether to return the
     state of the search for warm starts. By default this is false.
+- `run_id::Union{String,Nothing}=nothing`: A unique identifier for the run.
+    This will be used to store outputs from the run in the `outputs` directory.
+    If not specified, a unique ID will be generated.
 - `loss_type::Type=Nothing`: If you would like to use a different type
     for the loss than for the data you passed, specify the type here.
     Note that if you pass complex data `::Complex{L}`, then the loss
@@ -490,6 +493,9 @@ which is useful for debugging and profiling.
 - `y_units=nothing`: The units of the output, to be used for dimensional constraints.
     If `y` is a matrix, then this can be a vector of units, in which case
     each element corresponds to each output feature.
+- `extra::NamedTuple=NamedTuple()`: Extra information to pass to a custom
+    evaluation function. Since this is an arbitrary named tuple, you could pass
+    any sort of dataset you wish to here.
 - `guesses::Union{AbstractVector,AbstractVector{<:AbstractVector},Nothing}=nothing`: Initial
     guess equations to seed the search. Examples:
     - Single output: `["x1^2 + x2", "sin(x1) * x2"]`

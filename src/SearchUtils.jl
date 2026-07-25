@@ -498,7 +498,9 @@ function update_progress_bar!(
         @sprintf("Full dataset evaluations per second: [.....]. ")
     end
     load_string *= get_load_string(; head_node_occupation, parallelism)
-    load_string *= @sprintf("Press 'q' and then <enter> to stop execution early.")
+    if options.input_stream != devnull
+        load_string *= @sprintf("Press 'q' and then <enter> to stop execution early.")
+    end
     equation_strings = string_dominating_pareto_curve(
         hall_of_fame, dataset, options; width=barlen(progress_bar)
     )
@@ -548,7 +550,10 @@ function print_search_state(
         print(equation_strings * "\n")
         print("═"^twidth * "\n")
     end
-    return print("Press 'q' and then <enter> to stop execution early.\n")
+    if options.input_stream != devnull
+        print("Press 'q' and then <enter> to stop execution early.\n")
+    end
+    return nothing
 end
 
 function load_saved_hall_of_fame(saved_state)

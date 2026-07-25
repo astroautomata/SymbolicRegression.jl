@@ -33,7 +33,7 @@ jobs:
       matrix:
         target: [astroautomata, cambridge]
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
       - uses: julia-actions/setup-julia@v3
         with:
           version: "1"
@@ -63,7 +63,7 @@ jobs:
       - name: Save Julia depot cache on cancel or failure
         id: julia-cache-save
         if: cancelled() || failure()
-        uses: actions/cache/save@v5
+        uses: actions/cache/save@v6
         with:
           path: |
             ${{ steps.julia-cache.outputs.cache-paths }}

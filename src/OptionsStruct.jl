@@ -217,11 +217,11 @@ struct Options{
     nested_constraints::Union{Vector{Tuple{Int,Int,Vector{Tuple{Int,Int,Int}}}},Nothing}
     complexity_mapping::CM
     tournament_selection_n::Int
-    tournament_selection_p::Float32
-    parsimony::Float32
-    dimensional_constraint_penalty::Union{Float32,Nothing}
+    tournament_selection_p::Float64
+    parsimony::Float64
+    dimensional_constraint_penalty::Union{Float64,Nothing}
     dimensionless_constants_only::Bool
-    alpha::Float32
+    alpha::Float64
     maxsize::Int
     maxdepth::Int
     turbo::Val{_turbo}
@@ -232,26 +232,26 @@ struct Options{
     should_optimize_constants::Bool
     output_directory::Union{String,Nothing}
     populations::Int
-    perturbation_factor::Float32
+    perturbation_factor::Float64
     annealing::Bool
     batching::Bool
     batch_size::Int
     mutation_weights::MW
-    crossover_probability::Float32
-    warmup_maxsize_by::Float32
+    crossover_probability::Float64
+    warmup_maxsize_by::Float64
     use_frequency::Bool
     use_frequency_in_tournament::Bool
     adaptive_parsimony_scaling::Float64
     population_size::Int
     ncycles_per_iteration::Int
-    fraction_replaced::Float32
-    fraction_replaced_hof::Float32
-    fraction_replaced_guesses::Float32
+    fraction_replaced::Float64
+    fraction_replaced_hof::Float64
+    fraction_replaced_guesses::Float64
     topn::Int
     verbosity::Union{Int,Nothing}
     v_print_precision::Val{print_precision}
     save_to_file::Bool
-    probability_negate_constant::Float32
+    probability_negate_constant::Float64
     nops::NOPS
     seed::Union{Int,Nothing}
     elementwise_loss::Union{SupervisedLoss,Function}
@@ -264,12 +264,12 @@ struct Options{
     progress::Union{Bool,Nothing}
     terminal_width::Union{Int,Nothing}
     optimizer_algorithm::Optim.AbstractOptimizer
-    optimizer_probability::Float32
+    optimizer_probability::Float64
     optimizer_nrestarts::Int
     optimizer_options::Optim.Options
     autodiff_backend::AD
     recorder_file::String
-    prob_pick_first::Float32
+    prob_pick_first::Float64
     early_stop_condition::Union{Function,Nothing}
     return_state::Val{_return_state}
     timeout_in_seconds::Union{Float64,Nothing}

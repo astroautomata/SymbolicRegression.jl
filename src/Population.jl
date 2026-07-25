@@ -194,15 +194,15 @@ _get_cost(member::AbstractPopMember) = member.cost
 
 const CACHED_WEIGHTS =
     let init_k = collect(0:5),
-        init_prob_each = 0.5f0 * (1 - 0.5f0) .^ init_k,
+        init_prob_each = 0.5 * (1 - 0.5) .^ init_k,
         test_weights = StatsBase.Weights(init_prob_each, sum(init_prob_each))
 
-        PerTaskCache{Dict{Tuple{Int,Float32},typeof(test_weights)}}()
+        PerTaskCache{Dict{Tuple{Int,Float64},typeof(test_weights)}}()
     end
 
 @unstable function get_tournament_selection_weights(@nospecialize(options::AbstractOptions))
     n = options.tournament_selection_n::Int
-    p = options.tournament_selection_p::Float32
+    p = options.tournament_selection_p::Float64
     # Computing the weights for the tournament becomes quite expensive,
     return get!(CACHED_WEIGHTS[], (n, p)) do
         k = collect(0:(n - 1))

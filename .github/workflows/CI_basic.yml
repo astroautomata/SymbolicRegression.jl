@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - master
+      - release-*
+    paths:
+      - "**"
+  pull_request:
+    branches:
+      - master
+      - release-*
+    paths:
+      - "**"
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  unit-basic:
+    name: u/basic-${{ matrix.julia-version }}-${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macOS-latest, windows-latest]
+        julia-version: ["1"]
+    steps:
+      - uses: actions/checkout@v7
+      - name: "Set up Julia"
+        uses: julia-actions/setup-julia@v3
+        with:
+          version: ${{ matrix.julia-version }}
+      - name: "Cache dependencies"
+        uses: julia-actions/cache@v3
+        with:
+          cache-name: julia-cache;workflow=${{ github.workflow }};job=${{ github.job }};os=${{ matrix.os }};julia=${{ matrix.julia-version }};group=unit-basic;project=${{ hashFiles('test/Project.toml') }}
+      - name: "Build package"
+        uses: julia-actions/julia-buildpkg@v1
+      - name: "Run basic unit tests"
+        env:
+          TEST_GROUP: unit/basic
+        run: |
+          julia --color=yes --project=. --threads=auto --check-bounds=yes --depwarn=yes -e 'import Pkg; Pkg.test()'
+        shell: bash
