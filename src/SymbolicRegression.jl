@@ -190,7 +190,7 @@ using Compat: @compat, Fix
         on_search_start!, on_search_end!,
         on_generation_end!, on_cycle_end!, on_mutation_end!, init_member,
         tournament_cost_multiplier, mutation_acceptance_multiplier,
-        fork_worker_state,
+        fork_plugin_state,
     )
 )
 #! format: on
@@ -316,7 +316,7 @@ using .CoreModule:
     invoke_init_member,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
-    fork_worker_state
+    fork_plugin_state
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity
 using .CheckConstraintsModule: check_constraints
@@ -907,7 +907,7 @@ function _warmup_search!(
 
         # Snapshot each plugin's head-side state for this worker dispatch.
         worker_plugin_states = map(
-            (p, hs) -> fork_worker_state(hs, p, dataset),
+            (p, hs) -> fork_plugin_state(hs, p, dataset),
             options.plugins,
             state.plugin_states[j],
         )
@@ -1082,7 +1082,7 @@ function _main_search_loop!(
 
             in_pop = copy(cur_pop::Population{T,L,N})
             worker_plugin_states = map(
-                (p, hs) -> fork_worker_state(hs, p, dataset),
+                (p, hs) -> fork_plugin_state(hs, p, dataset),
                 options.plugins,
                 state.plugin_states[j],
             )
@@ -1245,11 +1245,9 @@ end
     iteration::Int,
     verbosity,
     cur_maxsize::Int,
-    plugin_states::Union{Tuple,Nothing}=nothing,
+    plugin_states::Tuple,
 ) where {T,L,N}
-    worker_plugin_states = @something(
-        plugin_states, map(p -> init_plugin_state(p, options, dataset), options.plugins)
-    )
+    worker_plugin_states = plugin_states
 
     record = RecordType()
     @recorder record["out$(out)_pop$(pop)"] = RecordType(

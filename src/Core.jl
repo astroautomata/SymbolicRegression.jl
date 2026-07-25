@@ -85,7 +85,7 @@ using .PluginModule:
     init_member,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
-    fork_worker_state,
+    fork_plugin_state,
     invoke_init_member,
     default_adaptive_parsimony_plugin
 

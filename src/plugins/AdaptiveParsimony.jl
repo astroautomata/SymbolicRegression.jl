@@ -6,7 +6,7 @@ using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember
 import ..CoreModule:
     init_plugin_state,
-    fork_worker_state,
+    fork_plugin_state,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     on_generation_end!,
@@ -145,7 +145,7 @@ function init_plugin_state(::AdaptiveParsimonyPlugin, options, dataset)
     return AdaptiveParsimonyState(RunningSearchStatistics(; options=options))
 end
 
-function fork_worker_state(
+function fork_plugin_state(
     head_state::AdaptiveParsimonyState, ::AdaptiveParsimonyPlugin, dataset
 )
     snapshot = deepcopy(head_state.rss)::RunningSearchStatistics

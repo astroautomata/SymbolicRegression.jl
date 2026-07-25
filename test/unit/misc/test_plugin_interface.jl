@@ -3,7 +3,7 @@
     import SymbolicRegression:
         AbstractPlugin,
         init_plugin_state,
-        fork_worker_state,
+        fork_plugin_state,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
@@ -38,11 +38,11 @@
         s, p, MutationEvent(:mutate_constant, true, 0.5, 0.4), nothing, opts
     ) === nothing
 
-    # Factory defaults: init_member returns nothing, fork_worker_state
+    # Factory defaults: init_member returns nothing, fork_plugin_state
     # deepcopies the head state.
     @test init_member(s, p, nothing, opts) === nothing
     head = Ref(3)
-    snap = fork_worker_state(head, p, nothing)
+    snap = fork_plugin_state(head, p, nothing)
     @test snap[] == head[]
     @test snap !== head
 
@@ -63,7 +63,7 @@ end
     import SymbolicRegression:
         AbstractPlugin,
         init_plugin_state,
-        fork_worker_state,
+        fork_plugin_state,
         on_search_start!,
         on_search_end!,
         on_generation_end!,
@@ -85,7 +85,7 @@ end
     )
     # Share the head state's channel with workers (default fork deepcopies,
     # which would isolate the channel and lose worker-side events).
-    SymbolicRegression.fork_worker_state(
+    SymbolicRegression.fork_plugin_state(
         head::LifecyclePluginState, ::LifecyclePlugin, dataset
     ) = head
     SymbolicRegression.on_search_start!(
@@ -269,7 +269,7 @@ end
         p.events_ch
     )
     # Share the channel with workers (default fork deepcopies → events lost).
-    SymbolicRegression.fork_worker_state(
+    SymbolicRegression.fork_plugin_state(
         head::MutEvalPluginState, ::MutEvalPlugin, dataset
     ) = head
     function SymbolicRegression.on_mutation_end!(

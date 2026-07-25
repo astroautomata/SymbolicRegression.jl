@@ -46,7 +46,7 @@ end
         tournament_cost_multiplier,
         mutation_acceptance_multiplier,
         init_plugin_state,
-        fork_worker_state
+        fork_plugin_state
     using SymbolicRegression.AdaptiveParsimonyModule: update_frequencies!
     using SymbolicRegression.CoreModule.DatasetModule: Dataset
     using DynamicExpressions: Node
@@ -71,8 +71,8 @@ end
         update_frequencies!(head_state.rss; size=size)
     end
 
-    # fork_worker_state normalizes + deepcopies for the worker.
-    worker_state = fork_worker_state(head_state, plugin, dataset)
+    # fork_plugin_state normalizes + deepcopies for the worker.
+    worker_state = fork_plugin_state(head_state, plugin, dataset)
     @test sum(worker_state.rss.normalized_frequencies) ≈ 1.0 atol = 1e-9
     @test worker_state.rss !== head_state.rss  # snapshot is independent of head
 
@@ -146,7 +146,7 @@ end
     using SymbolicRegression
     using SymbolicRegression.AdaptiveParsimonyModule:
         AdaptiveParsimonyPlugin, AdaptiveParsimonyState, RunningSearchStatistics
-    using SymbolicRegression: Dataset, init_plugin_state, fork_worker_state
+    using SymbolicRegression: Dataset, init_plugin_state, fork_plugin_state
     using Test
 
     opts = Options(; binary_operators=[+, *])
@@ -159,8 +159,8 @@ end
     @test s isa AdaptiveParsimonyState
     @test s.rss isa RunningSearchStatistics
 
-    # fork_worker_state must produce the same shape (no output_index needed).
-    ws = fork_worker_state(s, plugin, dataset)
+    # fork_plugin_state must produce the same shape (no output_index needed).
+    ws = fork_plugin_state(s, plugin, dataset)
     @test ws isa AdaptiveParsimonyState
     @test ws.rss isa RunningSearchStatistics
 end

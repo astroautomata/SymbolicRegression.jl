@@ -82,14 +82,15 @@ so the state needs no particular supertype.
 **Thread / Multiprocessing Safety**:
 - `on_generation_end!` runs serially on the head node — safe to mutate.
 - `on_cycle_end!` and `on_mutation_end!` run on workers, against per-dispatch
-  copies built by [`fork_worker_state`](@ref). Cross-worker
+  copies built by [`fork_plugin_state`](@ref). Cross-worker
   communication must use `Channel` / `RemoteChannel`.
 - `init_member` reads the head node's per-output state during initial
   population creation. In multithreading mode, multiple population-creation
   tasks may call it concurrently — keep it read-only or thread-safe.
-- In multiprocessing mode, plugin config is serialized to workers (via
-  `options.plugins`); worker state is initialized lazily on each worker
-  process.
+- In multiprocessing mode, plugin config is serialized to workers via
+  `options.plugins`, and state is forked on the head by
+  [`fork_plugin_state`](@ref) and shipped with the dispatch. Workers never
+  construct their own state.
 
 !!! warning "Experimental"
     The plugin interface is experimental. Hook signatures may change in minor
@@ -282,7 +283,7 @@ function mutation_acceptance_multiplier(
 end
 
 """
-    fork_worker_state(head_state, plugin, dataset) -> state
+    fork_plugin_state(head_state, plugin, dataset) -> state
 
 Build the worker-side plugin state for one cycle's dispatch, given the head
 node's current plugin state for this output and the dataset the worker will
@@ -292,7 +293,7 @@ Default returns `deepcopy(head_state)` (full snapshot).
 
 !!! warning "Experimental"
 """
-function fork_worker_state(head_state, ::AbstractPlugin, dataset)
+function fork_plugin_state(head_state, ::AbstractPlugin, dataset)
     return deepcopy(head_state)
 end
 
