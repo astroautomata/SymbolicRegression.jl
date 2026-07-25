@@ -2,7 +2,6 @@
     using SymbolicRegression
     import SymbolicRegression:
         AbstractPlugin,
-        AbstractPluginState,
         NoPluginState,
         init_plugin_state,
         fork_worker_state,
@@ -18,9 +17,6 @@
         MutationEvent,
         MutationWeights
     using Test
-
-    @test NoPluginState() isa AbstractPluginState
-
     # No-plugin Options (legacy adaptive parsimony off, no auto-inject).
     opts = Options(;
         binary_operators=[+, *], use_frequency=false, use_frequency_in_tournament=false
@@ -67,7 +63,6 @@ end
     using SymbolicRegression
     import SymbolicRegression:
         AbstractPlugin,
-        AbstractPluginState,
         init_plugin_state,
         fork_worker_state,
         on_search_start!,
@@ -82,7 +77,7 @@ end
     struct LifecyclePlugin <: AbstractPlugin
         counter_ch::Channel{Symbol}
     end
-    mutable struct LifecyclePluginState <: AbstractPluginState
+    mutable struct LifecyclePluginState
         counter_ch::Channel{Symbol}
     end
 
@@ -133,7 +128,7 @@ end
 
 @testitem "Plugin interface: multiple plugins all fire" begin
     using SymbolicRegression
-    import SymbolicRegression: AbstractPlugin, AbstractPluginState
+    import SymbolicRegression: AbstractPlugin
     using Test
 
     a_calls = Ref(0)
@@ -145,10 +140,10 @@ end
     struct PluginB <: AbstractPlugin
         calls::Base.RefValue{Int}
     end
-    mutable struct PluginAState <: AbstractPluginState
+    mutable struct PluginAState
         calls::Base.RefValue{Int}
     end
-    mutable struct PluginBState <: AbstractPluginState
+    mutable struct PluginBState
         calls::Base.RefValue{Int}
     end
 
@@ -176,7 +171,7 @@ end
 
 @testitem "Plugin interface: init_member hook" begin
     using SymbolicRegression
-    import SymbolicRegression: AbstractPlugin, AbstractPluginState, init_member
+    import SymbolicRegression: AbstractPlugin, init_member
     using SymbolicRegression.MutationFunctionsModule: gen_random_tree
     using Test
 
@@ -185,7 +180,7 @@ end
     struct InitMemberPlugin <: AbstractPlugin
         calls::Base.RefValue{Int}
     end
-    mutable struct InitMemberPluginState <: AbstractPluginState
+    mutable struct InitMemberPluginState
         calls::Base.RefValue{Int}
     end
 
@@ -214,7 +209,7 @@ end
 
 @testitem "Plugin interface: init_member that returns a tree is consumed" begin
     using SymbolicRegression
-    import SymbolicRegression: AbstractPlugin, AbstractPluginState
+    import SymbolicRegression: AbstractPlugin
     using SymbolicRegression.MutationFunctionsModule: gen_random_tree
     using Test
 
@@ -226,7 +221,7 @@ end
     struct SeedingPlugin <: AbstractPlugin
         calls::Base.RefValue{Int}
     end
-    mutable struct SeedingPluginState <: AbstractPluginState
+    mutable struct SeedingPluginState
         calls::Base.RefValue{Int}
     end
     SymbolicRegression.init_plugin_state(p::SeedingPlugin, o, d) = SeedingPluginState(
@@ -259,8 +254,7 @@ end
 
 @testitem "Plugin interface: on_mutation_end! fires with correct args" begin
     using SymbolicRegression
-    import SymbolicRegression:
-        AbstractPlugin, AbstractPluginState, MutationEvent, on_mutation_end!
+    import SymbolicRegression: AbstractPlugin, MutationEvent, on_mutation_end!
     using Test
 
     # Collect MutationEvent values via a Channel
@@ -269,7 +263,7 @@ end
     struct MutEvalPlugin <: AbstractPlugin
         events_ch::Channel{MutationEvent}
     end
-    mutable struct MutEvalPluginState <: AbstractPluginState
+    mutable struct MutEvalPluginState
         events_ch::Channel{MutationEvent}
     end
     SymbolicRegression.init_plugin_state(p::MutEvalPlugin, o, d) = MutEvalPluginState(
@@ -331,13 +325,13 @@ end
 
 @testitem "Plugin interface: condition_mutation_weights! plugin-dispatched" begin
     using SymbolicRegression
-    using SymbolicRegression: AbstractPlugin, AbstractPluginState
+    using SymbolicRegression: AbstractPlugin
     using Test
 
     # Plugin that zeroes out `mutate_constant` from its dispatched method.
     # Verifies the engine layers plugin conditioning on top of its own.
     struct ZeroConstPlugin <: AbstractPlugin end
-    mutable struct ZeroConstState <: AbstractPluginState end
+    mutable struct ZeroConstState end
     SymbolicRegression.init_plugin_state(::ZeroConstPlugin, o, d) = ZeroConstState()
     function SymbolicRegression.condition_mutation_weights!(
         weights::SymbolicRegression.AbstractMutationWeights,

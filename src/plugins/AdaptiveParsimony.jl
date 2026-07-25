@@ -1,7 +1,7 @@
 module AdaptiveParsimonyModule
 
 using DispatchDoctor: @stable
-using ..CoreModule: AbstractPlugin, AbstractPluginState, AbstractOptions
+using ..CoreModule: AbstractPlugin, AbstractOptions
 using ..ComplexityModule: compute_complexity
 using ..PopMemberModule: AbstractPopMember
 import ..CoreModule:
@@ -131,13 +131,13 @@ Base.@kwdef struct AdaptiveParsimonyPlugin <: AbstractPlugin
 end
 
 """
-    AdaptiveParsimonyState <: AbstractPluginState
+    AdaptiveParsimonyState
 
 Per-output plugin state for [`AdaptiveParsimonyPlugin`](@ref). One instance
 per output (per dataset in multi-target regression); each instance owns a
 single `RunningSearchStatistics`.
 """
-struct AdaptiveParsimonyState <: AbstractPluginState
+struct AdaptiveParsimonyState
     rss::RunningSearchStatistics
 end
 

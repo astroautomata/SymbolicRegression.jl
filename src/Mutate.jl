@@ -19,7 +19,6 @@ using ..CoreModule:
     max_features,
     dataset_fraction,
     AbstractPlugin,
-    AbstractPluginState,
     NoPluginState,
     MutationEvent,
     on_mutation_end!,
@@ -172,7 +171,7 @@ biases). Default is a no-op.
 """
 function condition_mutation_weights!(
     weights::AbstractMutationWeights,
-    ::AbstractPluginState,
+    _,
     ::AbstractPlugin,
     member,
     options,

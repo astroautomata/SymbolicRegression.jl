@@ -75,7 +75,6 @@ using .ExpressionSpecModule:
 using .InterfaceDataTypesModule: init_value, sample_value, mutate_value
 using .PluginModule:
     AbstractPlugin,
-    AbstractPluginState,
     NoPluginState,
     MutationEvent,
     init_plugin_state,

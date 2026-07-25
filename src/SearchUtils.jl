@@ -27,7 +27,6 @@ using ..CoreModule:
     max_features,
     create_expression,
     init_value,
-    AbstractPluginState,
     NoPluginState
 using ..ComplexityModule: compute_complexity
 using ..PopulationModule: Population

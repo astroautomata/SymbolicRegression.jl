@@ -65,7 +65,7 @@ using DispatchDoctor: @unstable
 
 Abstract type for a plugin's *configuration*. A plugin instance is an immutable
 struct whose fields are the user-tunable settings of the plugin. Mutable
-runtime data is held separately in an [`AbstractPluginState`](@ref) returned by
+runtime data is held separately in a state object returned by
 [`init_plugin_state`](@ref).
 
 A search may have **any number of plugins active simultaneously**, supplied
@@ -73,20 +73,11 @@ via the `plugins = (Plugin1(), Plugin2(), ...)` keyword on `Options`. The
 engine iterates the tuple at each lifecycle point and dispatches the
 appropriate hook on the plugin type.
 
-!!! warning "Experimental"
-    The plugin interface is experimental. Hook signatures may change in minor
-    releases until validated by multiple in-tree plugins.
-"""
-abstract type AbstractPlugin end
+## Plugin state
 
-"""
-    AbstractPluginState
-
-Abstract type for mutable per-output plugin state.
-
-Each (plugin, output) pair gets its own state instance via
-[`init_plugin_state`](@ref). States hold the mutable runtime data the engine
-doesn't need to know about (counters, channels, concept databases, etc.).
+State is duck-typed: it can be any object, including a `NamedTuple`, a `Dict`,
+or a mutable struct of your own. Every hook dispatches on the *plugin* type,
+so the state needs no particular supertype.
 
 **Thread / Multiprocessing Safety**:
 - `on_generation_end!` runs serially on the head node — safe to mutate.
@@ -101,20 +92,21 @@ doesn't need to know about (counters, channels, concept databases, etc.).
   process.
 
 !!! warning "Experimental"
-    The plugin interface is experimental.
+    The plugin interface is experimental. Hook signatures may change in minor
+    releases until validated by multiple in-tree plugins.
 """
-abstract type AbstractPluginState end
+abstract type AbstractPlugin end
 
 """
-    NoPluginState <: AbstractPluginState
+    NoPluginState
 
 Default no-op plugin state, returned by the fallback `init_plugin_state` when
 a plugin doesn't override it.
 """
-struct NoPluginState <: AbstractPluginState end
+struct NoPluginState end
 
 """
-    init_plugin_state(plugin::AbstractPlugin, options, dataset) -> AbstractPluginState
+    init_plugin_state(plugin::AbstractPlugin, options, dataset) -> state
 
 Create the mutable per-output state for `plugin`. Called once per
 (plugin, output) pair at search start.
@@ -150,7 +142,7 @@ Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_search_start!(::AbstractPluginState, ::AbstractPlugin, dataset, options, ropt)
+function on_search_start!(_, ::AbstractPlugin, dataset, options, ropt)
     return nothing
 end
 
@@ -164,9 +156,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_search_end!(
-    ::AbstractPluginState, ::AbstractPlugin, search_state, dataset, options, ropt
-)
+function on_search_end!(_, ::AbstractPlugin, search_state, dataset, options, ropt)
     return nothing
 end
 
@@ -184,13 +174,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 !!! warning "Experimental"
 """
 function on_generation_end!(
-    ::AbstractPluginState,
-    ::AbstractPlugin,
-    search_state,
-    dataset,
-    options,
-    ropt,
-    returned_pop,
+    _, ::AbstractPlugin, search_state, dataset, options, ropt, returned_pop
 )
     return nothing
 end
@@ -207,7 +191,7 @@ Override by dispatching on your plugin type. Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_cycle_end!(::AbstractPluginState, ::AbstractPlugin, pop, dataset, hof, options)
+function on_cycle_end!(_, ::AbstractPlugin, pop, dataset, hof, options)
     return nothing
 end
 
@@ -269,9 +253,7 @@ Default is a no-op.
 
 !!! warning "Experimental"
 """
-function on_mutation_end!(
-    ::AbstractPluginState, ::AbstractPlugin, ::MutationEvent, dataset, options
-)
+function on_mutation_end!(_, ::AbstractPlugin, ::MutationEvent, dataset, options)
     return nothing
 end
 
@@ -288,9 +270,7 @@ frequency statistics from its own state, not from an engine-passed arg.
 
 !!! warning "Experimental"
 """
-function tournament_cost_multiplier(
-    ::AbstractPluginState, ::AbstractPlugin, member, options
-)
+function tournament_cost_multiplier(_, ::AbstractPlugin, member, options)
     return 1.0
 end
 
@@ -304,13 +284,13 @@ defaults to `1.0` (no adjustment).
 !!! warning "Experimental"
 """
 function mutation_acceptance_multiplier(
-    ::AbstractPluginState, ::AbstractPlugin, parent_member, new_tree, options
+    _, ::AbstractPlugin, parent_member, new_tree, options
 )
     return 1.0
 end
 
 """
-    fork_worker_state(head_state, plugin, dataset) -> AbstractPluginState
+    fork_worker_state(head_state, plugin, dataset) -> state
 
 Build the worker-side plugin state for one cycle's dispatch, given the head
 node's current plugin state for this output and the dataset the worker will
@@ -320,7 +300,7 @@ Default returns `deepcopy(head_state)` (full snapshot).
 
 !!! warning "Experimental"
 """
-function fork_worker_state(head_state::AbstractPluginState, ::AbstractPlugin, dataset)
+function fork_worker_state(head_state, ::AbstractPlugin, dataset)
     return deepcopy(head_state)
 end
 
@@ -342,7 +322,7 @@ Override by dispatching on your plugin type. Default returns `nothing`.
 
 !!! warning "Experimental"
 """
-function init_member(::AbstractPluginState, ::AbstractPlugin, dataset, options)
+function init_member(_, ::AbstractPlugin, dataset, options)
     return nothing
 end
 
