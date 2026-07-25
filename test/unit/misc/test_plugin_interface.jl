@@ -213,7 +213,7 @@ end
     using Test
 
     # Plugin always returns a real tree of the canonical type via gen_random_tree.
-    # Exercises the non-nothing branch of `invoke_init_member` AND the
+    # Exercises the non-nothing branch of `resolve_init_member` AND the
     # `candidate::typeof(fallback)` type assertion in `_init_tree`.
     seeded_calls = Ref(0)
 
@@ -249,6 +249,32 @@ end
     hof = equation_search(X, y; options=opts, niterations=2, parallelism=:serial)
     @test seeded_calls[] > 0
     @test hof isa SymbolicRegression.HallOfFame
+end
+
+@testitem "Plugin interface: two init_member providers is an error" begin
+    using SymbolicRegression
+    import SymbolicRegression: AbstractPlugin, resolve_init_member
+    using SymbolicRegression.MutationFunctionsModule: gen_random_tree
+    using Test
+
+    struct SeederA <: AbstractPlugin end
+    struct SeederB <: AbstractPlugin end
+    for P in (SeederA, SeederB)
+        @eval function SymbolicRegression.init_member(_, ::$P, dataset, options)
+            return gen_random_tree(3, options, size(dataset.X, 1), eltype(dataset.X))
+        end
+    end
+
+    opts = Options(; binary_operators=[+, *])
+    X = rand(Float32, 2, 30)
+    y = X[1, :] .+ X[2, :]
+    dataset = SymbolicRegression.Dataset(X, y)
+
+    @test_throws ArgumentError resolve_init_member(
+        (nothing, nothing), (SeederA(), SeederB()), dataset, opts
+    )
+    # A single provider still works:
+    @test resolve_init_member((nothing,), (SeederA(),), dataset, opts) !== nothing
 end
 
 @testitem "Plugin interface: on_mutation_end! fires with correct args" begin

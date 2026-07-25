@@ -313,7 +313,7 @@ using .CoreModule:
     on_cycle_end!,
     on_mutation_end!,
     init_member,
-    invoke_init_member,
+    resolve_init_member,
     tournament_cost_multiplier,
     mutation_acceptance_multiplier,
     fork_plugin_state

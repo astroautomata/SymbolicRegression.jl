@@ -11,7 +11,7 @@ using ..CoreModule:
     DATA_TYPE,
     LOSS_TYPE,
     init_member,
-    invoke_init_member,
+    resolve_init_member,
     tournament_cost_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, update_baseline_loss!
@@ -39,10 +39,11 @@ end
 """
     _init_tree(dataset, options, nlength, nfeatures, ::Type{T}, plugin_states)
 
-Initialize a tree for a new population member. Walks `options.plugins` in
-order via [`invoke_init_member`](@ref); the first plugin that returns a
-non-`nothing` expression wins. If all plugins return `nothing` (the common
-case — no plugin overrides `init_member`), falls back to `gen_random_tree`.
+Initialize a tree for a new population member. Asks every plugin via
+[`resolve_init_member`](@ref); at most one may return a non-`nothing`
+expression (two or more providers throw). If all plugins return `nothing`
+(the common case — no plugin overrides `init_member`), falls back to
+`gen_random_tree`.
 
 The empty-tuple specialisation keeps the no-plugin path fully type-stable.
 """
@@ -55,7 +56,7 @@ function _init_tree(
     dataset, options, nlength::Int, nfeatures::Int, ::Type{T}, plugin_states::Tuple
 ) where {T}
     fallback = gen_random_tree(nlength, options, nfeatures, T)
-    candidate = invoke_init_member(plugin_states, options.plugins, dataset, options)
+    candidate = resolve_init_member(plugin_states, options.plugins, dataset, options)
     return isnothing(candidate) ? fallback : candidate::typeof(fallback)
 end
 

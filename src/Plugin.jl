@@ -301,9 +301,9 @@ end
     init_member(state, plugin, dataset, options)
 
 Called when initializing each population member's tree during **initial
-population creation only**. Called per plugin; the first plugin whose hook
-returns a non-`nothing` value wins. If all plugins return `nothing`, the
-engine falls through to `gen_random_tree`.
+population creation only**. Every plugin is asked; at most one may return a
+non-`nothing` value, and two or more providers is an error. If all plugins
+return `nothing`, the engine falls through to `gen_random_tree`.
 
 Override by dispatching on your plugin type. Default returns `nothing`.
 
@@ -319,16 +319,27 @@ function init_member(_, ::AbstractPlugin, dataset, options)
     return nothing
 end
 
-# `Base.tail` recursion (vs a `for` loop) so heterogeneous tuples are walked
-# type-stably with early exit on the first non-`nothing` candidate.
-@inline invoke_init_member(::Tuple{}, ::Tuple{}, dataset, options) = nothing
-@inline function invoke_init_member(states::Tuple, plugins::Tuple, dataset, options)
-    candidate = init_member(states[1], plugins[1], dataset, options)
-    return if candidate === nothing
-        invoke_init_member(Base.tail(states), Base.tail(plugins), dataset, options)
-    else
-        candidate
-    end
+# Ask every plugin, then require at most one provider. `map` over the
+# heterogeneous tuple and `Base.tail` extraction keep this inferable.
+@inline function resolve_init_member(states::Tuple, plugins::Tuple, dataset, options)
+    candidates = map((s, p) -> init_member(s, p, dataset, options), states, plugins)
+    count(!isnothing, candidates) > 1 && _init_member_conflict(plugins, candidates)
+    return _first_non_nothing(candidates)
+end
+
+@inline _first_non_nothing(::Tuple{}) = nothing
+@inline function _first_non_nothing(t::Tuple)
+    return t[1] === nothing ? _first_non_nothing(Base.tail(t)) : t[1]
+end
+
+@noinline function _init_member_conflict(plugins::Tuple, candidates::Tuple)
+    providers = [string(typeof(p)) for (p, c) in zip(plugins, candidates) if c !== nothing]
+    throw(
+        ArgumentError(
+            "Plugins $(join(providers, ", ")) all returned a member from " *
+            "`init_member`, but at most one plugin may provide initial members.",
+        ),
+    )
 end
 
 # Forward-declared per kwarg→plugin migration. Plugin modules (loaded above
