@@ -340,8 +340,7 @@ function test_entire_pipeline(
                     dataset,
                     tmp_pop,
                     5,
-                    5,
-                    RunningSearchStatistics(; options=options);
+                    5;
                     verbosity=verbosity,
                     options=options,
                     record=RecordType(),

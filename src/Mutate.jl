@@ -17,11 +17,14 @@ using ..CoreModule:
     RecordType,
     sample_mutation,
     max_features,
-    dataset_fraction
+    dataset_fraction,
+    AbstractPlugin,
+    MutationEvent,
+    on_mutation_end!,
+    mutation_acceptance_multiplier
 using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..PopMemberModule: AbstractPopMember, PopMember, create_child
 using ..MutationFunctionsModule:
     mutate_constant,
@@ -156,6 +159,28 @@ function condition_mutation_weights!(
 end
 
 """
+    condition_mutation_weights!(plugin, state, weights, member, options, curmaxsize, nfeatures)
+
+Plugin-dispatched method: called once per plugin in tuple order after the
+engine's legality conditioning. Plugins compose by sequential in-place
+mutation of `weights` (e.g. multiplicative adaptive multipliers, curriculum
+biases). Default is a no-op.
+
+!!! warning "Experimental"
+"""
+function condition_mutation_weights!(
+    weights::AbstractMutationWeights,
+    _,
+    ::AbstractPlugin,
+    member,
+    options,
+    curmaxsize,
+    nfeatures,
+)
+    return nothing
+end
+
+"""
 Use this to modify how `mutate_constant` changes for an expression type.
 """
 function condition_mutate_constant!(
@@ -172,15 +197,24 @@ function condition_mutate_constant!(
 end
 
 # Go through one simulated options.annealing mutation cycle
+@inline function _fire_on_mutation_end!(
+    options::AbstractOptions, plugin_states::Tuple, event::MutationEvent, dataset
+)
+    for (plugin, pstate) in zip(options.plugins, plugin_states)
+        on_mutation_end!(pstate, plugin, event, dataset, options)
+    end
+    return nothing
+end
+
 #  exp(-delta/T) defines probability of accepting a change
 @unstable function next_generation(
     dataset::D,
     member::P,
     temperature,
     curmaxsize::Int,
-    running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions;
     tmp_recorder::RecordType,
+    plugin_states::Tuple=(),
     population_for_backsolve=nothing,
 )::Tuple{
     P,Bool,Float64
@@ -196,6 +230,11 @@ end
     weights = copy(options.mutation_weights)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
+    for (plugin, pstate) in zip(options.plugins, plugin_states)
+        condition_mutation_weights!(
+            weights, pstate, plugin, member, options, curmaxsize, nfeatures
+        )
+    end
 
     mutation_choice = sample_mutation(weights)
 
@@ -226,6 +265,7 @@ end
             parent_ref,
             curmaxsize,
             nfeatures,
+            plugin_states,
             population_for_backsolve,
         )
         mutation_result::AbstractMutationResult{N,P}
@@ -235,6 +275,17 @@ end
             @assert(
                 mutation_result.member isa P,
                 "Mutation result must return a `PopMember` if `return_immediately` is true"
+            )
+            _fire_on_mutation_end!(
+                options,
+                plugin_states,
+                MutationEvent(
+                    mutation_choice,
+                    true,
+                    Float64(before_loss),
+                    Float64(mutation_result.member.loss),
+                ),
+                dataset,
             )
             return mutation_result.member::P, true, num_evals
         else
@@ -256,6 +307,12 @@ end
             tmp_recorder["reason"] = "failed_constraint_check"
         end
         mutation_accepted = false
+        _fire_on_mutation_end!(
+            options,
+            plugin_states,
+            MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
+            dataset,
+        )
         return (
             create_child(
                 member,
@@ -280,6 +337,12 @@ end
             tmp_recorder["reason"] = "nan_loss"
         end
         mutation_accepted = false
+        _fire_on_mutation_end!(
+            options,
+            plugin_states,
+            MutationEvent(mutation_choice, false, Float64(before_loss), NaN),
+            dataset,
+        )
         return (
             create_child(
                 member,
@@ -301,21 +364,8 @@ end
         delta = after_cost - before_cost
         probChange *= exp(-delta / (temperature * options.alpha))
     end
-    newSize = -1
-    if options.use_frequency
-        oldSize = compute_complexity(member, options)
-        newSize = compute_complexity(tree, options)
-        old_frequency = if (0 < oldSize <= options.maxsize)
-            running_search_statistics.normalized_frequencies[oldSize]
-        else
-            1e-6
-        end
-        new_frequency = if (0 < newSize <= options.maxsize)
-            running_search_statistics.normalized_frequencies[newSize]
-        else
-            1e-6
-        end
-        probChange *= old_frequency / new_frequency
+    for (plugin, pstate) in zip(options.plugins, plugin_states)
+        probChange *= mutation_acceptance_multiplier(pstate, plugin, member, tree, options)
     end
 
     if probChange < rand()
@@ -324,6 +374,14 @@ end
             tmp_recorder["reason"] = "annealing_or_frequency"
         end
         mutation_accepted = false
+        _fire_on_mutation_end!(
+            options,
+            plugin_states,
+            MutationEvent(
+                mutation_choice, false, Float64(before_loss), Float64(after_loss)
+            ),
+            dataset,
+        )
         return (
             create_child(
                 member,
@@ -343,13 +401,13 @@ end
         end
         mutation_accepted = true
         new_member = create_child(
-            member,
-            tree,
-            after_cost,
-            after_loss,
-            options;
-            complexity=newSize,
-            parent_ref=parent_ref,
+            member, tree, after_cost, after_loss, options; parent_ref=parent_ref
+        )
+        _fire_on_mutation_end!(
+            options,
+            plugin_states,
+            MutationEvent(mutation_choice, true, Float64(before_loss), Float64(after_loss)),
+            dataset,
         )
         return (new_member, mutation_accepted, num_evals)
     end
@@ -403,6 +461,10 @@ You may overload this function to handle new mutation types for new `AbstractMut
 - `nfeatures`: The number of features in the dataset.
 - `parent_ref`: Reference to the mutated member's parent (only used for logging purposes).
 - `recorder::RecordType`: A recorder to log mutation details.
+- `plugin_states::Tuple`: The active worker plugin states, in tuple order matching
+  `options.plugins`. If your mutation method needs one, you can destructure
+  inside via `for (p, s) in zip(options.plugins, plugin_states) ... end`, or
+  capture via `; plugin_states::Tuple, kws...`.
 
 # Returns
 

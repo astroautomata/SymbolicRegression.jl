@@ -3,7 +3,6 @@ module RegularizedEvolutionModule
 using DynamicExpressions: string_tree
 using ..CoreModule: AbstractOptions, Dataset, RecordType, DATA_TYPE, LOSS_TYPE
 using ..PopulationModule: Population, best_of_sample
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..MutateModule: next_generation, crossover_generation
 using ..RecorderModule: @recorder
 using ..UtilsModule: argmin_fast
@@ -15,25 +14,25 @@ function reg_evol_cycle(
     pop::P,
     temperature,
     curmaxsize::Int,
-    running_search_statistics::RunningSearchStatistics,
     options::AbstractOptions,
-    record::RecordType,
+    record::RecordType;
+    plugin_states::Tuple=(),
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,P<:Population{T,L}}
     num_evals = 0.0
     n_evol_cycles = ceil(Int, pop.n / options.tournament_selection_n)
 
     for i in 1:n_evol_cycles
         if rand() > options.crossover_probability
-            allstar = best_of_sample(pop, running_search_statistics, options)
+            allstar = best_of_sample(pop, options; plugin_states)
             mutation_recorder = RecordType()
             baby, mutation_accepted, tmp_num_evals = next_generation(
                 dataset,
                 allstar,
                 temperature,
                 curmaxsize,
-                running_search_statistics,
                 options;
                 tmp_recorder=mutation_recorder,
+                plugin_states,
                 population_for_backsolve=pop,
             )
             num_evals += tmp_num_evals
@@ -78,8 +77,8 @@ function reg_evol_cycle(
             pop.members[oldest] = baby
 
         else # Crossover
-            allstar1 = best_of_sample(pop, running_search_statistics, options)
-            allstar2 = best_of_sample(pop, running_search_statistics, options)
+            allstar1 = best_of_sample(pop, options; plugin_states)
+            allstar2 = best_of_sample(pop, options; plugin_states)
 
             crossover_recorder = RecordType()
             baby1, baby2, crossover_accepted, tmp_num_evals = crossover_generation(

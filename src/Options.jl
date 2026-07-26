@@ -39,6 +39,7 @@ using ..OperatorsModule:
 using ..MutationWeightsModule: AbstractMutationWeights, MutationWeights, mutations
 import ..OptionsStructModule: Options
 using ..OptionsStructModule: ComplexityMapping, BacksolveOptions, operator_specialization
+using ..PluginModule: default_adaptive_parsimony_plugin, _merge_with_default_plugins
 using ..UtilsModule: @save_kwargs, @ignore
 using ..ExpressionSpecModule:
     AbstractExpressionSpec,
@@ -399,6 +400,11 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     for every complexity.
 - `use_frequency_in_tournament`: Whether to use the adaptive parsimony described
     above inside the score, rather than just at the mutation accept/reject stage.
+- `plugins`: Plugin instances to run, as a tuple or vector. Vectors are converted
+    to tuples when the options are constructed.
+- `default_plugins`: Default plugin instances appended after `plugins`. Set this
+    to `()` to disable automatic defaults. An explicit plugin takes precedence
+    over a default plugin of the same type.
 - `adaptive_parsimony_scaling`: How much to scale the adaptive parsimony term
     in the loss. Increase this if the search is spending too much time
     optimizing the most complex equations.
@@ -658,6 +664,8 @@ $(OPTION_DESCRIPTIONS)
     use_recorder::Bool=false,
     recorder_file::AbstractString="pysr_recorder.json",
     popmember_type::Type=default_popmember_type(),
+    plugins::Union{Tuple,AbstractVector}=(),
+    default_plugins::Union{Nothing,Tuple,AbstractVector}=nothing,
     ### Not search options; just construction options:
     define_helper_functions::Bool=true,
     #########################################
@@ -1011,6 +1019,14 @@ $(OPTION_DESCRIPTIONS)
     set_mutation_weights = create_mutation_weights(mutation_weights)
     backsolve = something(backsolve, BacksolveOptions())
 
+    user_plugin_tuple = Tuple(plugins)
+    default_plugin_tuple = if default_plugins === nothing
+        (default_adaptive_parsimony_plugin(; use_frequency, use_frequency_in_tournament),)
+    else
+        Tuple(default_plugins)
+    end
+    plugin_tuple = _merge_with_default_plugins(user_plugin_tuple, default_plugin_tuple...)
+
     @assert print_precision > 0
 
     _autodiff_backend = if autodiff_backend isa Union{Nothing,AbstractADType}
@@ -1038,6 +1054,7 @@ $(OPTION_DESCRIPTIONS)
         expression_type,
         typeof(expression_options),
         typeof(set_mutation_weights),
+        typeof(plugin_tuple),
         popmember_type,
         turbo,
         bumper,
@@ -1113,6 +1130,7 @@ $(OPTION_DESCRIPTIONS)
         define_helper_functions,
         use_recorder,
         popmember_type,
+        plugin_tuple,
         backsolve,
     )
 

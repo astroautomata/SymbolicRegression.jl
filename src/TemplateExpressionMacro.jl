@@ -116,8 +116,8 @@ function template_spec(func, args...)
         function_name = Symbol(:__sr_template_, function_hash)
 
         quote
-            TemplateExpressionSpec(;
-                structure=TemplateStructure{($(function_keys...),)}(
+            TemplateExpressionSpec(
+                TemplateStructure{($(function_keys...),)}(
                     function $(function_name)((; $(expr_names...)), ($(func_args...),))
                         return $(func_body)
                     end;
@@ -135,8 +135,8 @@ function template_spec(func, args...)
         function_name = Symbol(:__sr_template_, function_hash_with_params)
 
         quote
-            TemplateExpressionSpec(;
-                structure=TemplateStructure{($(function_keys...),),($(param_keys...),)}(
+            TemplateExpressionSpec(
+                TemplateStructure{($(function_keys...),),($(param_keys...),)}(
                     function $(function_name)(
                         (; $(expr_names...)), (; $(param_names...)), ($(func_args...),)
                     )

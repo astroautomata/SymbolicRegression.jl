@@ -1,7 +1,10 @@
 using BenchmarkTools
 using SymbolicRegression, BenchmarkTools, Random
-using SymbolicRegression.AdaptiveParsimonyModule: RunningSearchStatistics
 using SymbolicRegression.MutateModule: next_generation
+# Imported only for the pre-plugin-interface `next_generation` signature
+# benchmark path below; modern code paths (where `Options` has `:plugins`)
+# don't pass an `rss` arg.
+using SymbolicRegression.AdaptiveParsimonyModule: RunningSearchStatistics
 using SymbolicRegression.RecorderModule: RecordType
 using SymbolicRegression.PopulationModule: best_of_sample
 using SymbolicRegression.ConstantOptimizationModule: optimize_constants
@@ -85,68 +88,143 @@ function create_utils_benchmark()
 
     options = Options(; unary_operators=[sin, cos], binary_operators=[+, -, *, /])
 
-    suite["best_of_sample"] = @benchmarkable(
-        best_of_sample(pop, rss, $options),
-        setup = (
-            nfeatures=1;
-            dataset=Dataset(randn(nfeatures, 32), randn(32));
-            pop=Population(dataset; npop=100, nlength=20, options=($options), nfeatures);
-            rss=RunningSearchStatistics(; options=($options))
-        )
-    )
+    # The pre-plugin-interface signature took an `rss::RunningSearchStatistics`
+    # positional arg in both `best_of_sample` and `next_generation`. The
+    # post-refactor signature drops it (the RSS lives on the plugin state).
+    # Switch on `hasfield(Options, :plugins)` so this script benchmarks
+    # cleanly against both versions.
+    new_engine_sig = hasfield(Options, :plugins)
 
-    suite["next_generation_x100"] = @benchmarkable(
-        let
-            for member in members
-                next_generation(
-                    dataset,
-                    member,
-                    temperature,
-                    curmaxsize,
-                    rss,
-                    options;
-                    tmp_recorder=recorder,
+    suite["best_of_sample"] = if new_engine_sig
+        @benchmarkable(
+            best_of_sample(pop, $options),
+            setup = (
+                nfeatures=1;
+                dataset=Dataset(randn(nfeatures, 32), randn(32));
+                pop=Population(
+                    dataset; npop=100, nlength=20, options=($options), nfeatures
                 )
-            end
-        end,
-        setup = (
-            nfeatures=1;
-            dataset=Dataset(randn(nfeatures, 32), randn(32));
-            mutation_weights=MutationWeights(;
-                mutate_constant=1.0,
-                mutate_operator=1.0,
-                swap_operands=1.0,
-                rotate_tree=1.0,
-                add_node=1.0,
-                insert_node=1.0,
-                simplify=0.0,
-                randomize=0.0,
-                do_nothing=0.0,
-                form_connection=0.0,
-                break_connection=0.0,
-            );
-            options=Options(;
-                unary_operators=[sin, cos],
-                binary_operators=[+, -, *, /],
-                mutation_weights,
-            );
-            recorder=RecordType();
-            temperature=1.0;
-            curmaxsize=20;
-            rss=RunningSearchStatistics(; options);
-            trees=[
-                gen_random_tree_fixed_size(15, options, nfeatures, Float64) for _ in 1:100
-            ];
-            expressions=[
-                Expression(tree; operators=options.operators, variable_names=["x1"]) for
-                tree in trees
-            ];
-            members=[
-                PopMember(dataset, expression, options; deterministic=false) for
-                expression in expressions
-            ]
+            )
         )
-    )
+    else
+        @benchmarkable(
+            best_of_sample(pop, rss, $options),
+            setup = (
+                nfeatures=1;
+                dataset=Dataset(randn(nfeatures, 32), randn(32));
+                pop=Population(
+                    dataset; npop=100, nlength=20, options=($options), nfeatures
+                );
+                rss=RunningSearchStatistics(; options=($options))
+            )
+        )
+    end
+
+    suite["next_generation_x100"] = if new_engine_sig
+        @benchmarkable(
+            let
+                for member in members
+                    next_generation(
+                        dataset,
+                        member,
+                        temperature,
+                        curmaxsize,
+                        options;
+                        tmp_recorder=recorder,
+                    )
+                end
+            end,
+            setup = (
+                nfeatures=1;
+                dataset=Dataset(randn(nfeatures, 32), randn(32));
+                mutation_weights=MutationWeights(;
+                    mutate_constant=1.0,
+                    mutate_operator=1.0,
+                    swap_operands=1.0,
+                    rotate_tree=1.0,
+                    add_node=1.0,
+                    insert_node=1.0,
+                    simplify=0.0,
+                    randomize=0.0,
+                    do_nothing=0.0,
+                    form_connection=0.0,
+                    break_connection=0.0,
+                );
+                options=Options(;
+                    unary_operators=[sin, cos],
+                    binary_operators=[+, -, *, /],
+                    mutation_weights,
+                );
+                recorder=RecordType();
+                temperature=1.0;
+                curmaxsize=20;
+                trees=[
+                    gen_random_tree_fixed_size(15, options, nfeatures, Float64) for
+                    _ in 1:100
+                ];
+                expressions=[
+                    Expression(tree; operators=options.operators, variable_names=["x1"]) for tree in trees
+                ];
+                members=[
+                    PopMember(dataset, expression, options; deterministic=false) for
+                    expression in expressions
+                ]
+            )
+        )
+    else
+        @benchmarkable(
+            let
+                for member in members
+                    next_generation(
+                        dataset,
+                        member,
+                        temperature,
+                        curmaxsize,
+                        rss,
+                        options;
+                        tmp_recorder=recorder,
+                    )
+                end
+            end,
+            setup = (
+                nfeatures=1;
+                dataset=Dataset(randn(nfeatures, 32), randn(32));
+                mutation_weights=MutationWeights(;
+                    mutate_constant=1.0,
+                    mutate_operator=1.0,
+                    swap_operands=1.0,
+                    rotate_tree=1.0,
+                    add_node=1.0,
+                    insert_node=1.0,
+                    simplify=0.0,
+                    randomize=0.0,
+                    do_nothing=0.0,
+                    form_connection=0.0,
+                    break_connection=0.0,
+                );
+                options=Options(;
+                    unary_operators=[sin, cos],
+                    binary_operators=[+, -, *, /],
+                    mutation_weights,
+                );
+                recorder=RecordType();
+                temperature=1.0;
+                curmaxsize=20;
+                rss=RunningSearchStatistics(; options);
+                trees=[
+                    gen_random_tree_fixed_size(15, options, nfeatures, Float64) for
+                    _ in 1:100
+                ];
+                expressions=[
+                    Expression(tree; operators=options.operators, variable_names=["x1"]) for tree in trees
+                ];
+                members=[
+                    PopMember(dataset, expression, options; deterministic=false) for
+                    expression in expressions
+                ]
+            )
+        )
+    end
 
     ntrees = 10
     suite["optimize_constants_x10"] = @benchmarkable(

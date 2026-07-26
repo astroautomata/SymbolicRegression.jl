@@ -204,6 +204,7 @@ struct Options{
     E<:AbstractExpression,
     EO<:NamedTuple,
     MW<:AbstractMutationWeights,
+    PT<:Tuple,
     PM,
     _turbo,
     _bumper,
@@ -279,6 +280,7 @@ struct Options{
     define_helper_functions::Bool
     use_recorder::Bool
     popmember_type::Type{PM}
+    plugins::PT
     backsolve::BacksolveOptions
 end
 
@@ -292,7 +294,11 @@ function Base.print(io::IO, @nospecialize(options::Options))
         join(
             [
                 if fieldname in (
-                    :optimizer_algorithm, :optimizer_options, :mutation_weights, :backsolve
+                    :optimizer_algorithm,
+                    :optimizer_options,
+                    :mutation_weights,
+                    :plugins,
+                    :backsolve,
                 )
                     "$(fieldname)=..."
                 else

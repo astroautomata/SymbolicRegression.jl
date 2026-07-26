@@ -9,6 +9,7 @@ include("MutationWeights.jl")
 include("OptionsStruct.jl")
 include("Operators.jl")
 include("ExpressionSpec.jl")
+include("Plugin.jl")
 include("Options.jl")
 include("InterfaceDataTypes.jl")
 
@@ -72,5 +73,20 @@ using .ExpressionSpecModule:
     get_expression_options,
     get_node_type
 using .InterfaceDataTypesModule: init_value, sample_value, mutate_value
+using .PluginModule:
+    AbstractPlugin,
+    MutationEvent,
+    init_plugin_state,
+    on_search_start!,
+    on_search_end!,
+    on_generation_end!,
+    on_cycle_end!,
+    on_mutation_end!,
+    init_member,
+    tournament_cost_multiplier,
+    mutation_acceptance_multiplier,
+    fork_plugin_state,
+    resolve_init_member,
+    default_adaptive_parsimony_plugin
 
 end

@@ -3,6 +3,42 @@ using Base: @deprecate
 import .LossFunctionsModule: score_func
 import .HallOfFameModule: calculate_pareto_frontier
 import .MutationFunctionsModule: gen_random_tree, gen_random_tree_fixed_size
+import .MutateModule: next_generation
+import .PopulationModule: best_of_sample
+using .AdaptiveParsimonyModule: AdaptiveParsimonyState, RunningSearchStatistics
+
+@deprecate(
+    next_generation(
+        dataset,
+        member,
+        temperature,
+        curmaxsize::Int,
+        running_search_statistics::RunningSearchStatistics,
+        options::AbstractOptions;
+        tmp_recorder::RecordType,
+        population_for_backsolve=nothing,
+    ),
+    next_generation(
+        dataset,
+        member,
+        temperature,
+        curmaxsize,
+        options;
+        tmp_recorder,
+        plugin_states=(AdaptiveParsimonyState(running_search_statistics),),
+        population_for_backsolve,
+    ),
+)
+@deprecate(
+    best_of_sample(
+        pop::Population,
+        running_search_statistics::RunningSearchStatistics,
+        options::AbstractOptions,
+    ),
+    best_of_sample(
+        pop, options; plugin_states=(AdaptiveParsimonyState(running_search_statistics),)
+    ),
+)
 
 @deprecate(
     score_func(

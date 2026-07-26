@@ -8,6 +8,7 @@ export Population,
     OperatorEnum,
     Dataset,
     MutationWeights,
+    AdaptiveParsimonyPlugin,
     BacksolveOptions,
     Node,
     GraphNode,
@@ -179,8 +180,17 @@ using Compat: @compat, Fix
     (
         AbstractOptions, AbstractRuntimeOptions, RuntimeOptions,
         AbstractMutationWeights, mutate!, condition_mutation_weights!,
-        sample_mutation, MutationResult, AbstractSearchState, SearchState,
+        sample_mutation, MutationResult, AbstractPopMember, AbstractSearchState, SearchState,
         LOSS_TYPE, DATA_TYPE, node_type,
+        AbstractComposableExpression,
+        optimize_constants, get_constants_for_optimization,
+        set_constants_for_optimization!, extract_gradient_for_optimization,
+        AbstractPlugin, MutationEvent,
+        init_plugin_state,
+        on_search_start!, on_search_end!,
+        on_generation_end!, on_cycle_end!, on_mutation_end!, init_member,
+        tournament_cost_multiplier, mutation_acceptance_multiplier,
+        fork_plugin_state,
     )
 )
 #! format: on
@@ -202,7 +212,7 @@ catch
     VersionNumber(0, 0, 0)
 end
 
-using DispatchDoctor: @stable
+using DispatchDoctor: @stable, @unstable
 
 @stable default_mode = "disable" begin
     include("Utils.jl")
@@ -213,7 +223,6 @@ using DispatchDoctor: @stable
     include("Complexity.jl")
     include("DimensionalAnalysis.jl")
     include("CheckConstraints.jl")
-    include("AdaptiveParsimony.jl")
     include("InverseFunctions.jl")
     include("EvaluateInverse.jl")
     include("Backsolve.jl")
@@ -235,6 +244,7 @@ using DispatchDoctor: @stable
     include("TemplateExpression.jl")
     include("TemplateExpressionMacro.jl")
     include("ParametricExpression.jl")
+    include("plugins/AdaptiveParsimony.jl")
 
     __dispatch_doctor_unsable_test() = Val(rand(1:10))
 end
@@ -293,17 +303,33 @@ using .CoreModule:
     erfc,
     atanh_clip,
     create_expression,
-    has_units
+    has_units,
+    AbstractPlugin,
+    MutationEvent,
+    init_plugin_state,
+    on_search_start!,
+    on_search_end!,
+    on_generation_end!,
+    on_cycle_end!,
+    on_mutation_end!,
+    init_member,
+    resolve_init_member,
+    tournament_cost_multiplier,
+    mutation_acceptance_multiplier,
+    fork_plugin_state
 using .UtilsModule: is_anonymous_function, recursive_merge, json3_write, @ignore
 using .ComplexityModule: compute_complexity
 using .CheckConstraintsModule: check_constraints
-using .AdaptiveParsimonyModule:
-    RunningSearchStatistics, update_frequencies!, move_window!, normalize_frequencies!
 using .MutationFunctionsModule:
     gen_random_tree, gen_random_tree_fixed_size, random_node, crossover_trees
 using .InterfaceDynamicExpressionsModule:
     @extend_operators, require_copy_to_workers, make_example_inputs
 using .LossFunctionsModule: eval_loss, eval_cost, update_baseline_loss!, score_func
+using .ConstantOptimizationModule:
+    optimize_constants,
+    get_constants_for_optimization,
+    set_constants_for_optimization!,
+    extract_gradient_for_optimization
 using .PopMemberModule:
     AbstractPopMember, PopMember, reset_birth!, popmember_type, expression_type
 using .CoreModule.UtilsModule: get_birth_order
@@ -354,10 +380,14 @@ using .TemplateExpressionModule:
     TemplateExpression, TemplateStructure, TemplateExpressionSpec, ParamVector, has_params
 using .TemplateExpressionModule: ValidVector, TemplateReturnError
 using .ComposableExpressionModule:
-    ComposableExpression, ValidVectorMixError, ValidVectorAccessError
+    AbstractComposableExpression,
+    ComposableExpression,
+    ValidVectorMixError,
+    ValidVectorAccessError
 using .ExpressionBuilderModule: embed_metadata, strip_metadata
 using .ParametricExpressionModule: ParametricExpressionSpec
 using .TemplateExpressionMacroModule: @template_spec
+using .AdaptiveParsimonyModule: AdaptiveParsimonyPlugin
 
 @stable default_mode = "disable" begin
     include("deprecates.jl")
@@ -602,7 +632,7 @@ end
     _initialize_search!(state, datasets, ropt, options, saved_state, guesses)
     _warmup_search!(state, datasets, ropt, options)
     _main_search_loop!(state, datasets, ropt, options)
-    _tear_down!(state, ropt, options)
+    _tear_down!(state, datasets, ropt, options)
     _info_dump(state, datasets, ropt, options)
     return _format_output(state, datasets, ropt, options)
 end
@@ -646,7 +676,7 @@ end
     @recorder record["options"] = "$(options)"
 
     nout = length(datasets)
-    PMType = infer_popmember_type(T, L, D, options)
+    PMType = infer_popmember_type(T, L, example_dataset, options)
     NT = expression_type(PMType)
     PopType = Population{T,L,NT,PMType}
     HallOfFameType = HallOfFame{T,L,NT,PMType}
@@ -690,10 +720,6 @@ end
     last_pops = init_dummy_pops(options.populations, datasets, options)
     # Best 10 members from each population for migration:
     best_sub_pops = init_dummy_pops(options.populations, datasets, options)
-    # TODO: Should really be one per population too.
-    all_running_search_statistics = [
-        RunningSearchStatistics(; options=options) for j in 1:nout
-    ]
     # Records the number of evaluations:
     # Real numbers indicate use of batching.
     num_evals = [[0.0 for i in 1:(options.populations)] for j in 1:nout]
@@ -709,7 +735,13 @@ end
 
     seed_members = [Vector{PMType}() for j in 1:nout]
 
-    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType}(;
+    plugin_states = [
+        map(p -> init_plugin_state(p, options, datasets[j]), options.plugins) for
+        j in 1:nout
+    ]
+    PluginStatesType = eltype(plugin_states)
+
+    return SearchState{T,L,NT,PMType,WorkerOutputType,ChannelType,PluginStatesType}(;
         procs=procs,
         we_created_procs=we_created_procs,
         worker_output=worker_output,
@@ -720,13 +752,13 @@ end
         halls_of_fame=halls_of_fame,
         last_pops=last_pops,
         best_sub_pops=best_sub_pops,
-        all_running_search_statistics=all_running_search_statistics,
         num_evals=num_evals,
         cycles_remaining=cycles_remaining,
         cur_maxsizes=cur_maxsizes,
         stdin_reader=stdin_reader,
         record=Ref(record),
         seed_members=seed_members,
+        plugin_states=plugin_states,
     )
 end
 function _initialize_search!(
@@ -794,27 +826,35 @@ function _initialize_search!(
                 if saved_pop !== nothing && ropt.verbosity > 0
                     @warn "Recreating population (output=$(j), population=$(i)), as the saved one doesn't have the correct number of members."
                 end
-                @sr_spawner(
-                    begin
-                        (
-                            Population(
-                                datasets[j];
-                                population_size=options.population_size,
-                                nlength=3,
-                                options=options,
-                                nfeatures=max_features(datasets[j], options),
-                            ),
-                            HallOfFame(options, datasets[j]),
-                            RecordType(),
-                            Float64(options.population_size),
-                        )
-                    end,
-                    parallelism = ropt.parallelism,
-                    worker_idx = worker_idx
-                )
+                let _plugin_states = state.plugin_states[j], _dataset = datasets[j]
+                    @sr_spawner(
+                        begin
+                            (
+                                Population(
+                                    _dataset;
+                                    population_size=options.population_size,
+                                    nlength=3,
+                                    options=options,
+                                    nfeatures=max_features(_dataset, options),
+                                    plugin_states=_plugin_states,
+                                ),
+                                HallOfFame(options, _dataset),
+                                RecordType(),
+                                Float64(options.population_size),
+                            )
+                        end,
+                        parallelism = ropt.parallelism,
+                        worker_idx = worker_idx
+                    )
+                end  # let _plugin_states, _dataset
                 # This involves population_size evaluations, on the full dataset:
             end
         push!(state.worker_output[j], new_pop)
+    end
+    for j in eachindex(datasets, state.plugin_states)
+        for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+            on_search_start!(pstate, plugin, datasets[j], options, ropt)
+        end
     end
     return nothing
 end
@@ -851,16 +891,12 @@ function _warmup_search!(
     nout = length(datasets)
     for j in 1:nout, i in 1:(options.populations)
         dataset = datasets[j]
-        running_search_statistics = state.all_running_search_statistics[j]
         cur_maxsize = state.cur_maxsizes[j]
         @recorder state.record[]["out$(j)_pop$(i)"] = RecordType()
         worker_idx = assign_next_worker!(
             state.worker_assignment; out=j, pop=i, parallelism=ropt.parallelism, state.procs
         )
 
-        # TODO - why is this needed??
-        # Multi-threaded doesn't like to fetch within a new task:
-        c_rss = deepcopy(running_search_statistics)
         last_pop = state.worker_output[j][i]
 
         # Get the prototype to extract types
@@ -869,6 +905,12 @@ function _warmup_search!(
         PM = popmember_type(PopType)
         HallType = HallOfFame{T,L,N,PM}
 
+        # Snapshot each plugin's head-side state for this worker dispatch.
+        worker_plugin_states = map(
+            (p, hs) -> fork_plugin_state(hs, p, dataset),
+            options.plugins,
+            state.plugin_states[j],
+        )
         updated_pop = @sr_spawner(
             begin
                 in_pop = first(extract_from_worker(last_pop, PopType, HallType))
@@ -881,7 +923,7 @@ function _warmup_search!(
                     iteration=0,
                     ropt.verbosity,
                     cur_maxsize,
-                    running_search_statistics=c_rss,
+                    plugin_states=worker_plugin_states,
                 )::DefaultWorkerOutputType{Population{T,L,N},HallOfFame{T,L,N}}
             end,
             parallelism = ropt.parallelism,
@@ -899,6 +941,7 @@ function _main_search_loop!(
 ) where {T,L,N}
     ropt.verbosity > 0 && @info "Started!"
     nout = length(datasets)
+
     start_time = time()
     progress_bar = if ropt.progress
         #TODO: need to iterate this on the max cycles remaining!
@@ -978,10 +1021,6 @@ function _main_search_loop!(
             dataset = datasets[j]
             cur_maxsize = state.cur_maxsizes[j]
 
-            for member in cur_pop.members
-                size = compute_complexity(member, options)
-                update_frequencies!(state.all_running_search_statistics[j]; size)
-            end
             #! format: off
             update_hall_of_fame!(state.halls_of_fame[j], cur_pop.members, options)
             update_hall_of_fame!(state.halls_of_fame[j], best_seen.members[best_seen.exists], options)
@@ -993,6 +1032,14 @@ function _main_search_loop!(
             if options.save_to_file
                 save_to_file(dominating, nout, j, dataset, options, ropt)
             end
+
+            # Update plugin state (e.g. parsimony frequency table) from the
+            # population the worker actually produced, before migration mixes
+            # in pareto/seed/best-of-each members from outside this cycle.
+            for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+                on_generation_end!(pstate, plugin, state, dataset, options, ropt, cur_pop)
+            end
+
             ###################################################################
             # Migration #######################################################
             if options.migration
@@ -1033,8 +1080,12 @@ function _main_search_loop!(
                 0
             end
 
-            c_rss = deepcopy(state.all_running_search_statistics[j])
             in_pop = copy(cur_pop::Population{T,L,N})
+            worker_plugin_states = map(
+                (p, hs) -> fork_plugin_state(hs, p, dataset),
+                options.plugins,
+                state.plugin_states[j],
+            )
             state.worker_output[j][i] = @sr_spawner(
                 begin
                     _dispatch_s_r_cycle(
@@ -1046,7 +1097,7 @@ function _main_search_loop!(
                         iteration,
                         ropt.verbosity,
                         cur_maxsize,
-                        running_search_statistics=c_rss,
+                        plugin_states=worker_plugin_states,
                     )
                 end,
                 parallelism = ropt.parallelism,
@@ -1062,7 +1113,6 @@ function _main_search_loop!(
             state.cur_maxsizes[j] = get_cur_maxsize(;
                 options, total_cycles, cycles_remaining=state.cycles_remaining[j]
             )
-            move_window!(state.all_running_search_statistics[j])
             if !isnothing(progress_bar)
                 head_node_occupation = estimate_work_fraction(resource_monitor)
                 update_progress_bar!(
@@ -1142,18 +1192,26 @@ function _main_search_loop!(
     return nothing
 end
 function _tear_down!(
-    state::AbstractSearchState, ropt::AbstractRuntimeOptions, options::AbstractOptions
+    state::AbstractSearchState,
+    datasets,
+    ropt::AbstractRuntimeOptions,
+    options::AbstractOptions,
 )
     close_reader!(state.stdin_reader)
-    # Safely close all processes or threads
-    if ropt.parallelism == :multiprocessing
-        # TODO: We should unwrap the error monitors here
-        state.we_created_procs && rmprocs(state.procs)
-    elseif ropt.parallelism == :multithreading
+    if ropt.parallelism in (:multiprocessing, :multithreading)
         nout = length(state.worker_output)
         for j in 1:nout, i in eachindex(state.worker_output[j])
             wait(state.worker_output[j][i])
         end
+    end
+    for j in eachindex(datasets, state.plugin_states)
+        for (plugin, pstate) in zip(options.plugins, state.plugin_states[j])
+            on_search_end!(pstate, plugin, state, datasets[j], options, ropt)
+        end
+    end
+    if ropt.parallelism == :multiprocessing
+        # TODO: We should unwrap the error monitors here
+        state.we_created_procs && rmprocs(state.procs)
     end
     @recorder json3_write(state.record[], options.recorder_file)
     return nothing
@@ -1186,23 +1244,24 @@ end
     iteration::Int,
     verbosity,
     cur_maxsize::Int,
-    running_search_statistics,
+    plugin_states::Tuple,
 ) where {T,L,N}
+    worker_plugin_states = plugin_states
+
     record = RecordType()
     @recorder record["out$(out)_pop$(pop)"] = RecordType(
         "iteration$(iteration)" => record_population(in_pop, options)
     )
     num_evals = 0.0
-    normalize_frequencies!(running_search_statistics)
     out_pop, best_seen, evals_from_cycle = s_r_cycle(
         dataset,
         in_pop,
         options.ncycles_per_iteration,
-        cur_maxsize,
-        running_search_statistics;
+        cur_maxsize;
         verbosity=verbosity,
         options=options,
         record=record,
+        plugin_states=worker_plugin_states,
     )
     num_evals += evals_from_cycle
     out_pop, evals_from_optimize = optimize_and_simplify_population(
@@ -1218,6 +1277,9 @@ end
                 num_evals += 1
             end
         end
+    end
+    for (plugin, pstate) in zip(options.plugins, worker_plugin_states)
+        on_cycle_end!(pstate, plugin, out_pop, dataset, best_seen, options)
     end
     return (out_pop, best_seen, record, num_evals)
 end

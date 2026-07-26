@@ -20,14 +20,19 @@ using DynamicExpressions:
     constructorof
 using ..UtilsModule: subscriptify
 using ..CoreModule:
-    Dataset, AbstractOptions, Options, RecordType, max_features, create_expression
+    Dataset,
+    AbstractOptions,
+    Options,
+    RecordType,
+    max_features,
+    create_expression,
+    init_value
 using ..ComplexityModule: compute_complexity
 using ..PopulationModule: Population
 using ..PopMemberModule: PopMember, AbstractPopMember
 using ..HallOfFameModule: HallOfFame, string_dominating_pareto_curve
 using ..ConstantOptimizationModule: optimize_constants
 using ..ProgressBarsModule: WrappedProgressBar, manually_iterate!, barlen
-using ..AdaptiveParsimonyModule: RunningSearchStatistics
 using ..ExpressionBuilderModule: strip_metadata
 using ..InterfaceDynamicExpressionsModule: takes_eval_options
 using ..CheckConstraintsModule: check_constraints
@@ -35,11 +40,11 @@ using ..CheckConstraintsModule: check_constraints
 function logging_callback! end
 
 @unstable @inline function infer_popmember_type(
-    ::Type{T}, ::Type{L}, ::Type{D}, options
+    ::Type{T}, ::Type{L}, dataset::D, options
 ) where {T,L,D<:Dataset}
     NodeType = with_type_parameters(options.node_type, T)
-    N = Base.promote_op(create_expression, NodeType, typeof(options), D)
-    N in (Any, Union{}) && error("Failed to infer expression type")
+    prototype = constructorof(NodeType)(; val=init_value(T))
+    N = typeof(create_expression(prototype, options, dataset))
     return with_type_parameters(options.popmember_type, T, L, N)
 end
 
@@ -595,14 +600,20 @@ Look through the source of `equation_search` to see how this is used.
 abstract type AbstractSearchState{T,L,N<:AbstractExpression{T}} end
 
 """
-    SearchState{T,L,N,WorkerOutputType,ChannelType} <: AbstractSearchState{T,L,N}
+    SearchState{T,L,N,PM,WorkerOutputType,ChannelType,PluginStatesType} <: AbstractSearchState{T,L,N}
 
 The state of the search, including the populations, worker outputs, tasks, and
 channels. This is used to manage the search and keep track of runtime variables
 in a single struct.
 """
 Base.@kwdef struct SearchState{
-    T,L,N<:AbstractExpression{T},PM<:AbstractPopMember{T,L,N},WorkerOutputType,ChannelType
+    T,
+    L,
+    N<:AbstractExpression{T},
+    PM<:AbstractPopMember{T,L,N},
+    WorkerOutputType,
+    ChannelType,
+    PluginStatesType<:Tuple,
 } <: AbstractSearchState{T,L,N}
     procs::Vector{Int}
     we_created_procs::Bool
@@ -614,13 +625,13 @@ Base.@kwdef struct SearchState{
     halls_of_fame::Vector{HallOfFame{T,L,N,PM}}
     last_pops::Vector{Vector{Population{T,L,N,PM}}}
     best_sub_pops::Vector{Vector{Population{T,L,N,PM}}}
-    all_running_search_statistics::Vector{RunningSearchStatistics}
     num_evals::Vector{Vector{Float64}}
     cycles_remaining::Vector{Int}
     cur_maxsizes::Vector{Int}
     stdin_reader::StdinReader
     record::Base.RefValue{RecordType}
     seed_members::Vector{Vector{PM}}
+    plugin_states::Vector{PluginStatesType}
 end
 
 function save_to_file(
@@ -813,7 +824,7 @@ end
     datasets::Vector{D},
     options::AbstractOptions,
 ) where {T,L,P<:AbstractPopMember{T,L},D<:Dataset{T,L}}
-    ConcreteP = infer_popmember_type(T, L, D, options)
+    ConcreteP = infer_popmember_type(T, L, first(datasets), options)
     return _parse_guesses_impl(ConcreteP, guesses, datasets, options)
 end
 
