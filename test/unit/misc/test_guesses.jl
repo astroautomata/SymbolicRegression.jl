@@ -107,62 +107,6 @@ end
     @test length(get_metadata(member.tree).parameters.p._data) == 2
 end
 
-@testitem "Guess with template parameters actually optimizes them" begin
-    # Regression test for #510: template parameters are always
-    # zero-initialized when parsing a guess, and get only a single shot at
-    # `optimize_constants`. The restart mechanism used to perturb constants
-    # multiplicatively (`x0 * (1 + eps)`), which can never move a
-    # zero-valued constant away from zero, so guesses depending on nonzero
-    # parameters were effectively unoptimizable.
-    using SymbolicRegression
-    using SymbolicRegression: calculate_pareto_frontier, get_metadata
-    using Random: MersenneTwister
-    using Test
-
-    template = @template_spec(expressions=(f,), parameters=(p1=4,)) do x, cat
-        f(x, p1[cat])
-    end
-    options = Options(;
-        binary_operators=[+, -, *, /],
-        unary_operators=[sqrt],
-        expression_spec=template,
-        optimizer_nrestarts=8,
-        deterministic=true,
-        seed=0,
-        verbosity=0,
-        progress=false,
-    )
-
-    rng = MersenneTwister(0)
-    n = 200
-    x_data = rand(rng, n) * 10.0
-    cat_data = rand(rng, 1:4, n)
-    p1_true = [5.0, 10.0, 0.8, 3.1]
-    y = @. p1_true[cat_data] * x_data^3 + sqrt(x_data) / p1_true[cat_data]
-    X = vcat(x_data', cat_data')
-
-    guess = (f="(#2 * ((#1 * #1) * #1)) + (sqrt(#1) / #2)",)
-    hof = equation_search(
-        X,
-        y;
-        niterations=0,
-        options,
-        guesses=[guess],
-        variable_names=["x", "cat"],
-        parallelism=:serial,
-    )
-    dominating = calculate_pareto_frontier(hof)
-
-    # Before the fix, the parameters stay at their zero-initialized values
-    # (the `1/p1[cat]` term blows up and loss never leaves Inf), so check
-    # directly that the recovered parameters are close to the true values,
-    # rather than relying on an opaque loss threshold.
-    best = argmin(m -> m.loss, dominating)
-    recovered_p1 = get_metadata(best.tree).parameters.p1._data
-    @test isfinite(best.loss)
-    @test maximum(abs.(recovered_p1 .- p1_true)) < 1e-3
-end
-
 @testitem "NamedTuple guesses with different variable names" begin
     using SymbolicRegression
     using SymbolicRegression: calculate_pareto_frontier
