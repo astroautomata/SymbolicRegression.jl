@@ -54,7 +54,7 @@ using ..LossFunctionsModule: LossFunctionsModule as LF
 using ..MutateModule: MutateModule as MM
 using ..PopMemberModule: PopMember, AbstractPopMember
 using ..ComposableExpressionModule:
-    AbstractComposableExpression, ComposableExpression, ValidVector
+    AbstractComposableExpression, ComposableExpression, ValidVector, _copy_candidate_state
 
 struct ParamVector{T} <: AbstractVector{T}
     _data::Vector{T}
@@ -373,18 +373,9 @@ end
 
 function Base.copy(e::TemplateExpression)
     ts = get_contents(e)
-    meta = get_metadata(e)
-    meta_inner = DE.ExpressionModule.unpack_metadata(meta)
     copy_ts = NamedTuple{keys(ts)}(map(copy, values(ts)))
-    keys_except_structure = filter(!=(:structure), keys(meta_inner))
-    copy_metadata = (;
-        meta_inner.structure,
-        # Note: this `_copy` is just `copy` but with handling for `nothing` and `NamedTuple`
-        NamedTuple{keys_except_structure}(
-            map(_copy, values(meta_inner[keys_except_structure]))
-        )...,
-    )
-    return DE.constructorof(typeof(e))(copy_ts, Metadata(copy_metadata))
+    copy_parameters = _copy(get_metadata(e).parameters::NamedTuple)
+    return with_metadata(with_contents(e, copy_ts); parameters=copy_parameters)
 end
 function DE.get_contents(e::TemplateExpression)
     return e.trees
@@ -464,6 +455,14 @@ function CO.get_constants_for_optimization(e::TemplateExpression{T}) where {T}
         parameter_keys=has_params(e) ? collect(keys(get_metadata(e).parameters)) : Symbol[],
     )
     return flat, refs
+end
+function CO.get_optimizable_parameters(e::TemplateExpression, options)
+    combiner = get_metadata(e).structure.combine
+    return CO.get_optimizable_parameters(combiner, e, options)
+end
+function CO.count_optimizable_parameters(e::TemplateExpression, options)
+    combiner = get_metadata(e).structure.combine
+    return CO.count_optimizable_parameters(combiner, e, options)
 end
 function CO.set_constants_for_optimization!(e::TemplateExpression, constants, refs)
     cursor = Ref(1)
@@ -917,6 +916,44 @@ function MF.get_contents_for_mutation(ex::TemplateExpression, rng::AbstractRNG)
     return raw_contents[key_to_mutate], key_to_mutate
 end
 
+function _crossover_template_inners(
+    ex1::E, ex2::E, rng::AbstractRNG
+) where {E<:ComposableExpression}
+    return MF.crossover_trees(_copy_candidate_state(ex1), _copy_candidate_state(ex2), rng)
+end
+function _crossover_template_inners(
+    ex1::E, ex2::E, rng::AbstractRNG
+) where {E<:AbstractComposableExpression}
+    return MF.crossover_trees(copy(ex1), copy(ex2), rng)
+end
+
+function _template_crossover_child(
+    ex::TemplateExpression, crossed_inner::AbstractComposableExpression, context::Symbol
+)
+    raw_contents = get_contents(ex)
+    raw_contents_keys = keys(raw_contents)
+    new_contents = NamedTuple{raw_contents_keys}(
+        ntuple(length(raw_contents_keys)) do i
+            key = raw_contents_keys[i]
+            return key == context ? crossed_inner : copy(raw_contents[key])
+        end,
+    )
+    new_parameters = _copy(get_metadata(ex).parameters::NamedTuple)
+    return with_metadata(with_contents(ex, new_contents); parameters=new_parameters)
+end
+
+function MF.crossover_trees(
+    ex1::E, ex2::E, rng::AbstractRNG=default_rng()
+) where {E<:TemplateExpression}
+    ex1 === ex2 && error("Attempted to crossover the same expression!")
+    inner1, context1 = MF.get_contents_for_mutation(ex1, rng)
+    inner2, context2 = MF.get_contents_for_mutation(ex2, rng)
+    crossed1, crossed2 = _crossover_template_inners(inner1, inner2, rng)
+    child1 = _template_crossover_child(ex1, crossed1, context1)
+    child2 = _template_crossover_child(ex2, crossed2, context2)
+    return child1, child2
+end
+
 """See `get_contents_for_mutation(::TemplateExpression, ::AbstractRNG)`."""
 function MF.with_contents_for_mutation(
     ex::TemplateExpression, new_inner_contents, context::Symbol
@@ -1088,7 +1125,9 @@ end
 # Fields
 - `structure`: The `TemplateStructure` defining how inner expressions and parameters
     are combined.
-- `inner_expression_type`: The expression type used for each inner expression.
+- `inner_expression_type`: The expression type used for each inner expression. Custom
+    types must implement the DynamicExpressions expression interface, including
+    `Base.copy` with independent copies of any mutable candidate-local metadata.
 - `inner_expression_options`: Additional keyword arguments passed to inner expressions.
 - `parameter_initializer`: Optional function called as
     `parameter_initializer(rng, T, num_parameters)` when creating a new candidate.

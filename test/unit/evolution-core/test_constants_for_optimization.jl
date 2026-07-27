@@ -32,6 +32,44 @@
     @test SymbolicRegression.get_optimizable_parameters(template, options)[1] == [4.0, 5.0]
 end
 
+@testitem "Template optimizable selection delegates through its combiner" begin
+    using DynamicExpressions
+    using SymbolicRegression
+
+    struct ContextAwareCombiner <: Function end
+    function (::ContextAwareCombiner)(fs, parameters, (x,))
+        return fs.f(x) + parameters.p[1]
+    end
+    struct ContextAwareRefs end
+    function SymbolicRegression.count_optimizable_parameters(
+        ::ContextAwareCombiner, ::TemplateExpression, _options
+    )
+        return 1
+    end
+    function SymbolicRegression.get_optimizable_parameters(
+        ::ContextAwareCombiner, ::TemplateExpression, _options
+    )
+        return [42.0], ContextAwareRefs()
+    end
+
+    operators = OperatorEnum(; binary_operators=(+,))
+    structure = TemplateStructure{(:f,),(:p,)}(
+        ContextAwareCombiner(); num_features=(; f=1), num_parameters=(; p=1)
+    )
+    ex = TemplateExpression(
+        (; f=ComposableExpression(Node{Float64}(; val=3.0); operators));
+        structure,
+        operators,
+        parameters=(; p=[2.0]),
+    )
+    options = Options(; operators)
+
+    parameters, refs = SymbolicRegression.get_optimizable_parameters(ex, options)
+    @test parameters == [42.0]
+    @test refs isa ContextAwareRefs
+    @test SymbolicRegression.count_optimizable_parameters(ex, options) == 1
+end
+
 @testitem "Generic optimizable hooks are options- and refs-aware" begin
     using SymbolicRegression
 

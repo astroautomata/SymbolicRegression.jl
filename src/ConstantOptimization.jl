@@ -72,6 +72,18 @@ function count_optimizable_parameters(ex, options)
 end
 
 """
+    count_optimizable_parameters(context, ex, options)
+
+Return the number of parameters selected for `ex` by an owning `context`.
+
+Structured expressions may route parameter selection through a context object such
+as their combiner. By default the context does not alter constant selection.
+"""
+function count_optimizable_parameters(context, ex, options)
+    return count_constants_for_optimization(ex)
+end
+
+"""
     get_optimizable_parameters(ex, options) -> x0, refs
 
 Flatten the parameters from `ex` that should be optimized under `options` into `x0`.
@@ -82,6 +94,18 @@ The returned `refs` object is passed unchanged to
 By default this forwards to [`get_constants_for_optimization`](@ref).
 """
 function get_optimizable_parameters(ex, options)
+    return get_constants_for_optimization(ex)
+end
+
+"""
+    get_optimizable_parameters(context, ex, options) -> x0, refs
+
+Flatten the parameters selected for `ex` by an owning `context`.
+
+Structured expressions may route parameter selection through a context object such
+as their combiner. By default the context does not alter constant selection.
+"""
+function get_optimizable_parameters(context, ex, options)
     return get_constants_for_optimization(ex)
 end
 
