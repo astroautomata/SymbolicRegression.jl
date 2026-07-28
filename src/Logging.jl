@@ -21,9 +21,10 @@ Abstract type for symbolic regression loggers. Subtypes must implement:
 
 - `get_logger(logger)`: Return the underlying logger
 - `logging_callback!(logger; kws...)`: Callback function for logging.
-    Called with the current state, datasets, runtime options, and options. If you wish to
-    reduce the logging frequency, you can increment and monitor a counter within this
-    function.
+    Called once after each completed search cycle, including the globally terminal
+    cycle, with the current state, datasets, runtime options, and options. If you wish
+    to reduce the logging frequency, you can increment and monitor a counter within
+    this function.
 """
 abstract type AbstractSRLogger <: AbstractLogger end
 
@@ -34,7 +35,9 @@ A logger for symbolic regression that wraps another logger.
 
 # Arguments
 - `logger`: The base logger to wrap
-- `log_interval`: Number of steps between logging events. Default is 100 (log every 100 steps).
+- `log_interval`: Number of steps between intermediate logging events. Default is 100.
+    Positive intervals always emit the normally completed terminal state, even when it
+    does not align with the interval. Nonpositive intervals disable logging.
 """
 Base.@kwdef struct SRLogger{L<:AbstractLogger} <: AbstractSRLogger
     logger::L
@@ -63,6 +66,9 @@ end
 
 Default logging callback for SymbolicRegression.
 
+For positive `log_interval` values, the normally completed terminal state is always
+logged exactly once. Nonpositive intervals disable logging.
+
 To override the default logging behavior, create a new type `MyLogger <: AbstractSRLogger`
 and define a method for `SymbolicRegression.logging_callback`.
 """
@@ -73,7 +79,8 @@ function logging_callback!(
     @nospecialize(ropt::AbstractRuntimeOptions),
     @nospecialize(options::AbstractOptions),
 ) where {T,L}
-    if should_log(logger)
+    is_terminal = all(iszero, state.cycles_remaining)
+    if should_log(logger) || (logger.log_interval > 0 && is_terminal)
         data = log_payload(logger, state, datasets, options)
         LG.with_logger(logger) do
             @info("search", data = data)

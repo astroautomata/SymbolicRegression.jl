@@ -36,7 +36,8 @@
 
     # Check TensorBoardLogger
     b = TensorBoardLogger.steps(tb_logger)
-    @test length(b) == (niterations * populations//2) + 1
+    # Interval-selected records, the forced terminal record, and TensorBoard metadata:
+    @test length(b) == (niterations * populations ÷ 2) + 2
     files_and_dirs = readdir(dir)
     @test length(files_and_dirs) == 1
     @test occursin(r"events\.out\.tfevents", only(files_and_dirs))

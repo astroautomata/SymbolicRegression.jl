@@ -1149,67 +1149,68 @@ function _main_search_loop!(
             ###################################################################
 
             state.cycles_remaining[j] -= 1
-            if state.cycles_remaining[j] == 0
-                break
-            end
-            worker_idx = assign_next_worker!(
-                state.worker_assignment;
-                out=j,
-                pop=i,
-                parallelism=ropt.parallelism,
-                state.procs,
-            )
-            iteration = if options.use_recorder isa Val{true}
-                key = "out$(j)_pop$(i)"
-                find_iteration_from_record(key, state.record[]) + 1
-            else
-                0
-            end
+            if state.cycles_remaining[j] > 0
+                worker_idx = assign_next_worker!(
+                    state.worker_assignment;
+                    out=j,
+                    pop=i,
+                    parallelism=ropt.parallelism,
+                    state.procs,
+                )
+                iteration = if options.use_recorder isa Val{true}
+                    key = "out$(j)_pop$(i)"
+                    find_iteration_from_record(key, state.record[]) + 1
+                else
+                    0
+                end
 
-            in_pop = copy(cur_pop::Population{T,L,N})
-            worker_plugin_states = strictmap(
-                options.plugins, returned_plugin_states, state.plugin_states[j]
-            ) do plugin, worker_state, latest_head_state
-                refresh_worker_plugin_state(worker_state, latest_head_state, plugin, dataset)
-            end
-            state.worker_output[j][i] = @sr_spawner(
-                begin
-                    _dispatch_s_r_cycle(
-                        in_pop,
-                        dataset,
-                        options;
-                        pop=i,
-                        out=j,
-                        iteration,
-                        ropt.verbosity,
-                        cur_maxsize,
-                        plugin_states=worker_plugin_states,
+                in_pop = copy(cur_pop::Population{T,L,N})
+                worker_plugin_states = strictmap(
+                    options.plugins, returned_plugin_states, state.plugin_states[j]
+                ) do plugin, worker_state, latest_head_state
+                    refresh_worker_plugin_state(
+                        worker_state, latest_head_state, plugin, dataset
                     )
-                end,
-                parallelism = ropt.parallelism,
-                worker_idx = worker_idx
-            )
-            if ropt.parallelism in (:multiprocessing, :multithreading)
-                state.tasks[j][i] = @filtered_async put!(
-                    state.channels[j][i], fetch(state.worker_output[j][i])
+                end
+                state.worker_output[j][i] = @sr_spawner(
+                    begin
+                        _dispatch_s_r_cycle(
+                            in_pop,
+                            dataset,
+                            options;
+                            pop=i,
+                            out=j,
+                            iteration,
+                            ropt.verbosity,
+                            cur_maxsize,
+                            plugin_states=worker_plugin_states,
+                        )
+                    end,
+                    parallelism = ropt.parallelism,
+                    worker_idx = worker_idx
                 )
-            end
+                if ropt.parallelism in (:multiprocessing, :multithreading)
+                    state.tasks[j][i] = @filtered_async put!(
+                        state.channels[j][i], fetch(state.worker_output[j][i])
+                    )
+                end
 
-            total_cycles = ropt.niterations * options.populations
-            state.cur_maxsizes[j] = get_cur_maxsize(;
-                options, total_cycles, cycles_remaining=state.cycles_remaining[j]
-            )
-            if !isnothing(progress_bar)
-                head_node_occupation = estimate_work_fraction(resource_monitor)
-                update_progress_bar!(
-                    progress_bar,
-                    only(state.halls_of_fame),
-                    only(datasets),
-                    options,
-                    equation_speed,
-                    head_node_occupation,
-                    ropt.parallelism,
+                total_cycles = ropt.niterations * options.populations
+                state.cur_maxsizes[j] = get_cur_maxsize(;
+                    options, total_cycles, cycles_remaining=state.cycles_remaining[j]
                 )
+                if !isnothing(progress_bar)
+                    head_node_occupation = estimate_work_fraction(resource_monitor)
+                    update_progress_bar!(
+                        progress_bar,
+                        only(state.halls_of_fame),
+                        only(datasets),
+                        options,
+                        equation_speed,
+                        head_node_occupation,
+                        ropt.parallelism,
+                    )
+                end
             end
             if ropt.logger !== nothing
                 logging_callback!(ropt.logger; state, datasets, ropt, options)
