@@ -25,3 +25,4 @@ jobs:
         with:
           julia-version: "1"
           exeflags: "-O3 --threads=auto"
+          bench-on: ${{ github.event.pull_request.head.sha }}
