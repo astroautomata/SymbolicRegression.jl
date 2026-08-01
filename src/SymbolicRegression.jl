@@ -204,7 +204,7 @@ using Compat: @compat, Fix
         AbstractComposableExpression,
         optimize_constants, get_constants_for_optimization,
         set_constants_for_optimization!, extract_gradient_for_optimization,
-        AbstractPlugin, MutationEvent,
+        AbstractPlugin, PluginInterface, MutationInterface, MutationEvent,
         init_plugin_state,
         on_search_start!, on_search_end!,
         on_generation_end!, on_cycle_end!, on_mutation_end!, init_member,
@@ -269,6 +269,8 @@ using DispatchDoctor: @stable, @unstable
 
     __dispatch_doctor_unsable_test() = Val(rand(1:10))
 end
+
+include("Interfaces.jl")
 
 using .CoreModule:
     DATA_TYPE,
@@ -438,6 +440,7 @@ using .AdaptiveParsimonyModule: AdaptiveParsimonyPlugin
 using .AdaptiveMutationWeightsModule: AdaptiveMutationWeightsPlugin
 using .MutationBurstModule: MutationBurstPlugin
 using .SimulatedAnnealingModule: SimulatedAnnealingPlugin
+using .InterfacesModule: PluginInterface, MutationInterface
 
 @stable default_mode = "disable" begin
     include("deprecates.jl")

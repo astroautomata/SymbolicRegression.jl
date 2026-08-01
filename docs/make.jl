@@ -8,6 +8,8 @@ using SymbolicRegression:
     Dataset,
     update_baseline_loss!,
     AbstractOptions,
+    PluginInterface,
+    MutationInterface,
     mutate!,
     condition_mutation_weights!,
     sample_mutation,
