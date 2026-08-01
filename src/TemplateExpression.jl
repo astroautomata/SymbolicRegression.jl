@@ -54,7 +54,7 @@ using ..LossFunctionsModule: LossFunctionsModule as LF
 using ..MutateModule: MutateModule as MM
 using ..PopMemberModule: PopMember, AbstractPopMember
 using ..ComposableExpressionModule:
-    AbstractComposableExpression, ComposableExpression, ValidVector, _copy_candidate_state
+    AbstractComposableExpression, ComposableExpression, ValidVector
 
 struct ParamVector{T} <: AbstractVector{T}
     _data::Vector{T}
@@ -434,54 +434,33 @@ function DE.set_scalar_constants!(e::TemplateExpression, constants, refs)
     return e
 end
 
-_parameter_data(x::ParamVector) = x._data
-_parameter_data(x) = x
-
-function CO.get_constants_for_optimization(e::TemplateExpression{T}) where {T}
-    inner_params_and_refs = map(CO.get_constants_for_optimization, values(get_contents(e)))
-    inner_chunks = first.(inner_params_and_refs)
-    parameter_chunks = if has_params(e)
-        map(_parameter_data, values(get_metadata(e).parameters))
-    else
-        ()
-    end
-    flat = if isempty(inner_chunks) && isempty(parameter_chunks)
-        T[]
-    else
-        vcat(inner_chunks..., parameter_chunks...)
-    end
-    refs = (
-        inner=map(pr -> (; n=length(first(pr)), ref=last(pr)), inner_params_and_refs),
-        parameter_keys=has_params(e) ? collect(keys(get_metadata(e).parameters)) : Symbol[],
-    )
-    return flat, refs
+struct TemplateOptimizableRefs{R}
+    scalar_refs::R
+    length::Int
 end
+
 function CO.get_optimizable_parameters(e::TemplateExpression, options)
     combiner = get_metadata(e).structure.combine
     return CO.get_optimizable_parameters(combiner, e, options)
 end
-function CO.count_optimizable_parameters(e::TemplateExpression, options)
-    combiner = get_metadata(e).structure.combine
-    return CO.count_optimizable_parameters(combiner, e, options)
+function CO.get_optimizable_parameters(_context, e::TemplateExpression, _options)
+    parameters, scalar_refs = DE.get_scalar_constants(e)
+    return parameters, TemplateOptimizableRefs(scalar_refs, length(parameters))
 end
-function CO.set_constants_for_optimization!(e::TemplateExpression, constants, refs)
-    cursor = Ref(1)
-    foreach(values(get_contents(e)), refs.inner) do tree, r
-        let n = r.n, i = cursor[]
-            CO.set_constants_for_optimization!(tree, constants[i:(i + n - 1)], r.ref)
-            cursor[] = i + n
-        end
-    end
-    if has_params(e)
-        parameters = get_metadata(e).parameters
-        for k in refs.parameter_keys
-            let n = length(parameters[k]), i = cursor[]
-                parameters[k]._data[:] = constants[i:(i + n - 1)]
-                cursor[] = i + n
-            end
-        end
-    end
-    return e
+function CO.set_optimizable_parameters!(
+    e::TemplateExpression, parameters, refs::TemplateOptimizableRefs
+)
+    length(parameters) == refs.length || throw(
+        DimensionMismatch(
+            "received $(length(parameters)) optimizable parameters but expected $(refs.length)",
+        ),
+    )
+    return DE.set_scalar_constants!(e, parameters, refs.scalar_refs)
+end
+function CO.extract_optimizable_gradient(
+    grad, e::TemplateExpression, _refs::TemplateOptimizableRefs
+)
+    return DE.extract_gradient(grad, e)
 end
 Base.@kwdef struct PreallocatedTemplateExpression{A,B}
     trees::A
@@ -918,11 +897,6 @@ end
 
 function _crossover_template_inners(
     ex1::E, ex2::E, rng::AbstractRNG
-) where {E<:ComposableExpression}
-    return MF.crossover_trees(_copy_candidate_state(ex1), _copy_candidate_state(ex2), rng)
-end
-function _crossover_template_inners(
-    ex1::E, ex2::E, rng::AbstractRNG
 ) where {E<:AbstractComposableExpression}
     return MF.crossover_trees(copy(ex1), copy(ex2), rng)
 end
@@ -1054,18 +1028,21 @@ end
 
 # TODO: Look at other ParametricExpression behavior
 
-for f in (:(DE.count_scalar_constants), :(CO.count_constants_for_optimization))
-    @eval function $f(ex::TemplateExpression)
-        return (
-            sum($f, values(get_contents(ex))) +
-            (has_params(ex) ? sum($f, values(get_metadata(ex).parameters)) : 0)
+function DE.count_scalar_constants(ex::TemplateExpression)
+    return (
+        sum(DE.count_scalar_constants, values(get_contents(ex))) + (
+            if has_params(ex)
+                sum(DE.count_scalar_constants, values(get_metadata(ex).parameters))
+            else
+                0
+            end
         )
-    end
-    @eval function $f(p::ParamVector)
-        # TODO: This is not general enough; we should be using `get_scalar_constants`
-        # on the parameters themselves.
-        return length(p._data)
-    end
+    )
+end
+function DE.count_scalar_constants(p::ParamVector)
+    # TODO: This is not general enough; we should be using `get_scalar_constants`
+    # on the parameters themselves.
+    return length(p._data)
 end
 
 function CC.check_constraints(

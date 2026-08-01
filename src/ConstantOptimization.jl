@@ -8,7 +8,6 @@ using DifferentiationInterface: value_and_gradient, prepare_gradient
 using DynamicExpressions:
     AbstractExpression,
     Expression,
-    count_scalar_constants,
     get_scalar_constants,
     set_scalar_constants!,
     extract_gradient
@@ -33,6 +32,9 @@ Flatten all parameters optimized by `optimize_constants` into a single vector `x
 along with any references needed by [`set_constants_for_optimization!`](@ref).
 
 By default this forwards to `get_scalar_constants`.
+
+New expression integrations should overload [`get_optimizable_parameters`](@ref)
+instead. This method remains as a compatibility hook for existing integrations.
 """
 get_constants_for_optimization(ex::AbstractExpression) = get_scalar_constants(ex)
 
@@ -43,6 +45,9 @@ Set the optimizable parameters of `ex` from the flat vector `x`, using the `refs
 returned by [`get_constants_for_optimization`](@ref).
 
 By default this forwards to `set_scalar_constants!`.
+
+New expression integrations should overload [`set_optimizable_parameters!`](@ref)
+instead. This method remains as a compatibility hook for existing integrations.
 """
 function set_constants_for_optimization!(ex::AbstractExpression, x, refs)
     set_scalar_constants!(ex, x, refs)
@@ -55,33 +60,11 @@ Extract the gradient of all optimizable parameters of `ex` into the same flatten
 order returned by [`get_constants_for_optimization`](@ref).
 
 By default this forwards to `extract_gradient`.
+
+New expression integrations should overload [`extract_optimizable_gradient`](@ref)
+instead. This method remains as a compatibility hook for existing integrations.
 """
 extract_gradient_for_optimization(grad, ex::AbstractExpression) = extract_gradient(grad, ex)
-
-"""
-    count_optimizable_parameters(ex, options)
-
-Return the number of parameters from `ex` that should be optimized under `options`.
-
-By default this forwards to [`count_constants_for_optimization`](@ref). Custom
-expression integrations may overload this method to make parameter selection depend
-on the active options.
-"""
-function count_optimizable_parameters(ex, options)
-    return count_constants_for_optimization(ex)
-end
-
-"""
-    count_optimizable_parameters(context, ex, options)
-
-Return the number of parameters selected for `ex` by an owning `context`.
-
-Structured expressions may route parameter selection through a context object such
-as their combiner. By default the context does not alter constant selection.
-"""
-function count_optimizable_parameters(context, ex, options)
-    return count_constants_for_optimization(ex)
-end
 
 """
     get_optimizable_parameters(ex, options) -> x0, refs
@@ -92,9 +75,17 @@ The returned `refs` object is passed unchanged to
 [`extract_optimizable_gradient`](@ref).
 
 By default this forwards to [`get_constants_for_optimization`](@ref).
+
+The returned `refs` is opaque and only valid for the expression state and `x0`
+returned by the same call. Implementations must preserve parameter ordering across
+this function, [`set_optimizable_parameters!`](@ref), and
+[`extract_optimizable_gradient`](@ref).
 """
 function get_optimizable_parameters(ex, options)
     return get_constants_for_optimization(ex)
+end
+function get_optimizable_parameters(ex::Expression, options)
+    return get_scalar_constants(ex)
 end
 
 """
@@ -106,7 +97,7 @@ Structured expressions may route parameter selection through a context object su
 as their combiner. By default the context does not alter constant selection.
 """
 function get_optimizable_parameters(context, ex, options)
-    return get_constants_for_optimization(ex)
+    return get_optimizable_parameters(ex, options)
 end
 
 """
@@ -116,9 +107,15 @@ Set the optimizable parameters of `ex` from `x`, using the opaque `refs` object
 returned by [`get_optimizable_parameters`](@ref).
 
 By default this forwards to [`set_constants_for_optimization!`](@ref).
+
+Implementations must consume parameters in exactly the order returned by
+[`get_optimizable_parameters`](@ref).
 """
 function set_optimizable_parameters!(ex, x, refs)
     return set_constants_for_optimization!(ex, x, refs)
+end
+function set_optimizable_parameters!(ex::Expression, x, refs)
+    return set_scalar_constants!(ex, x, refs)
 end
 
 """
@@ -129,9 +126,15 @@ Extract the gradient of the selected parameters in the same order returned by
 by that call, allowing custom integrations to preserve an active parameter subset.
 
 By default this forwards to [`extract_gradient_for_optimization`](@ref).
+
+Implementations must return one gradient entry for each parameter returned by
+[`get_optimizable_parameters`](@ref), in the same order.
 """
 function extract_optimizable_gradient(grad, ex, refs)
     return extract_gradient_for_optimization(grad, ex)
+end
+function extract_optimizable_gradient(grad, ex::Expression, refs)
+    return extract_gradient(grad, ex)
 end
 
 @unstable function optimize_constants(
@@ -170,9 +173,6 @@ end
         rng,
     )
 end
-
-"""How many constants will be optimized."""
-count_constants_for_optimization(ex::Expression) = count_scalar_constants(ex)
 
 function _optimize_constants(
     dataset, member::P, x0, refs, options, algorithm, optimizer_options, rng
@@ -283,7 +283,14 @@ function (g::GradEvaluator{<:Any,AD})(_, G, x::AbstractVector) where {AD}
     maybe_prep = isnothing(g.prep) ? () : (g.prep,)
     (val, grad) = value_and_gradient(g.e.ctx, maybe_prep..., g.backend, g.e.tree)
     if G !== nothing && grad !== nothing
-        G .= extract_optimizable_gradient(grad, g.e.tree, g.e.refs)
+        extracted_gradient = extract_optimizable_gradient(grad, g.e.tree, g.e.refs)
+        length(extracted_gradient) == length(G) || throw(
+            DimensionMismatch(
+                "extracted $(length(extracted_gradient)) parameter gradients for " *
+                "an optimization vector of length $(length(G))",
+            ),
+        )
+        G .= extracted_gradient
     end
     return val
 end

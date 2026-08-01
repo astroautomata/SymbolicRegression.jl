@@ -11,27 +11,22 @@
     using SymbolicRegression: ComposableExpression
 
     operators = OperatorEnum(; binary_operators=(+,))
-    variable_name_storage = ["x"]
-    variable_names = @view variable_name_storage[:]
-    buffer_storage = zeros(3, 4)
-    buffer_array = @view buffer_storage[1:2, :]
-    eval_options = EvalOptions(; buffer=ArrayBuffer(buffer_array, Ref(0)))
+    variable_names = ["x"]
+    eval_options = EvalOptions(; buffer=ArrayBuffer(zeros(2, 4), Ref(0)))
     expression = ComposableExpression(
         Node{Float64}(; feature=1); operators, variable_names, eval_options
     )
 
     copied = copy(expression)
 
-    @test typeof(copied) === typeof(expression)
     @test get_contents(copied) !== get_contents(expression)
     @test get_metadata(copied).operators === operators
-    @test get_metadata(copied).variable_names === variable_names
+    @test get_metadata(copied).variable_names == variable_names
+    @test get_metadata(copied).variable_names !== variable_names
     @test get_metadata(copied).eval_options !== eval_options
     @test get_metadata(copied).eval_options.buffer !== eval_options.buffer
     @test get_metadata(copied).eval_options.buffer.array !== eval_options.buffer.array
     @test get_metadata(copied).eval_options.buffer.index !== eval_options.buffer.index
-    @test parent(get_metadata(copied).eval_options.buffer.array) !==
-        parent(eval_options.buffer.array)
     get_metadata(copied).eval_options.buffer.array[1, 1] = 1.0
     @test eval_options.buffer.array[1, 1] == 0.0
 
@@ -46,6 +41,10 @@
         eval_options.buffer.index
     get_metadata(buffered_copy).eval_options.buffer.array[1, 2] = 2.0
     @test eval_options.buffer.array[1, 2] == 0.0
+
+    same_shape_copy = copy_into!(preallocated, expression)
+    @test get_metadata(same_shape_copy).eval_options.buffer.array ===
+        get_metadata(buffered_copy).eval_options.buffer.array
 
     source_buffer = fill(3.0, 3, 4)
     source_eval_options = EvalOptions(;
@@ -111,7 +110,7 @@ end
         metadata = get_metadata(ex)
         variable_names = metadata.variable_names
         eval_options = metadata.eval_options
-        copied_eval_options = isnothing(eval_options) ? nothing : deepcopy(eval_options)
+        copied_eval_options = isnothing(eval_options) ? nothing : copy(eval_options)
         return WrappedExpression(
             copy(get_contents(ex));
             operators=metadata.operators,

@@ -166,8 +166,14 @@ function MF.crossover_trees(
     return ex1, ex2
 end
 
-function CO.count_constants_for_optimization(ex::ParametricExpression)
-    return CO.count_scalar_constants(get_tree(ex)) + length(get_metadata(ex).parameters)
+function CO.get_optimizable_parameters(ex::ParametricExpression, _options)
+    return DE.get_scalar_constants(ex)
+end
+function CO.set_optimizable_parameters!(ex::ParametricExpression, x, refs)
+    return DE.set_scalar_constants!(ex, x, refs)
+end
+function CO.extract_optimizable_gradient(grad, ex::ParametricExpression, _refs)
+    return DE.extract_gradient(grad, ex)
 end
 
 function MF.mutate_constant(

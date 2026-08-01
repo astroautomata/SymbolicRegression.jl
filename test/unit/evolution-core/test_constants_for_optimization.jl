@@ -10,7 +10,6 @@
     flat = SymbolicRegression.get_optimizable_parameters(expr, options)[1]
     @test flat == [2.0]
     @test length(flat) == 1
-    @test SymbolicRegression.count_optimizable_parameters(expr, options) == 1
 
     structure = TemplateStructure{(:f,),(:p,)}(
         ((; f), (; p), (x,)) -> f(x) * p[1]; num_parameters=(; p=1)
@@ -26,10 +25,12 @@
     params, refs = SymbolicRegression.get_optimizable_parameters(template, options)
     @test params == [3.0, 2.0]
     @test length(params) == 2
-    @test SymbolicRegression.count_optimizable_parameters(template, options) == 2
 
     SymbolicRegression.set_optimizable_parameters!(template, [4.0, 5.0], refs)
     @test SymbolicRegression.get_optimizable_parameters(template, options)[1] == [4.0, 5.0]
+    @test_throws DimensionMismatch SymbolicRegression.set_optimizable_parameters!(
+        template, [6.0], refs
+    )
 end
 
 @testitem "Template optimizable selection delegates through its combiner" begin
@@ -41,11 +42,6 @@ end
         return fs.f(x) + parameters.p[1]
     end
     struct ContextAwareRefs end
-    function SymbolicRegression.count_optimizable_parameters(
-        ::ContextAwareCombiner, ::TemplateExpression, _options
-    )
-        return 1
-    end
     function SymbolicRegression.get_optimizable_parameters(
         ::ContextAwareCombiner, ::TemplateExpression, _options
     )
@@ -67,7 +63,6 @@ end
     parameters, refs = SymbolicRegression.get_optimizable_parameters(ex, options)
     @test parameters == [42.0]
     @test refs isa ContextAwareRefs
-    @test SymbolicRegression.count_optimizable_parameters(ex, options) == 1
 end
 
 @testitem "Generic optimizable hooks are options- and refs-aware" begin
@@ -80,9 +75,6 @@ end
         indices::Vector{Int}
     end
 
-    function SymbolicRegression.count_optimizable_parameters(box::OptimizableBox, options)
-        return count(options.active)
-    end
     function SymbolicRegression.get_optimizable_parameters(box::OptimizableBox, options)
         refs = OptimizableBoxRefs(findall(options.active))
         return box.values[refs.indices], refs
@@ -103,7 +95,6 @@ end
     options = (; active=Bool[true, false, true])
     params, refs = SymbolicRegression.get_optimizable_parameters(box, options)
 
-    @test SymbolicRegression.count_optimizable_parameters(box, options) == 2
     @test params == [1.0, 3.0]
     @test refs.indices == [1, 3]
     @test SymbolicRegression.extract_optimizable_gradient([0.1, 0.2, 0.3], box, refs) ==

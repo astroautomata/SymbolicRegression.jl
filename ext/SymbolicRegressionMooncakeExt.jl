@@ -2,13 +2,12 @@ module SymbolicRegressionMooncakeExt
 
 using DynamicExpressions: DynamicExpressions as DE
 using SymbolicRegression: SymbolicRegression as SR
-using SymbolicRegression.ConstantOptimizationModule: count_constants_for_optimization
 using Mooncake: Mooncake
 
 function DE.extract_gradient(
     gradient::Mooncake.Tangent, ex::SR.TemplateExpression{T}
 ) where {T}
-    n_const = count_constants_for_optimization(ex)
+    n_const = DE.count_scalar_constants(ex)
     out = Array{T}(undef, n_const)
     i = firstindex(out)
     for (tree_gradient, tree) in zip(values(gradient.fields.trees), values(ex.trees))

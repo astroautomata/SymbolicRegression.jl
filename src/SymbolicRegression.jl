@@ -204,7 +204,7 @@ using Compat: @compat, Fix
         AbstractComposableExpression,
         optimize_constants, get_constants_for_optimization,
         set_constants_for_optimization!, extract_gradient_for_optimization,
-        count_optimizable_parameters, get_optimizable_parameters,
+        get_optimizable_parameters,
         set_optimizable_parameters!, extract_optimizable_gradient,
         AbstractPlugin, MutationEvent,
         init_plugin_state,
@@ -377,7 +377,6 @@ using .ConstantOptimizationModule:
     get_constants_for_optimization,
     set_constants_for_optimization!,
     extract_gradient_for_optimization,
-    count_optimizable_parameters,
     get_optimizable_parameters,
     set_optimizable_parameters!,
     extract_optimizable_gradient

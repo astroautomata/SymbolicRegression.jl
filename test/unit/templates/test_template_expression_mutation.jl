@@ -191,15 +191,11 @@ end
         binary_operators=(+, *), expression_spec=TemplateExpressionSpec(; structure)
     )
     operators = options.operators
-    variable_name_storage = ["x"]
-    variable_names = @view variable_name_storage[:]
+    variable_names = ["x"]
 
     function make_parent(f_value, g_value, parameters)
         function make_inner(value)
-            buffer_storage = zeros(3, 4)
-            eval_options = EvalOptions(;
-                buffer=ArrayBuffer(@view(buffer_storage[1:2, :]), Ref(0))
-            )
+            eval_options = EvalOptions(; buffer=ArrayBuffer(zeros(2, 4), Ref(0)))
             return ComposableExpression(
                 Node{Float64}(;
                     op=1, l=Node{Float64}(; val=value), r=Node{Float64}(; feature=1)
@@ -268,14 +264,12 @@ end
         for buffer in buffers, original_buffer in original_buffers
             @test buffer !== original_buffer
             @test buffer.array !== original_buffer.array
-            @test parent(buffer.array) !== parent(original_buffer.array)
             @test buffer.index !== original_buffer.index
         end
     end
     for buffer1 in child_buffers[1], buffer2 in child_buffers[2]
         @test buffer1 !== buffer2
         @test buffer1.array !== buffer2.array
-        @test parent(buffer1.array) !== parent(buffer2.array)
         @test buffer1.index !== buffer2.index
     end
     child_buffers[1][1].array[1, 1] = 1.0

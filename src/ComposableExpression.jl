@@ -95,16 +95,8 @@ function DE.set_scalar_constants!(ex::AbstractComposableExpression, constants, r
     return DE.set_scalar_constants!(DE.get_contents(ex), constants, refs)
 end
 
-function _copy_candidate_state(ex::E)::E where {E<:ComposableExpression}
-    eval_options = DE.get_metadata(ex).eval_options
-    isnothing(eval_options) && return ex
-    copied_eval_options = deepcopy(eval_options)::typeof(eval_options)
-    return DE.with_metadata(ex; eval_options=copied_eval_options)::E
-end
-
-function Base.copy(ex::E) where {E<:ComposableExpression}
-    copied = DE.with_contents(ex, copy(DE.get_contents(ex)))::E
-    return _copy_candidate_state(copied)
+function Base.copy(ex::ComposableExpression)
+    return ComposableExpression(copy(DE.get_contents(ex)), copy(DE.get_metadata(ex)))
 end
 
 function Base.convert(::Type{E}, ex::AbstractComposableExpression) where {E<:Expression}
@@ -124,8 +116,14 @@ end
 function DE.count_scalar_constants(ex::AbstractComposableExpression)
     return DE.count_scalar_constants(convert(Expression, ex))
 end
-function CO.count_constants_for_optimization(ex::AbstractComposableExpression)
-    return CO.count_constants_for_optimization(convert(Expression, ex))
+function CO.get_optimizable_parameters(ex::ComposableExpression, _options)
+    return DE.get_scalar_constants(ex)
+end
+function CO.set_optimizable_parameters!(ex::ComposableExpression, x, refs)
+    return DE.set_scalar_constants!(ex, x, refs)
+end
+function CO.extract_optimizable_gradient(grad, ex::ComposableExpression, _refs)
+    return DE.extract_gradient(grad, ex)
 end
 
 struct PreallocatedComposableExpression{N,E}
@@ -133,39 +131,31 @@ struct PreallocatedComposableExpression{N,E}
     eval_options::E
 end
 
-_copy_eval_options_into!(::Nothing, ::Nothing) = nothing
-_copy_eval_options_into!(::EvalOptions, ::Nothing) = nothing
-function _copy_eval_options_into!(::Nothing, src::E)::E where {E<:EvalOptions}
-    return deepcopy(src)::E
-end
-function _copy_eval_options_into!(::EvalOptions, src::E)::E where {E<:EvalOptions}
-    return deepcopy(src)::E
-end
-function _copy_eval_options_into!(dest::E, src::E) where {E<:EvalOptions}
-    dest_buffer = dest.buffer
-    src_buffer = src.buffer
-    isnothing(src_buffer) && return src
-    if isnothing(dest_buffer) || axes(dest_buffer.array) != axes(src_buffer.array)
-        return deepcopy(src)::E
+_reuse_or_copy_eval_options(::Nothing, ::Nothing) = nothing
+_reuse_or_copy_eval_options(::EvalOptions, ::Nothing) = nothing
+_reuse_or_copy_eval_options(::Nothing, src::EvalOptions) = copy(src)
+function _reuse_or_copy_eval_options(dest::E, src::E) where {E<:EvalOptions}
+    if isnothing(src.buffer) ||
+        (!isnothing(dest.buffer) && axes(dest.buffer.array) == axes(src.buffer.array))
+        return dest
     end
-    copyto!(dest_buffer.array, src_buffer.array)
-    dest_buffer.index[] = src_buffer.index[]
-    return dest
+    return copy(src)
 end
+_reuse_or_copy_eval_options(::EvalOptions, src::EvalOptions) = copy(src)
 
 function DE.allocate_container(
     prototype::ComposableExpression, n::Union{Nothing,Integer}=nothing
 )
     eval_options = DE.get_metadata(prototype).eval_options
-    copied_eval_options = isnothing(eval_options) ? nothing : deepcopy(eval_options)
     return PreallocatedComposableExpression(
-        DE.allocate_container(get_contents(prototype), n), copied_eval_options
+        DE.allocate_container(get_contents(prototype), n),
+        isnothing(eval_options) ? nothing : copy(eval_options),
     )
 end
 function DE.copy_into!(dest::PreallocatedComposableExpression, src::ComposableExpression)
     new_tree = DE.copy_into!(dest.tree, get_contents(src))
     metadata = DE.get_metadata(src)
-    eval_options = _copy_eval_options_into!(dest.eval_options, metadata.eval_options)
+    eval_options = _reuse_or_copy_eval_options(dest.eval_options, metadata.eval_options)
     new_metadata = Metadata((;
         operators=metadata.operators, variable_names=metadata.variable_names, eval_options
     ))
