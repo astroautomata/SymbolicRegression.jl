@@ -68,7 +68,7 @@ function on_cycle_start!(
     ncycles::Int,
     options::AbstractOptions,
 )
-    s.temperature = ncycles > 1 ? (ncycles - cycle_idx) / (ncycles - 1) : 1.0
+    s.temperature = ncycles > 1 ? LinRange(1.0, 0.0, ncycles)[cycle_idx] : 1.0
     return nothing
 end
 
