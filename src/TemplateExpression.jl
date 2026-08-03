@@ -1106,7 +1106,7 @@ end
     types must implement the DynamicExpressions expression interface, including
     `Base.copy` with independent copies of any mutable candidate-local metadata.
 - `inner_expression_options`: Additional keyword arguments passed to inner expressions.
-- `parameter_initializer`: Optional function called as
+- `parameter_initializer`: **Experimental** optional function called as
     `parameter_initializer(rng, T, num_parameters)` when creating a new candidate.
     It must return a `NamedTuple` with the same keys and vector lengths as
     `num_parameters`. By default, template parameters are initialized with `randn`.
