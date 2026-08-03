@@ -110,6 +110,20 @@ function MM.condition_mutate_constant!(
     # otherwise we would be mutating constants all the time!
     return nothing
 end
+
+function random_parameter_leaf(
+    ::Type{T}, rng::AbstractRNG, options::AbstractOptions
+) where {T<:DATA_TYPE}
+    tree = ParametricNode{T}()
+    tree.val = zero(T)
+    tree.degree = 0
+    tree.feature = 0
+    tree.constant = false
+    tree.is_parameter = true
+    tree.parameter = rand(rng, UInt16(1):UInt16(options.expression_options.max_parameters))
+    return tree
+end
+
 function MF.make_random_leaf(
     nfeatures::Int,
     ::Type{T},
@@ -117,22 +131,29 @@ function MF.make_random_leaf(
     rng::AbstractRNG=default_rng(),
     options::Union{AbstractOptions,Nothing}=nothing,
 ) where {T<:DATA_TYPE,N<:ParametricNode}
+    if isnothing(options)
+        choice = rand(rng, 1:2)
+        if choice == 1
+            return ParametricNode(; val=randn(rng, T))
+        end
+        return ParametricNode(T; feature=rand(rng, 1:nfeatures))
+    end
+
+    if !options.use_constants
+        choice = rand(rng, 1:2)
+        if choice == 1
+            return ParametricNode(T; feature=rand(rng, 1:nfeatures))
+        end
+        return random_parameter_leaf(T, rng, options)
+    end
+
     choice = rand(rng, 1:3)
     if choice == 1
         return ParametricNode(; val=randn(rng, T))
     elseif choice == 2
         return ParametricNode(T; feature=rand(rng, 1:nfeatures))
     else
-        tree = ParametricNode{T}()
-        tree.val = zero(T)
-        tree.degree = 0
-        tree.feature = 0
-        tree.constant = false
-        tree.is_parameter = true
-        tree.parameter = rand(
-            rng, UInt16(1):UInt16(options.expression_options.max_parameters)
-        )
-        return tree
+        return random_parameter_leaf(T, rng, options)
     end
 end
 

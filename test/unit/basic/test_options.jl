@@ -170,3 +170,65 @@ end
         [(-1, -1, -1, -1, -1)],
     )
 end
+
+@testitem "Test use_constants disables constant operations" begin
+    using SymbolicRegression
+    using Random: MersenneTwister
+    using DynamicExpressions: ParametricNode
+    using SymbolicRegression: condition_mutation_weights!
+    using SymbolicRegression.MutationFunctionsModule: make_random_leaf
+
+    options = Options(;
+        binary_operators=(+, -, *),
+        mutation_weights=MutationWeights(; mutate_constant=1.0, optimize=1.0),
+        should_optimize_constants=true,
+        probability_negate_constant=0.4,
+        use_constants=false,
+    )
+
+    @test options.use_constants == false
+    @test options.should_optimize_constants == false
+    @test options.probability_negate_constant == 0.0f0
+
+    rng = MersenneTwister(0)
+    for _ in 1:20
+        tree = gen_random_tree(8, options, 5, Float32, rng)
+        @test !any(node -> node.degree == 0 && node.constant, tree)
+    end
+
+    constant_tree = Node(Float64; val=1.0)
+    dataset = Dataset(randn(MersenneTwister(1), 1, 4), ones(4))
+    member = PopMember(dataset, constant_tree, options; deterministic=true)
+    weights = MutationWeights(; mutate_constant=1.0, optimize=1.0, mutate_feature=1.0)
+    condition_mutation_weights!(weights, member, options, 8, 1)
+    @test weights.mutate_constant == 0.0
+    @test weights.optimize == 0.0
+
+    parametric_options = Options(;
+        expression_spec=ParametricExpressionSpec(; max_parameters=3, warn=false),
+        use_constants=false,
+    )
+    parametric_counts = (; constant=Ref(0), feature=Ref(0), parameter=Ref(0))
+    for _ in 1:40
+        leaf = make_random_leaf(
+            5, Float32, ParametricNode{Float32}, rng, parametric_options
+        )
+        if leaf.constant
+            parametric_counts.constant[] += 1
+        elseif leaf.is_parameter
+            parametric_counts.parameter[] += 1
+        else
+            parametric_counts.feature[] += 1
+        end
+    end
+    @test parametric_counts.constant[] == 0
+    @test parametric_counts.feature[] > 0
+    @test parametric_counts.parameter[] > 0
+
+    leaves_without_options = [
+        make_random_leaf(5, Float32, ParametricNode{Float32}, rng, nothing) for _ in 1:20
+    ]
+    @test !any(leaf -> leaf.is_parameter, leaves_without_options)
+    @test any(leaf -> leaf.constant, leaves_without_options)
+    @test any(leaf -> !leaf.constant && !leaf.is_parameter, leaves_without_options)
+end

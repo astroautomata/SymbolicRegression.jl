@@ -427,6 +427,8 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     guess expressions at the end of each cycle.
 - `should_simplify`: Whether to simplify equations. If you
     pass a custom objective, this will be set to `false`.
+- `use_constants`: Whether to allow constant-valued leaves in expressions.
+    If `false`, random generation will only create non-constant leaves.
 - `should_optimize_constants`: Whether to use an optimization algorithm
     to periodically optimize constants in equations.
 - `optimizer_algorithm`: Select algorithm to use for optimizing constants. Default
@@ -619,6 +621,7 @@ $(OPTION_DESCRIPTIONS)
     use_frequency::Bool=true,
     use_frequency_in_tournament::Bool=true,
     should_simplify::Union{Nothing,Bool}=nothing,
+    use_constants::Bool=true,
     ## 5. Mutations:
     perturbation_factor::Union{Nothing,Real}=nothing,
     probability_negate_constant::Union{Real,Nothing}=nothing,
@@ -1068,6 +1071,11 @@ $(OPTION_DESCRIPTIONS)
     end
     plugin_tuple = _merge_with_default_plugins(user_plugin_tuple, default_plugin_tuple...)
 
+    if !use_constants
+        should_optimize_constants = false
+        probability_negate_constant = 0.0
+    end
+
     @assert print_precision > 0
 
     _autodiff_backend = if autodiff_backend isa Union{Nothing,AbstractADType}
@@ -1119,6 +1127,7 @@ $(OPTION_DESCRIPTIONS)
         migration,
         hof_migration,
         should_simplify,
+        use_constants,
         should_optimize_constants,
         _output_directory,
         populations,

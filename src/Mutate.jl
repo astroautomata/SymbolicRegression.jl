@@ -163,6 +163,10 @@ function condition_mutation_weights!(
         _set_weight!(weights, FormConnectionMutation, 0.0)
         _set_weight!(weights, BreakConnectionMutation, 0.0)
     end
+    if !options.use_constants
+        weights.optimize = 0.0
+        weights.mutate_constant = 0.0
+    end
     if tree.degree == 0
         _set_weight!(weights, OperatorMutation, 0.0)
         _set_weight!(weights, SwapOperandsMutation, 0.0)
