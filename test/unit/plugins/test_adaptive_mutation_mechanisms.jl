@@ -106,6 +106,11 @@ end
     @test state.temperature == 0.0
     SymbolicRegression.on_cycle_start!(state, plugin, 1, 1, options)
     @test state.temperature == 1.0
+
+    for (cycle_idx, temperature) in enumerate(LinRange(1.0, 0.0, 550))
+        SymbolicRegression.on_cycle_start!(state, plugin, cycle_idx, 550, options)
+        @test state.temperature === temperature
+    end
 end
 
 @testitem "prepare_mutation_context / condition_mutation!" begin
