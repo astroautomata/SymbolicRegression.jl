@@ -4,6 +4,14 @@
 
 # Changelog
 
+## [1.13.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.2...v1.13.3) (2026-08-05)
+
+
+### Bug Fixes
+
+* finalize logging after all search outputs complete (backport) ([#655](https://github.com/astroautomata/SymbolicRegression.jl/issues/655)) ([55b170e](https://github.com/astroautomata/SymbolicRegression.jl/commit/55b170ec63463291227c5664529ef736aa96f9e5))
+* guard against out-of-bounds access (backport) ([#658](https://github.com/astroautomata/SymbolicRegression.jl/issues/658)) ([6fe56d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/6fe56d4883ebe13a8542b14ccc60719f27f61865))
+
 ## [1.13.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.1...v1.13.2) (2026-03-28)
 
 ### Bug Fixes
