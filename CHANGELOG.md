@@ -2,58 +2,54 @@
 
 ## [2.0.0-alpha.12](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.11...v2.0.0-alpha.12) (2026-08-09)
 
-
 ### ⚠ BREAKING CHANGES
 
-* centralize debug tracing ([#651](https://github.com/astroautomata/SymbolicRegression.jl/issues/651))
-* increase default crossover probability ([#643](https://github.com/astroautomata/SymbolicRegression.jl/issues/643))
-* remove ParametricExpression support in favor of TemplateExpressions ([#656](https://github.com/astroautomata/SymbolicRegression.jl/issues/656))
-* adaptive-mutation / annealing / mutation  burst plugins + per-call mutation contexts ([#645](https://github.com/astroautomata/SymbolicRegression.jl/issues/645))
-* `SearchState` replaces `all_running_search_statistics` with `plugin_states` and gains a plugin-state type parameter. `Options` and `TemplateExpressionSpec` also gain type parameters, changing the concrete type arity of these public structs.
+- centralize debug tracing ([#651](https://github.com/astroautomata/SymbolicRegression.jl/issues/651))
+- increase default crossover probability ([#643](https://github.com/astroautomata/SymbolicRegression.jl/issues/643))
+- remove ParametricExpression support in favor of TemplateExpressions ([#656](https://github.com/astroautomata/SymbolicRegression.jl/issues/656))
+- adaptive-mutation / annealing / mutation burst plugins + per-call mutation contexts ([#645](https://github.com/astroautomata/SymbolicRegression.jl/issues/645))
+- `SearchState` replaces `all_running_search_statistics` with `plugin_states` and gains a plugin-state type parameter. `Options` and `TemplateExpressionSpec` also gain type parameters, changing the concrete type arity of these public structs.
 
 ### Features
 
-* adaptive-mutation / annealing / mutation  burst plugins + per-call mutation contexts ([#645](https://github.com/astroautomata/SymbolicRegression.jl/issues/645)) ([6787993](https://github.com/astroautomata/SymbolicRegression.jl/commit/6787993563b926aec8b154efdf416289f546eb74))
-* add composable plugin interface ([94cb307](https://github.com/astroautomata/SymbolicRegression.jl/commit/94cb307103ee3e22310e0608b932a11ea86a022b))
-* add generic optimizable parameters for template expressions ([#644](https://github.com/astroautomata/SymbolicRegression.jl/issues/644)) ([87b9cbd](https://github.com/astroautomata/SymbolicRegression.jl/commit/87b9cbdd7d4d20a7f1442cd465908a5de8033968))
-* address review (drop weights arg, MutateConstant config, inline Backsolve) ([67ee068](https://github.com/astroautomata/SymbolicRegression.jl/commit/67ee06837f197e53ff9cb0826000ea8d726658e8))
-* adopt DynamicExpressions 2.9 EvalContext ([#668](https://github.com/astroautomata/SymbolicRegression.jl/issues/668)) ([663d30c](https://github.com/astroautomata/SymbolicRegression.jl/commit/663d30c2b61c046d17e4b9cbcf4702e404b0155b))
-* create AbstractCrossover interface ([#664](https://github.com/astroautomata/SymbolicRegression.jl/issues/664)) ([e6484d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/e6484d49d9f9a9879b501e8fb8837015ac64df6e))
-* increase default crossover probability ([#643](https://github.com/astroautomata/SymbolicRegression.jl/issues/643)) ([ee36121](https://github.com/astroautomata/SymbolicRegression.jl/commit/ee361219201250ae51264a7abbb4d09dff5a11e8))
-* let plugins contribute mutation/crossover defaults ([#663](https://github.com/astroautomata/SymbolicRegression.jl/issues/663)) ([c3617af](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3617af9190e2f8348caf438cfcf2d4eab9da9dc))
-* remove ParametricExpression support in favor of TemplateExpressions ([#656](https://github.com/astroautomata/SymbolicRegression.jl/issues/656)) ([7ba365f](https://github.com/astroautomata/SymbolicRegression.jl/commit/7ba365f26e440224528a7abdec462918544376d4))
-
+- adaptive-mutation / annealing / mutation burst plugins + per-call mutation contexts ([#645](https://github.com/astroautomata/SymbolicRegression.jl/issues/645)) ([6787993](https://github.com/astroautomata/SymbolicRegression.jl/commit/6787993563b926aec8b154efdf416289f546eb74))
+- add composable plugin interface ([94cb307](https://github.com/astroautomata/SymbolicRegression.jl/commit/94cb307103ee3e22310e0608b932a11ea86a022b))
+- add generic optimizable parameters for template expressions ([#644](https://github.com/astroautomata/SymbolicRegression.jl/issues/644)) ([87b9cbd](https://github.com/astroautomata/SymbolicRegression.jl/commit/87b9cbdd7d4d20a7f1442cd465908a5de8033968))
+- address review (drop weights arg, MutateConstant config, inline Backsolve) ([67ee068](https://github.com/astroautomata/SymbolicRegression.jl/commit/67ee06837f197e53ff9cb0826000ea8d726658e8))
+- adopt DynamicExpressions 2.9 EvalContext ([#668](https://github.com/astroautomata/SymbolicRegression.jl/issues/668)) ([663d30c](https://github.com/astroautomata/SymbolicRegression.jl/commit/663d30c2b61c046d17e4b9cbcf4702e404b0155b))
+- create AbstractCrossover interface ([#664](https://github.com/astroautomata/SymbolicRegression.jl/issues/664)) ([e6484d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/e6484d49d9f9a9879b501e8fb8837015ac64df6e))
+- increase default crossover probability ([#643](https://github.com/astroautomata/SymbolicRegression.jl/issues/643)) ([ee36121](https://github.com/astroautomata/SymbolicRegression.jl/commit/ee361219201250ae51264a7abbb4d09dff5a11e8))
+- let plugins contribute mutation/crossover defaults ([#663](https://github.com/astroautomata/SymbolicRegression.jl/issues/663)) ([c3617af](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3617af9190e2f8348caf438cfcf2d4eab9da9dc))
+- remove ParametricExpression support in favor of TemplateExpressions ([#656](https://github.com/astroautomata/SymbolicRegression.jl/issues/656)) ([7ba365f](https://github.com/astroautomata/SymbolicRegression.jl/commit/7ba365f26e440224528a7abdec462918544376d4))
 
 ### Bug Fixes
 
-* align mutation overrides with plugins ([c3242b2](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3242b2d0c548bc93a50d5443b2cd4492fc6faf3))
-* cap crossover constraint retries at max_tries attempts ([#666](https://github.com/astroautomata/SymbolicRegression.jl/issues/666)) ([00c5c01](https://github.com/astroautomata/SymbolicRegression.jl/commit/00c5c010ba8f3625b631f3ca619358a5c7cb4333))
-* clear early DimensionMismatch for mismatched X/y sample counts ([#660](https://github.com/astroautomata/SymbolicRegression.jl/issues/660)) ([adf80a9](https://github.com/astroautomata/SymbolicRegression.jl/commit/adf80a972344f9e1e3b3b37ae0b16b9d369a3785))
-* constant optimization restarts never escaping a zero-valued constant ([#637](https://github.com/astroautomata/SymbolicRegression.jl/issues/637)) ([e95759a](https://github.com/astroautomata/SymbolicRegression.jl/commit/e95759ad6a5633989c22177778a19e68dd144651))
-* eval_grad_tree_array works with SubArray inputs ([#566](https://github.com/astroautomata/SymbolicRegression.jl/issues/566)) ([fbb1a7f](https://github.com/astroautomata/SymbolicRegression.jl/commit/fbb1a7f043729669c1524c1cc678a5a4b97195cc))
-* finalize first-class mutation API ([850d8c2](https://github.com/astroautomata/SymbolicRegression.jl/commit/850d8c232c11012d28c2bfa106703a8f59ab9e46))
-* finalize logging after all search outputs complete ([#646](https://github.com/astroautomata/SymbolicRegression.jl/issues/646)) ([b25a4fe](https://github.com/astroautomata/SymbolicRegression.jl/commit/b25a4fe63ca8fd8244d99bda5e86d78681e43c65))
-* make stdin quit monitoring non-blocking ([#562](https://github.com/astroautomata/SymbolicRegression.jl/issues/562)) ([74cf6b7](https://github.com/astroautomata/SymbolicRegression.jl/commit/74cf6b79cdfa47ace674c38edde2a3e1e0ec7c15))
-* preserve natural type promotion in ValidVector-Number ops ([#625](https://github.com/astroautomata/SymbolicRegression.jl/issues/625)) ([f1aebde](https://github.com/astroautomata/SymbolicRegression.jl/commit/f1aebde4ff98aba72f6e5de1a2da4536d09db433))
-* preserve simulated annealing temperature schedule ([#652](https://github.com/astroautomata/SymbolicRegression.jl/issues/652)) ([a7b4db4](https://github.com/astroautomata/SymbolicRegression.jl/commit/a7b4db408e5f6608442f62f234cd2cf6b2fbba6e))
-* prevent multiprocessing teardown hangs ([#641](https://github.com/astroautomata/SymbolicRegression.jl/issues/641)) ([26efc23](https://github.com/astroautomata/SymbolicRegression.jl/commit/26efc235429e94cb42ffdb422a50cb4d2a0920b9))
-* reject unsupported evaluation keywords ([#670](https://github.com/astroautomata/SymbolicRegression.jl/issues/670)) ([05029cd](https://github.com/astroautomata/SymbolicRegression.jl/commit/05029cdaa8547b049b5a478a2d48a152871dc990))
-* repair first-class mutation regressions ([e68fe14](https://github.com/astroautomata/SymbolicRegression.jl/commit/e68fe14ce1708997317b8bd8fa4d2f264a321af5))
-* suppress 'press q' prompt when input_stream is devnull ([#623](https://github.com/astroautomata/SymbolicRegression.jl/issues/623)) ([3130ece](https://github.com/astroautomata/SymbolicRegression.jl/commit/3130ece5b942981856d073d63ccacc96460a1302))
-* TemplateExpression/ParametricExpression overrides for new weights Vector signature ([ac260f9](https://github.com/astroautomata/SymbolicRegression.jl/commit/ac260f926adc9dcf91f4f258572d4db5566bea9b))
-
+- align mutation overrides with plugins ([c3242b2](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3242b2d0c548bc93a50d5443b2cd4492fc6faf3))
+- cap crossover constraint retries at max_tries attempts ([#666](https://github.com/astroautomata/SymbolicRegression.jl/issues/666)) ([00c5c01](https://github.com/astroautomata/SymbolicRegression.jl/commit/00c5c010ba8f3625b631f3ca619358a5c7cb4333))
+- clear early DimensionMismatch for mismatched X/y sample counts ([#660](https://github.com/astroautomata/SymbolicRegression.jl/issues/660)) ([adf80a9](https://github.com/astroautomata/SymbolicRegression.jl/commit/adf80a972344f9e1e3b3b37ae0b16b9d369a3785))
+- constant optimization restarts never escaping a zero-valued constant ([#637](https://github.com/astroautomata/SymbolicRegression.jl/issues/637)) ([e95759a](https://github.com/astroautomata/SymbolicRegression.jl/commit/e95759ad6a5633989c22177778a19e68dd144651))
+- eval_grad_tree_array works with SubArray inputs ([#566](https://github.com/astroautomata/SymbolicRegression.jl/issues/566)) ([fbb1a7f](https://github.com/astroautomata/SymbolicRegression.jl/commit/fbb1a7f043729669c1524c1cc678a5a4b97195cc))
+- finalize first-class mutation API ([850d8c2](https://github.com/astroautomata/SymbolicRegression.jl/commit/850d8c232c11012d28c2bfa106703a8f59ab9e46))
+- finalize logging after all search outputs complete ([#646](https://github.com/astroautomata/SymbolicRegression.jl/issues/646)) ([b25a4fe](https://github.com/astroautomata/SymbolicRegression.jl/commit/b25a4fe63ca8fd8244d99bda5e86d78681e43c65))
+- make stdin quit monitoring non-blocking ([#562](https://github.com/astroautomata/SymbolicRegression.jl/issues/562)) ([74cf6b7](https://github.com/astroautomata/SymbolicRegression.jl/commit/74cf6b79cdfa47ace674c38edde2a3e1e0ec7c15))
+- preserve natural type promotion in ValidVector-Number ops ([#625](https://github.com/astroautomata/SymbolicRegression.jl/issues/625)) ([f1aebde](https://github.com/astroautomata/SymbolicRegression.jl/commit/f1aebde4ff98aba72f6e5de1a2da4536d09db433))
+- preserve simulated annealing temperature schedule ([#652](https://github.com/astroautomata/SymbolicRegression.jl/issues/652)) ([a7b4db4](https://github.com/astroautomata/SymbolicRegression.jl/commit/a7b4db408e5f6608442f62f234cd2cf6b2fbba6e))
+- prevent multiprocessing teardown hangs ([#641](https://github.com/astroautomata/SymbolicRegression.jl/issues/641)) ([26efc23](https://github.com/astroautomata/SymbolicRegression.jl/commit/26efc235429e94cb42ffdb422a50cb4d2a0920b9))
+- reject unsupported evaluation keywords ([#670](https://github.com/astroautomata/SymbolicRegression.jl/issues/670)) ([05029cd](https://github.com/astroautomata/SymbolicRegression.jl/commit/05029cdaa8547b049b5a478a2d48a152871dc990))
+- repair first-class mutation regressions ([e68fe14](https://github.com/astroautomata/SymbolicRegression.jl/commit/e68fe14ce1708997317b8bd8fa4d2f264a321af5))
+- suppress 'press q' prompt when input_stream is devnull ([#623](https://github.com/astroautomata/SymbolicRegression.jl/issues/623)) ([3130ece](https://github.com/astroautomata/SymbolicRegression.jl/commit/3130ece5b942981856d073d63ccacc96460a1302))
+- TemplateExpression/ParametricExpression overrides for new weights Vector signature ([ac260f9](https://github.com/astroautomata/SymbolicRegression.jl/commit/ac260f926adc9dcf91f4f258572d4db5566bea9b))
 
 ### Performance Improvements
 
-* copy not deepcopy for mutations vector in next_generation (pairs are immutable) ([225f951](https://github.com/astroautomata/SymbolicRegression.jl/commit/225f9513321e5dcf570366f4b63f49403f7fc20a))
-* function barrier on next_generation to specialize per mutation type ([5feb572](https://github.com/astroautomata/SymbolicRegression.jl/commit/5feb572434c03343e9105c5595d0de53a7418563))
-* narrow precompile workload ([#642](https://github.com/astroautomata/SymbolicRegression.jl/issues/642)) ([5833a91](https://github.com/astroautomata/SymbolicRegression.jl/commit/5833a9131f7b3566453ae46b8827c52076f80f12))
-* reuse evaluation buffers during search ([#654](https://github.com/astroautomata/SymbolicRegression.jl/issues/654)) ([5c61538](https://github.com/astroautomata/SymbolicRegression.jl/commit/5c6153859590d920865c3e352da415a1d8085a80))
-
+- copy not deepcopy for mutations vector in next_generation (pairs are immutable) ([225f951](https://github.com/astroautomata/SymbolicRegression.jl/commit/225f9513321e5dcf570366f4b63f49403f7fc20a))
+- function barrier on next_generation to specialize per mutation type ([5feb572](https://github.com/astroautomata/SymbolicRegression.jl/commit/5feb572434c03343e9105c5595d0de53a7418563))
+- narrow precompile workload ([#642](https://github.com/astroautomata/SymbolicRegression.jl/issues/642)) ([5833a91](https://github.com/astroautomata/SymbolicRegression.jl/commit/5833a9131f7b3566453ae46b8827c52076f80f12))
+- reuse evaluation buffers during search ([#654](https://github.com/astroautomata/SymbolicRegression.jl/issues/654)) ([5c61538](https://github.com/astroautomata/SymbolicRegression.jl/commit/5c6153859590d920865c3e352da415a1d8085a80))
 
 ### Code Refactoring
 
-* centralize debug tracing ([#651](https://github.com/astroautomata/SymbolicRegression.jl/issues/651)) ([22e57a4](https://github.com/astroautomata/SymbolicRegression.jl/commit/22e57a4b7088cf31adfb1fbd4520b3d88feffd11))
+- centralize debug tracing ([#651](https://github.com/astroautomata/SymbolicRegression.jl/issues/651)) ([22e57a4](https://github.com/astroautomata/SymbolicRegression.jl/commit/22e57a4b7088cf31adfb1fbd4520b3d88feffd11))
 
 ## [2.0.0-alpha.11](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.10...v2.0.0-alpha.11) (2026-05-17)
 
