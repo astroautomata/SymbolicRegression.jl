@@ -2,10 +2,9 @@
 
 ## [2.0.0-beta.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.12...v2.0.0-beta.1) (2026-08-09)
 
-
 ### Miscellaneous Chores
 
-* begin beta releases ([#671](https://github.com/astroautomata/SymbolicRegression.jl/issues/671)) ([2d2b112](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d2b112227071f70776337d3b9e25ac4f1a43311))
+- begin beta releases ([#671](https://github.com/astroautomata/SymbolicRegression.jl/issues/671)) ([2d2b112](https://github.com/astroautomata/SymbolicRegression.jl/commit/2d2b112227071f70776337d3b9e25ac4f1a43311))
 
 ## [2.0.0-alpha.12](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.11...v2.0.0-alpha.12) (2026-08-09)
 
