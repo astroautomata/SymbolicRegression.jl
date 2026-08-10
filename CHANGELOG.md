@@ -2,14 +2,13 @@
 
 ## [2.0.0-beta.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.2...v2.0.0-beta.3) (2026-08-10)
 
-
 ### ⚠ BREAKING CHANGES
 
-* automatic batching for large datasets ([#676](https://github.com/astroautomata/SymbolicRegression.jl/issues/676))
+- automatic batching for large datasets ([#676](https://github.com/astroautomata/SymbolicRegression.jl/issues/676))
 
 ### Features
 
-* automatic batching for large datasets ([#676](https://github.com/astroautomata/SymbolicRegression.jl/issues/676)) ([bc04c76](https://github.com/astroautomata/SymbolicRegression.jl/commit/bc04c766bdc5677c69da1bdb00af5f9ef6b70e5b))
+- automatic batching for large datasets ([#676](https://github.com/astroautomata/SymbolicRegression.jl/issues/676)) ([bc04c76](https://github.com/astroautomata/SymbolicRegression.jl/commit/bc04c766bdc5677c69da1bdb00af5f9ef6b70e5b))
 
 ## [2.0.0-beta.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-08-10)
 
