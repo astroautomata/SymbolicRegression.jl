@@ -2,19 +2,17 @@
 
 ## [2.0.0-beta.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.1...v2.0.0-beta.2) (2026-08-10)
 
-
 ### ⚠ BREAKING CHANGES
 
-* enable adaptive mutation weights by default ([#678](https://github.com/astroautomata/SymbolicRegression.jl/issues/678))
+- enable adaptive mutation weights by default ([#678](https://github.com/astroautomata/SymbolicRegression.jl/issues/678))
 
 ### Features
 
-* enable adaptive mutation weights by default ([#678](https://github.com/astroautomata/SymbolicRegression.jl/issues/678)) ([3f7873c](https://github.com/astroautomata/SymbolicRegression.jl/commit/3f7873c247bc33d6daec2f964fe6a20b6b97172f))
-
+- enable adaptive mutation weights by default ([#678](https://github.com/astroautomata/SymbolicRegression.jl/issues/678)) ([3f7873c](https://github.com/astroautomata/SymbolicRegression.jl/commit/3f7873c247bc33d6daec2f964fe6a20b6b97172f))
 
 ### Bug Fixes
 
-* disable simplification for expression losses ([#674](https://github.com/astroautomata/SymbolicRegression.jl/issues/674)) ([47fdd14](https://github.com/astroautomata/SymbolicRegression.jl/commit/47fdd14894bf5d9c3ef884a73646e180e4057368))
+- disable simplification for expression losses ([#674](https://github.com/astroautomata/SymbolicRegression.jl/issues/674)) ([47fdd14](https://github.com/astroautomata/SymbolicRegression.jl/commit/47fdd14894bf5d9c3ef884a73646e180e4057368))
 
 ## [2.0.0-beta.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-alpha.12...v2.0.0-beta.1) (2026-08-09)
 
