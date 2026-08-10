@@ -46,6 +46,11 @@ default. It biases tournament selection and mutation acceptance away from
 over-represented complexities, using a sliding window of recent equation
 frequencies.
 
+[`AdaptiveMutationWeightsPlugin`](@ref) is also enabled by default. It learns
+relative mutation weights from successful search moves, with the learned
+multipliers regularized halfway toward the configured weights in log space.
+Pass `default_plugins=()` to `Options` to disable automatic plugins.
+
 ## Writing a custom plugin
 
 Define a struct that subtypes [`AbstractPlugin`](@ref), then override whichever

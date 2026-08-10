@@ -10,6 +10,65 @@
     s = SymbolicRegression.init_plugin_state(AdaptiveMutationWeightsPlugin(), opts, nothing)
     @test length(s.attempts) == length(opts.mutations)
     @test all(s.multipliers .== 1.0)
+    @test AdaptiveMutationWeightsPlugin().reward === :cost
+    @test AdaptiveMutationWeightsPlugin().adaptation_strength == 0.5
+    @test count(p -> p isa AdaptiveMutationWeightsPlugin, opts.plugins) == 1
+    @test !any(p -> p isa MutationBurstPlugin, opts.plugins)
+    @test isempty(Options(; default_plugins=()).plugins)
+end
+
+@testitem "AdaptiveMutationWeightsPlugin updates sampled operator and normalizes" begin
+    using SymbolicRegression
+    using SymbolicRegression: MutationEvent, init_plugin_state, on_mutation_end!
+    using Test
+
+    options = Options(;
+        default_mutations=(),
+        mutations=(ConstantMutation() => 1.0, OperatorMutation() => 1.0),
+        default_plugins=(),
+    )
+    plugin = AdaptiveMutationWeightsPlugin(; smoothing=0.2, reward=:loss)
+    state = init_plugin_state(plugin, options, nothing)
+
+    on_mutation_end!(
+        state,
+        plugin,
+        ConstantMutation(),
+        MutationEvent(true, 1.0, 0.5, 1.0, 0.5, 1),
+        nothing,
+        options,
+    )
+
+    updated = 0.8 + 0.2 * ((2 / 3) / (3 / 5))
+    normalizer = (updated + 1.0) / 2
+    @test state.multipliers ≈ [updated / normalizer, 1.0 / normalizer]
+    @test sum(state.multipliers) / length(state.multipliers) ≈ 1.0
+end
+
+@testitem "AdaptiveMutationWeightsPlugin regularizes multipliers in log space" begin
+    using SymbolicRegression
+    using SymbolicRegression: condition_mutation_weights!, init_plugin_state
+    using Test
+
+    options = Options(;
+        default_mutations=(),
+        mutations=(ConstantMutation() => 2.0, OperatorMutation() => 3.0),
+        default_plugins=(),
+    )
+    learned_multipliers = [4.0, 0.25]
+
+    function conditioned_weights(adaptation_strength)
+        plugin = AdaptiveMutationWeightsPlugin(; adaptation_strength)
+        state = init_plugin_state(plugin, options, nothing)
+        state.multipliers .= learned_multipliers
+        weights = collect(options.mutations)
+        condition_mutation_weights!(weights, state, plugin, nothing, options, 20, 2)
+        return last.(weights)
+    end
+
+    @test conditioned_weights(0.0) == [2.0, 3.0]
+    @test conditioned_weights(0.5) == [4.0, 1.5]
+    @test conditioned_weights(1.0) == [8.0, 0.75]
 end
 
 @testitem "skipped mutation kinds stay out of adaptive-weights accounting" begin
@@ -72,6 +131,8 @@ end
     @test_throws ArgumentError AdaptiveMutationWeightsPlugin(; floor=0.0)
     @test_throws ArgumentError AdaptiveMutationWeightsPlugin(; floor=1.1)
     @test_throws ArgumentError AdaptiveMutationWeightsPlugin(; reward=:unknown)
+    @test_throws ArgumentError AdaptiveMutationWeightsPlugin(; adaptation_strength=-0.1)
+    @test_throws ArgumentError AdaptiveMutationWeightsPlugin(; adaptation_strength=1.1)
     @test_throws ArgumentError MutationBurstPlugin(; retry_attempts=0)
     @test_throws ArgumentError MutationBurstPlugin(; compound_probability=-0.1)
     @test_throws ArgumentError MutationBurstPlugin(; compound_probability=1.1)

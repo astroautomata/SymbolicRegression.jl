@@ -56,7 +56,8 @@ end
         annealing=false,
         plugins=[DefaultProbePlugin(1)],
     )
-    @test opts_vector.plugins === (DefaultProbePlugin(1),)
+    @test first(opts_vector.plugins) === DefaultProbePlugin(1)
+    @test count(p -> p isa AdaptiveMutationWeightsPlugin, opts_vector.plugins) == 1
 
     opts_no_defaults = Options(; binary_operators=[+, *], default_plugins=())
     @test isempty(opts_no_defaults.plugins)

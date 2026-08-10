@@ -30,6 +30,7 @@
         use_frequency=false,
         use_frequency_in_tournament=false,
         annealing=false,
+        default_plugins=(),
     )
     @test opts.plugins isa Tuple{}
 
@@ -43,6 +44,7 @@
         use_frequency_in_tournament=false,
         annealing=false,
         plugins=(p,),
+        default_plugins=(),
     )
     @test init_plugin_states(plugin_opts, nothing) === (nothing,)
     dataset = Dataset(randn(1, 4), randn(4))

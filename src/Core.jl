@@ -121,6 +121,7 @@ using .PluginModule:
     plugin_mutations,
     plugin_crossovers,
     default_adaptive_parsimony_plugin,
-    default_simulated_annealing_plugin
+    default_simulated_annealing_plugin,
+    default_adaptive_mutation_weights_plugin
 
 end

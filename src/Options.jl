@@ -44,6 +44,7 @@ using ..OptionsStructModule: ComplexityMapping, operator_specialization
 using ..PluginModule:
     default_adaptive_parsimony_plugin,
     default_simulated_annealing_plugin,
+    default_adaptive_mutation_weights_plugin,
     _merge_with_default_plugins,
     plugin_mutations,
     plugin_crossovers
@@ -1067,6 +1068,7 @@ $(OPTION_DESCRIPTIONS)
         (
             default_simulated_annealing_plugin(; annealing, alpha),
             default_adaptive_parsimony_plugin(; use_frequency, use_frequency_in_tournament),
+            default_adaptive_mutation_weights_plugin(),
         )
     else
         Tuple(default_plugins)

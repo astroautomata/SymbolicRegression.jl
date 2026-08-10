@@ -56,6 +56,7 @@
         annealing=false,
         save_to_file=false,
         plugins=(TeardownProbePlugin(),),
+        default_plugins=(),
     )
     ropt = TeardownProbeRuntimeOptions(:multiprocessing)
 
