@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.4](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.3...v2.0.0-beta.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* use loss type for early-stop worker checks ([#683](https://github.com/astroautomata/SymbolicRegression.jl/issues/683)) ([83dbdf6](https://github.com/astroautomata/SymbolicRegression.jl/commit/83dbdf620b449cef1769d19133d54816288c657d))
+
 ## [2.0.0-beta.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.2...v2.0.0-beta.3) (2026-08-10)
 
 ### ⚠ BREAKING CHANGES
