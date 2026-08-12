@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.0.0-beta.6](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.5...v2.0.0-beta.6) (2026-08-12)
+
+
+### Features
+
+* compatibility between template expressions and custom types ([#690](https://github.com/astroautomata/SymbolicRegression.jl/issues/690)) ([02f4d1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/02f4d1ab5a588587aa5e52ff0c3d35f028052f5f))
+* MLJ-free machine/fit!/predict/report interface ([#680](https://github.com/astroautomata/SymbolicRegression.jl/issues/680)) ([719cb71](https://github.com/astroautomata/SymbolicRegression.jl/commit/719cb715802dc53bef52304c38aa8e87eaa50a55))
+
 ## [2.0.0-beta.5](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.4...v2.0.0-beta.5) (2026-08-12)
 
 ### Bug Fixes
