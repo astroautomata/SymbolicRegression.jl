@@ -2,10 +2,9 @@
 
 ## [2.0.0-beta.5](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.4...v2.0.0-beta.5) (2026-08-12)
 
-
 ### Bug Fixes
 
-* enable discrete custom-value mutation ([#687](https://github.com/astroautomata/SymbolicRegression.jl/issues/687)) ([fe92956](https://github.com/astroautomata/SymbolicRegression.jl/commit/fe9295616b9127d69d067437e3faf59ad9b24a93))
+- enable discrete custom-value mutation ([#687](https://github.com/astroautomata/SymbolicRegression.jl/issues/687)) ([fe92956](https://github.com/astroautomata/SymbolicRegression.jl/commit/fe9295616b9127d69d067437e3faf59ad9b24a93))
 
 ## [2.0.0-beta.4](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.3...v2.0.0-beta.4) (2026-08-12)
 
