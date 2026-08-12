@@ -9,7 +9,7 @@
         _min(x, y) = x - y
         _cos(x) = cos(x)
         _exp(x) = exp(x)
-        early_stop(loss, c) = ((loss <= 1e-10) && (c <= 6))
+        early_stop(loss::Float64, c) = ((loss <= 1e-10) && (c <= 6))
         my_loss(x, y, w) = abs(x - y)^2 * w
         my_complexity(ex) = ceil(Int, length($(get_tree)(ex)) / 2)
     end
@@ -48,6 +48,7 @@
         niterations=1_000_000_000,
         numprocs=2,
         parallelism=:multiprocessing,
+        loss_type=Float64,
     )
 
     @test any(

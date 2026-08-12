@@ -126,8 +126,8 @@ end
 
 """ Move custom operators and loss functions to workers, if undefined """
 function move_functions_to_workers(
-    procs, options::AbstractOptions, dataset::Dataset{T}, verbosity
-) where {T}
+    procs, options::AbstractOptions, dataset::Dataset{T,L}, verbosity
+) where {T,L}
     # All the types of functions we need to move to workers:
     function_sets = (
         :unaops,
@@ -162,7 +162,7 @@ function move_functions_to_workers(
                 continue
             end
             ops = (options.early_stop_condition,)
-            example_inputs = (zero(T), 0)
+            example_inputs = (zero(L), 0)
         elseif function_set == :expression_type
             # Needs to run _before_ using TemplateExpression anywhere, such
             # as in `loss_function_expression`!
