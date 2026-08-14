@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.0.0-beta.7](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.6...v2.0.0-beta.7) (2026-08-14)
+
+
+### Features
+
+* allow custom types in TemplateExpression parameters ([#693](https://github.com/astroautomata/SymbolicRegression.jl/issues/693)) ([494614b](https://github.com/astroautomata/SymbolicRegression.jl/commit/494614b8add88b833fdb9e33e001b3f3a594bb87))
+
 ## [2.0.0-beta.6](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.5...v2.0.0-beta.6) (2026-08-12)
 
 ### Features
