@@ -361,6 +361,7 @@ makedocs(;
             "Parameterized Expressions" => "examples/parameterized_function.md",
             "Parameterized Template Expressions" => "examples/template_parametric_expression.md",
             "Custom Types" => "examples/custom_types.md",
+            "RASP Programs" => "examples/rasp.md",
             "Writing a Custom Plugin" => "examples/plugin_tutorial.md",
             "Using SymbolicRegression.jl on a Cluster" => "slurm.md",
         ],

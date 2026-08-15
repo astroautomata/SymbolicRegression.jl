@@ -12,6 +12,8 @@ if startswith(TEST_GROUP, "integration/")
         joinpath(@__DIR__, "..", "examples", "parameterized_function.jl")
     elseif integration_name == "examples/custom_types"
         joinpath(@__DIR__, "..", "examples", "custom_types.jl")
+    elseif integration_name == "examples/rasp"
+        joinpath(@__DIR__, "..", "examples", "rasp.jl")
     end
     integration_dir = joinpath(@__DIR__, "integration", integration_name)
 

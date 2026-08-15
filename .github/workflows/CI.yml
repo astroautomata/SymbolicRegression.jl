@@ -130,6 +130,7 @@ jobs:
           - examples/readme
           - examples/parameterized_function
           - examples/custom_types
+          - examples/rasp
         exclude:
           - julia-version: "1"
             group: ad/mooncake
