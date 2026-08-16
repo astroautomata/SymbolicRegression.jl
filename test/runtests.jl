@@ -31,6 +31,21 @@ if startswith(TEST_GROUP, "integration/")
     else
         include(example_path)
     end
+
+    # Emit package versions for debugging CI matrix/pins.
+    if integration_name == "ad/mooncake"
+        try
+            using Optim: Optim
+            using NLSolversBase: NLSolversBase
+            @info "Integration env package versions" Optim = Base.pkgversion(Optim) NLSolversBase = Base.pkgversion(
+                NLSolversBase
+            )
+        catch err
+            @warn "Could not import Optim/NLSolversBase to report versions" exception = (
+                err, catch_backtrace()
+            )
+        end
+    end
 else
     @testset "SymbolicRegression.jl" begin
         test_dir = joinpath(@__DIR__, TEST_GROUP)
