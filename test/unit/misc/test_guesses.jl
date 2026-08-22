@@ -579,3 +579,34 @@ end
     )
     @test data_line == "1,0.0,\"x\"\"quoted\""
 end
+
+@testitem "Guesses with complex number constants" begin
+    using SymbolicRegression
+    using SymbolicRegression:
+        calculate_pareto_frontier, parse_guesses, Dataset, PopMember, compute_complexity,
+        string_tree
+    using Test
+
+    # Load a previously-found equation, exactly as printed in `hall_of_fame.csv`
+    # from a complex-valued search, into `guesses` (issue #581)
+    X = ComplexF32.(randn(2, 50), randn(2, 50))
+    guess = "(0.8427f0 - 0.4012f0im) + (x1 * (0.2311f0 + 0.9155f0im))"
+    y = ComplexF32(0.8427, -0.4012) .+ X[1, :] .* ComplexF32(0.2311, 0.9155)
+
+    options = Options(; binary_operators=(+, -, *, /), verbosity=0, progress=false)
+
+    hof = equation_search(X, y; niterations=0, options, guesses=[guess])
+    dominating = calculate_pareto_frontier(hof)
+    @test any(m -> m.loss < 1f-6, dominating)
+
+    # Complex constants (`a + b*im`) should parse into single constant leaves,
+    # so the complexity is not overcounted
+    dataset = Dataset(X, y)
+    parsed = parse_guesses(PopMember{ComplexF32,Float32}, [guess], [dataset], options)
+    @test compute_complexity(parsed[1][1].tree, options) == 5
+
+    # The printed form should re-parse to the same tree
+    printed = string_tree(parsed[1][1].tree, options.operators; variable_names=["x1", "x2"])
+    reparsed = parse_guesses(PopMember{ComplexF32,Float32}, [printed], [dataset], options)
+    @test reparsed[1][1].tree == parsed[1][1].tree
+end
