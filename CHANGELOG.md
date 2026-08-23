@@ -2,10 +2,9 @@
 
 ## [2.0.0-beta.9](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.8...v2.0.0-beta.9) (2026-08-23)
 
-
 ### Features
 
-* evaluate guess constants in a module ([#705](https://github.com/astroautomata/SymbolicRegression.jl/issues/705)) ([e1232e6](https://github.com/astroautomata/SymbolicRegression.jl/commit/e1232e6cff1878067725255153707b7ec3d8750a))
+- evaluate guess constants in a module ([#705](https://github.com/astroautomata/SymbolicRegression.jl/issues/705)) ([e1232e6](https://github.com/astroautomata/SymbolicRegression.jl/commit/e1232e6cff1878067725255153707b7ec3d8750a))
 
 ## [2.0.0-beta.8](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.7...v2.0.0-beta.8) (2026-08-15)
 
