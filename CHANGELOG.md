@@ -92,12 +92,12 @@ The differential-operator integration is likewise an expansion of something pre-
 
 ### Changed defaults
 
-| setting | v1.13 | v2.0 | reference |
-|---|---|---|---|
-| `batching` | `false` | `:auto` | engaged above 1000 rows ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)) |
-| `batch_size` | `50` | `nothing` | full data up to 1000 rows, then 128 below 5000, 256 below 50000, else 512 ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)) |
-| `crossover_probability` | `0.0259` | `0.20` | selected by a 560-search factorial ablation (+2.24% aggregate held-out Pareto NMSE) and a 420-search sweep in which 0.20 was the only setting that helped, both reported in [#643](https://github.com/astroautomata/SymbolicRegression.jl/pull/643) |
-| adaptive mutation weights | off | on | `AdaptiveMutationWeightsPlugin` in the default set; continuous-benchmark runs in [#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678) showed 12.9 s versus 13.1 s multithreaded with aggregate score +0.0143 |
+| setting                   | v1.13    | v2.0      | reference                                                                                                                                                                                                                                           |
+| ------------------------- | -------- | --------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `batching`                | `false`  | `:auto`   | engaged above 1000 rows ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676))                                                                                                                                                   |
+| `batch_size`              | `50`     | `nothing` | full data up to 1000 rows, then 128 below 5000, 256 below 50000, else 512 ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676))                                                                                                 |
+| `crossover_probability`   | `0.0259` | `0.20`    | selected by a 560-search factorial ablation (+2.24% aggregate held-out Pareto NMSE) and a 420-search sweep in which 0.20 was the only setting that helped, both reported in [#643](https://github.com/astroautomata/SymbolicRegression.jl/pull/643) |
+| adaptive mutation weights | off      | on        | `AdaptiveMutationWeightsPlugin` in the default set; continuous-benchmark runs in [#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678) showed 12.9 s versus 13.1 s multithreaded with aggregate score +0.0143                     |
 
 Constant-optimization restarts can escape zero-valued constants ([#637](https://github.com/astroautomata/SymbolicRegression.jl/pull/637)), changing optimization trajectories even with identical settings. To recover static v1-style dynamics:
 
