@@ -4,9 +4,8 @@
     ".": {
       "release-type": "julia",
       "include-component-in-tag": false,
-      "versioning": "prerelease",
-      "prerelease-type": "beta",
-      "prerelease": true
+      "versioning": "default",
+      "prerelease": false
     }
   }
 }

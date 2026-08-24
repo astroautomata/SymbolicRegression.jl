@@ -1,5 +1,172 @@
 # Changelog
 
+## [2.0.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.4...v2.0.0) (2026-08-24)
+
+Version 2.0 restructures SymbolicRegression.jl around composable parts: a plugin interface for the search loop, first-class mutation and crossover objects, and operators of arbitrary arity over the `Node{T,D}` tree from DynamicExpressions 2.x. New capabilities include user-provided guesses that mix into the populations throughout the search, generic optimizable template parameters, an MLJ-free tabular workflow, and a reusable evaluation arena that cut allocations sharply on this project's own benchmark. Defaults changed for batching, crossover probability, and adaptive mutation weights; see [Changed defaults](#changed-defaults) and [Breaking changes](#breaking-changes).
+
+This entry consolidates the v2 prerelease line (`v2.0.0-alpha.1` through `v2.0.0-beta.9`) by theme. The per-release entries remain in the repository history.
+
+### Composable plugins
+
+The search loop gained a public plugin interface ([#645](https://github.com/astroautomata/SymbolicRegression.jl/pull/645), commit [94cb307](https://github.com/astroautomata/SymbolicRegression.jl/commit/94cb307103ee3e22310e0608b932a11ea86a022b)). A plugin pairs an immutable configuration struct (subtyping `AbstractPlugin`) with mutable runtime state returned by `init_plugin_state`, and opts into whichever hooks it needs. Plugins compose in tuple order via `Options(; plugins=(p1, p2))`; explicit `mutations=`/`crossovers=` entries take precedence over plugin-contributed defaults ([#663](https://github.com/astroautomata/SymbolicRegression.jl/pull/663), commit [c3617af](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3617af9190e2f8348caf438cfcf2d4eab9da9dc)). The interface is experimental and marked as such in the documentation.
+
+Built-in plugins:
+
+- `AdaptiveParsimonyPlugin`: biases tournament selection and mutation acceptance away from over-represented complexities; enabled by default, configured by the existing `use_frequency` keywords.
+- `AdaptiveMutationWeightsPlugin`: learns multiplicative factors on top of configured mutation weights ([#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678)); enabled by default.
+- `SimulatedAnnealingPlugin`: carries the annealing schedule, which previously lived in the core loop; enabled by default when `annealing=true`, the default. The port preserves the temperature schedule bit for bit, verified by identical hall-of-fame hashes across the refactor ([#652](https://github.com/astroautomata/SymbolicRegression.jl/pull/652)).
+- `MutationBurstPlugin`: retries rejected mutations and can chain further mutations after an acceptance ([#645](https://github.com/astroautomata/SymbolicRegression.jl/pull/645)). Experimental; `MutationBurstPlugin(retry_attempts=1, compound_probability=0)` reproduces the previous single-attempt inner loop.
+
+<details>
+<summary>Hook surface and execution model</summary>
+
+Hook categories, each dispatching on the plugin type with no-op defaults:
+
+- Lifecycle observers: `on_search_start!`, `on_search_end!`, `on_generation_end!` (fires on the head node when a completed cycle arrives), `on_cycle_start!`/`on_cycle_end!` (worker side), and `on_mutation_end!` (receives the mutation as a typed argument plus a `MutationEvent`).
+- Multipliers: `tournament_cost_multiplier` and `mutation_acceptance_multiplier`, composed multiplicatively across plugins.
+- Conditioners: `condition_mutation!` and `prepare_mutation_context` for per-call mutation contexts introduced alongside the plugin work in #645.
+- Factories: `init_plugin_state` per (plugin, output), `fork_plugin_state` for per-dispatch worker copies (defaulting to `deepcopy`), `refresh_worker_plugin_state`, and `init_member` for population seeding.
+- Operation defaults: `plugin_mutations` and `plugin_crossovers`.
+
+`on_generation_end!` runs serially on the head node; `on_cycle_end!` and `on_mutation_end!` run on workers against forked copies, so cross-worker aggregation needs `Channel`/`RemoteChannel`. A worked tutorial lives at `examples/plugin_tutorial.jl` and on the Plugins documentation page.
+
+</details>
+
+### First-class mutations and crossovers
+
+Mutations became weighted objects rather than fixed internal functions ([#610](https://github.com/astroautomata/SymbolicRegression.jl/pull/610); finalized in commits [850d8c2](https://github.com/astroautomata/SymbolicRegression.jl/commit/850d8c232c11012d28c2bfa106703a8f59ab9e46) and [e68fe14](https://github.com/astroautomata/SymbolicRegression.jl/commit/e68fe14ce1708997317b8bd8fa4d2f264a321af5), with override alignment in [c3242b2](https://github.com/astroautomata/SymbolicRegression.jl/commit/c3242b2d0c548bc93a50d5443b2cd4492fc6faf3)). Pass `mutations=[ConstantMutation(perturbation_factor=0.1) => 0.05]` to replace a default weight by type, or `default_mutations=()` to remove every automatic entry. Custom mutations subtype `AbstractMutation`, extend `SymbolicRegression.mutate!`, and return a `MutationResult{N,P}`.
+
+Crossovers received the same treatment ([#664](https://github.com/astroautomata/SymbolicRegression.jl/pull/664), commit [e6484d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/e6484d49d9f9a9879b501e8fb8837015ac64df6)): `AbstractCrossover`, `SubtreeCrossover`, a `crossovers=` weighted mapping with `default_crossovers=()`, and a `CrossoverResult{N}` contract. Constraint failures retry the sampled crossover up to `max_tries`, passing a 1-based `attempt` keyword so expensive crossovers can bail out on retries ([#666](https://github.com/astroautomata/SymbolicRegression.jl/pull/666)).
+
+New and notable mutation types:
+
+- `FeatureMutation`: rewiring a leaf to a different input column is its own weighted move (default 0.1), instead of an accident of delete-then-add ([#475](https://github.com/astroautomata/SymbolicRegression.jl/pull/475), commit [84ba961](https://github.com/astroautomata/SymbolicRegression.jl/commit/84ba961d8ca79fedd7be0d8f57c64733fd643f7a)). Template expressions now also mutate only up to the number of available features (commit [738165e](https://github.com/astroautomata/SymbolicRegression.jl/commit/738165e6a213321b2869025ca83e655473d35f5c)).
+- `BacksolveMutation`: experimental repair step that inverts the evaluation path above a target subtree and sparse-fits a replacement by sequentially thresholded least squares against a library of strong subtrees from the population ([#573](https://github.com/astroautomata/SymbolicRegression.jl/pull/573), thanks @ayagh19; commit [de86fef](https://github.com/astroautomata/SymbolicRegression.jl/commit/de86fef0dc6e99cee05d2e80969ab0d0e0016907), library hardening in [46a1ad2](https://github.com/astroautomata/SymbolicRegression.jl/commit/46a1ad2972c11f00969139c1b687a26ff976907a)). Off by default.
+
+<details>
+<summary>Built-in mutation defaults</summary>
+
+From the current `Options` documentation: `ConstantMutation() => 0.0353`, `OperatorMutation() => 3.63`, `FeatureMutation() => 0.1`, `SwapOperandsMutation() => 0.00608`, `RotateTreeMutation() => 1.42`, `AddNodeMutation() => 0.0771`, `InsertNodeMutation() => 2.44`, `DeleteNodeMutation() => 0.369`, `SimplifyMutation() => 0.00148`, `RandomizeMutation() => 0.00695`, `DoNothingMutation() => 0.431`, `OptimizeMutation() => 0.0`, `BacksolveMutation() => 0.0`, `FormConnectionMutation() => 0.5`, `BreakConnectionMutation() => 0.1`. The last two operate only on graph-backed expressions.
+
+Supporting refactor: `AbstractPopMember` generalizes the member type used across selection, mutation, and crossover ([#540](https://github.com/astroautomata/SymbolicRegression.jl/issues/540)), and next-generation dispatch gained a function barrier per mutation type plus shallow copies for the immutable weight pairs (commits [5feb572](https://github.com/astroautomata/SymbolicRegression.jl/commit/5feb572434c03343e9105c5595d0de53a7418563) and [225f951](https://github.com/astroautomata/SymbolicRegression.jl/commit/225f9513321e5dcf570366f4b63f49403f7fc20a)).
+
+</details>
+
+### Operators of arbitrary arity
+
+The tree type became `Node{T,D}`, where `D` is the maximum operator degree, in DynamicExpressions ([#127](https://github.com/SymbolicML/DynamicExpressions.jl/pull/127)), and SymbolicRegression.jl generalized every consumer of it: operator and connection mutations, append/delete/swap/rotate operations, crossover, random tree generation, constraint checking, nested constraints, and dimensional analysis all accept degree-N operators (PRs [#464](https://github.com/astroautomata/SymbolicRegression.jl/pull/464), [#471](https://github.com/astroautomata/SymbolicRegression.jl/pull/471), [#472](https://github.com/astroautomata/SymbolicRegression.jl/pull/472); alpha.4 commits [62e6758](https://github.com/astroautomata/SymbolicRegression.jl/commit/62e6758236d8c568727b1c52b072672608c41747), [dbc9777](https://github.com/astroautomata/SymbolicRegression.jl/commit/dbc97770eda832218261d8686bceee9309852fb7), [4090fbb](https://github.com/astroautomata/SymbolicRegression.jl/commit/4090fbb5a906674c6bec1b3849c9ab0506e51810) among others). Users declare arities through an explicit enum:
+
+```julia
+model = SRRegressor(
+    operators=OperatorEnum(
+        1 => (),
+        2 => (+, -, *, /),
+        3 => (scalar_ifelse,),
+    ),
+)
+```
+
+`binary_operators` and `unary_operators` continue to work and stay mutually exclusive with `operators=`. `constraints` entries for an N-ary operator take N-tuples, with unary operators defaulting to `-1`. The maximum degree is inferred from the supplied operator sets when the node type does not pin one (commit [0bada8c](https://github.com/astroautomata/SymbolicRegression.jl/commit/0bada8c9242cf45608d66786ccfd3919cac4275f)).
+
+### Guesses
+
+Searches accept user-provided guess expressions through `equation_search(...; guesses=[...])` and the `SRRegressor(guesses=[...])` field (PRs [#469](https://github.com/astroautomata/SymbolicRegression.jl/pull/469) and [#500](https://github.com/astroautomata/SymbolicRegression.jl/pull/500); alpha.3 commits [236af2b](https://github.com/astroautomata/SymbolicRegression.jl/commit/236af2b340e00014e901efc9e88b45bbc6c37677), [1f24e09](https://github.com/astroautomata/SymbolicRegression.jl/commit/1f24e095c8a7c33c13b1f2a50269b72234bbbe98)). Guesses are parsed with your configured operators, their constants are optimized before the candidate enters a population, and they persist throughout the run: `fraction_replaced_guesses` controls the fraction of each population drawn from guesses at the end of every cycle (commit [c5ff3f0](https://github.com/astroautomata/SymbolicRegression.jl/commit/c5ff3f002f168865b004223dc1f8e5bffc7c84d9)). Template searches take named-tuple guesses keyed by sub-expression name with `#1`, `#2` placeholders (commit [b52906a](https://github.com/astroautomata/SymbolicRegression.jl/commit/b52906a1ed0364608634799f2f8c07a163490477)); multi-output searches take a vector of vectors. Overly complex guesses produce a warning, and malformed template guesses raise specific errors (commits [f24a4b](https://github.com/astroautomata/SymbolicRegression.jl/commit/f24a4b41c95f40b46e43957d72561112016cc08), [d14ace6](https://github.com/astroautomata/SymbolicRegression.jl/commit/d14ace6ef3c70b1d3a2e098d3998b46c572d97f3), [4fe4aa0](https://github.com/astroautomata/SymbolicRegression.jl/commit/4fe4aa09b8bcef6bfa59662018aee814293a7952)). In beta.9, guess constants came to evaluate inside a generated module so guesses naming custom operators resolve correctly ([#705](https://github.com/astroautomata/SymbolicRegression.jl/issues/705), commit [e1232e6](https://github.com/astroautomata/SymbolicRegression.jl/commit/e1232e6cff1878067725255153707b7ec3d8750a)).
+
+### Template expressions, parameters, and custom value types
+
+Parameterized template expressions existed before this release through `TemplateStructure(; num_parameters=...)`; version 2 makes the optimizable-parameter path generic. `@template_spec(expressions=(f,), parameters=(p=2,)) do x ... end` declares named parameter vectors optimized alongside the expression constants, with `get_optimizable_parameters`, `set_optimizable_parameters!`, and `extract_optimizable_gradient` exposed for programmatic access ([#644](https://github.com/astroautomata/SymbolicRegression.jl/pull/644), thanks @adil-soubki, commit [87b9cbd](https://github.com/astroautomata/SymbolicRegression.jl/commit/87b9cbdd7d4d20a7f1442cd465908a5de8033968)). The older `ParametricExpression` route was removed in favor of this design ([#656](https://github.com/astroautomata/SymbolicRegression.jl/pull/656)).
+
+Searching over nonnumeric values predates v2: strings arrived in v1.10 and v1.12 already documented the generic value interface (`GenericOperatorEnum`, `init_value`, `sample_value`, `mutate_value`, scalar-constant packing, custom printing). Version 2 expands it: template expression bodies accept custom value types ([#690](https://github.com/astroautomata/SymbolicRegression.jl/pull/690), commit [02f4d1a](https://github.com/astroautomata/SymbolicRegression.jl/commit/02f4d1ab5a588587aa5e52ff0c3d35f028052f5f)), template parameter vectors do too ([#693](https://github.com/astroautomata/SymbolicRegression.jl/pull/693), commit [494614b](https://github.com/astroautomata/SymbolicRegression.jl/commit/494614b8add88b833fdb9e33e001b3f3a594bb87)), and a regression that broke discrete custom-value mutation was fixed ([#687](https://github.com/astroautomata/SymbolicRegression.jl/pull/687), commit [fe92956](https://github.com/astroautomata/SymbolicRegression.jl/commit/fe9295616b9127d69d067437e3faf59ad9b24a93)). Related template work: mixed element types in template bodies (commit [0781cf7](https://github.com/astroautomata/SymbolicRegression.jl/commit/0781cf77246893c53fcd18220c2678ca96a0a207)), automatic conversion for `ComposableExpression` operands (commit [ccef1d1](https://github.com/astroautomata/SymbolicRegression.jl/commit/ccef1d15ab49d4af04dc333e5f70164db765ef98)), clearer errors for common template mistakes (commit [3e155e5](https://github.com/astroautomata/SymbolicRegression.jl/commit/3e155e58e654a78a4cb353466fd04f6402f5ab0e)), `atan` in the `ValidVector` operator set ([#546](https://github.com/astroautomata/SymbolicRegression.jl/issues/546)), and natural type promotion in `ValidVector`-Number operations ([#625](https://github.com/astroautomata/SymbolicRegression.jl/issues/625)).
+
+The differential-operator integration is likewise an expansion of something pre-existing: `D(f, i)` from [DynamicDiff.jl](https://github.com/MilesCranmer/DynamicDiff.jl) inside `@template_spec` shipped in v1, and the dependency bump to DynamicDiff 0.3 brings symbolic differentiation of expressions containing n-ary operator nodes ([DynamicDiff #4](https://github.com/MilesCranmer/DynamicDiff.jl/pull/4)), attributed to that project.
+
+### MLJ interface and the Tables extension
+
+`machine`, `fit!`, `predict`, and `report` now work without loading MLJ or MLJBase whenever the input is Tables-compatible, through the new `SymbolicRegressionTablesExt` ([#680](https://github.com/astroautomata/SymbolicRegression.jl/pull/680), commit [719cb71](https://github.com/astroautomata/SymbolicRegression.jl/commit/719cb715802dc53bef52304c38aa8e87eaa50a55)). The extension handles table detection, column naming, matrix conversion, and result materialization. MLJ users keep the same regressors; the core continues to build on MLJModelInterface. Separately, options caching in the MLJ regressors was fixed (commit [51e5a3e](https://github.com/astroautomata/SymbolicRegression.jl/commit/51e5a3eb639239382208cf84e3e7b29956614ce5)).
+
+### Performance
+
+- Evaluation buffers are allocated once in a contiguous arena and reused across mutation, crossover, loss evaluation, constant optimization, and template inner calls ([#654](https://github.com/astroautomata/SymbolicRegression.jl/pull/654), commit [5c61538](https://github.com/astroautomata/SymbolicRegression.jl/commit/5c6153859590d920865c3e352da415a1d8085a80); adopted `EvalContext` in [#668](https://github.com/astroautomata/SymbolicRegression.jl/pull/668), commit [663d30c](https://github.com/astroautomata/SymbolicRegression.jl/commit/663d30c2b61c046d17e4b9cbcf4702e404b0155b); DynamicExpressions [#180](https://github.com/SymbolicML/DynamicExpressions.jl/pull/180), [#186](https://github.com/SymbolicML/DynamicExpressions.jl/pull/186), [#187](https://github.com/SymbolicML/DynamicExpressions.jl/pull/187), [#192](https://github.com/SymbolicML/DynamicExpressions.jl/pull/192)). On this project's own 8-thread benchmark suite, as reported in those pull requests, median search time fell from 9.541 s to 5.880 s and allocated memory from 59.10 GB to 10.71 GB, with byte-identical hall-of-fame output. These figures describe that measured workload, not a universal speedup.
+- Precompilation workload narrowed to what the default options actually execute, the Float32 single-output search ([#642](https://github.com/astroautomata/SymbolicRegression.jl/pull/642), commit [5833a91](https://github.com/astroautomata/SymbolicRegression.jl/commit/5833a9131f7b3566453ae46b8827c52076f80f12)).
+- Autodiff backends broadened: Mooncake runs through a package extension ([#537](https://github.com/astroautomata/SymbolicRegression.jl/pull/537), commit [0a5a919](https://github.com/astroautomata/SymbolicRegression.jl/commit/0a5a91954c701e64f29310217c36d33ccb89335)), Enzyme support was generalized via `make_zero` and stabilized ([#537](https://github.com/astroautomata/SymbolicRegression.jl/pull/537), [#566](https://github.com/astroautomata/SymbolicRegression.jl/pull/566), commits [e7641a4](https://github.com/astroautomata/SymbolicRegression.jl/commit/e7641a4abd450006b18c24f5303bf017d731374e), [31bdd80](https://github.com/astroautomata/SymbolicRegression.jl/commit/31bdd8012ebbdaf2e07b1eef5d84926f8b13ff97)), backend selection accepts `ADTypes` objects, constant optimization takes an explicit RNG (commit [4add39c](https://github.com/astroautomata/SymbolicRegression.jl/commit/4add39ca79bdf947faa052a7226a6f11dbe37e18)), and evaluation rejects unknown keywords loudly ([#670](https://github.com/astroautomata/SymbolicRegression.jl/pull/670)).
+
+### Changed defaults
+
+| setting | v1.13 | v2.0 | reference |
+|---|---|---|---|
+| `batching` | `false` | `:auto` | engaged above 1000 rows ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)) |
+| `batch_size` | `50` | `nothing` | full data up to 1000 rows, then 128 below 5000, 256 below 50000, else 512 ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)) |
+| `crossover_probability` | `0.0259` | `0.20` | selected by a 560-search factorial ablation (+2.24% aggregate held-out Pareto NMSE) and a 420-search sweep in which 0.20 was the only setting that helped, both reported in [#643](https://github.com/astroautomata/SymbolicRegression.jl/pull/643) |
+| adaptive mutation weights | off | on | `AdaptiveMutationWeightsPlugin` in the default set; continuous-benchmark runs in [#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678) showed 12.9 s versus 13.1 s multithreaded with aggregate score +0.0143 |
+
+Constant-optimization restarts can escape zero-valued constants ([#637](https://github.com/astroautomata/SymbolicRegression.jl/pull/637)), changing optimization trajectories even with identical settings. To recover static v1-style dynamics:
+
+```julia
+Options(;
+    default_plugins=(SimulatedAnnealingPlugin(; alpha=3.17), AdaptiveParsimonyPlugin()),
+    batching=false,
+    batch_size=50,
+    crossover_probability=0.0259,
+)
+```
+
+### Breaking changes
+
+- Automatic batching engages by default above 1000 rows; reported losses become minibatch estimates ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)).
+- Adaptive mutation weights are enabled by default and adjust mutation probabilities during the run ([#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678)).
+- Default `crossover_probability` rose to 0.20 ([#643](https://github.com/astroautomata/SymbolicRegression.jl/pull/643)).
+- `ParametricExpression` and `ParametricNode` removed; use parameterized `TemplateExpressionSpec` ([#656](https://github.com/astroautomata/SymbolicRegression.jl/pull/656)).
+- Debug recording centralized into versioned JSONL tracing; `use_recorder`/`recorder_file` become `use_tracing`/`tracing_file` ([#651](https://github.com/astroautomata/SymbolicRegression.jl/pull/651)). Memory scales with in-flight records rather than the whole search history, and disabled tracing is designed to be zero-allocation.
+- `Options`, `SearchState`, and `TemplateExpressionSpec` gained type parameters, changing concrete type arity; `SearchState` replaces `all_running_search_statistics` with `plugin_states`.
+- Internal helpers `delete_random_op!` and `_random_op` carry generalized n-ary signatures, affecting custom mutations written against internals.
+- At the DynamicExpressions level, `Node{T}` becomes `Node{T,D}` ([#127](https://github.com/SymbolicML/DynamicExpressions.jl/pull/127)), and `EvalOptions` becomes `EvalContext` with caller-owned arena lifetimes ([#187](https://github.com/SymbolicML/DynamicExpressions.jl/pull/187), [#192](https://github.com/SymbolicML/DynamicExpressions.jl/pull/192)). `EvalOptions` survives as a deprecated alias; the `Node` type arity changed.
+
+<details>
+<summary>Renames that still work through deprecation shims</summary>
+
+- `eval_options=` becomes `eval_context=` in evaluation entry points.
+- `use_recorder`/`recorder_file` become `use_tracing`/`tracing_file`.
+- `PopMember.score` becomes `PopMember.cost`.
+- camelCase keywords convert automatically. Most map to direct snake_case equivalents; `probNegate` maps to `probability_negate_constant`, and `probPickFirst` maps to `tournament_selection_p`.
+- v1 keyword groups still configure the new machinery: `mutation_weights` converts to weighted first-class mutations, `annealing`/`alpha` maps onto a `SimulatedAnnealingPlugin`, `use_frequency`/`use_frequency_in_tournament` configure `AdaptiveParsimonyPlugin`, and `perturbation_factor`/`probability_negate_constant` apply to the default `ConstantMutation`.
+
+</details>
+
+### Fixed
+
+Reliability and diagnostics repairs across the prerelease line:
+
+- Clear early error for mismatched `X`/`y` sample counts instead of a failure deep in the search ([#660](https://github.com/astroautomata/SymbolicRegression.jl/pull/660), commit [adf80a9](https://github.com/astroautomata/SymbolicRegression.jl/commit/adf80a972344f9e1e3b3b37ae0b16b9d369a3785)).
+- Multiprocessing teardown hangs resolved ([#641](https://github.com/astroautomata/SymbolicRegression.jl/pull/641)).
+- Constant-optimization restarts no longer trap a zero-valued constant ([#637](https://github.com/astroautomata/SymbolicRegression.jl/pull/637)).
+- Expression-level losses skip simplification, preserving user-defined semantics ([#674](https://github.com/astroautomata/SymbolicRegression.jl/pull/674)).
+- Members violating complexity constraints are never stored (commit [a9754ad](https://github.com/astroautomata/SymbolicRegression.jl/commit/a9754ad1d0bee0a9f20fd5d1534d0d2907d34370)).
+- Gradient evaluation works with `SubArray` inputs ([#566](https://github.com/astroautomata/SymbolicRegression.jl/issues/566)).
+- `poisson_sample` handles `lambda=0`; state survives `niterations=0`, and the output file is written even then (commits [fc0bbd9](https://github.com/astroautomata/SymbolicRegression.jl/commit/fc0bbd954a3a81c12befdb5a1ef389f6923aa37e), [6c611f3](https://github.com/astroautomata/SymbolicRegression.jl/commit/6c611f3ab541a4bc5bc5450b64ccd309189f9d3a), [10236d7](https://github.com/astroautomata/SymbolicRegression.jl/commit/10236d70b82648e4ec02a5651cf456271641eb2f)).
+- `worker_timeout` controls connection startup by setting `JULIA_WORKER_TIMEOUT` while workers are created; it defaults to the larger configured timeout (commits [5b4a712](https://github.com/astroautomata/SymbolicRegression.jl/commit/5b4a712fd61da2ed4ab5a7b55dbca3e2a93de36c), [f45e146](https://github.com/astroautomata/SymbolicRegression.jl/commit/f45e1465e850a8269d1d5b805450b46dd75e1761)).
+- Stdin quit monitoring is non-blocking ([#562](https://github.com/astroautomata/SymbolicRegression.jl/issues/562)), and the quit prompt stays silent for devnull input ([#623](https://github.com/astroautomata/SymbolicRegression.jl/issues/623)).
+- Iteration counters display one consistent unit with `progress=false` ([#696](https://github.com/astroautomata/SymbolicRegression.jl/issues/696)); hall-of-fame CSV escapes embedded quotes ([#698](https://github.com/astroautomata/SymbolicRegression.jl/issues/698)).
+- `OperatorEnum` inputs map to safe operator definitions and are not force-replaced (commits [9d99fea](https://github.com/astroautomata/SymbolicRegression.jl/commit/9d99feab741f47d35772cf5e5e2af80e1a50a7f5), [ecc271e](https://github.com/astroautomata/SymbolicRegression.jl/commit/ecc271e92babfa2e5f63f0067b669ecba6b7fb89)).
+- Optimized constants load back onto the tree reliably (commit [dbf6513](https://github.com/astroautomata/SymbolicRegression.jl/commit/dbf65135e72f45541812ab3123b4a9e5f0c322ed)).
+
+### Documentation
+
+New and expanded material accompanies the release: a Plugins page covering the hook taxonomy, composition rules, and thread/process safety, with a worked custom-plugin tutorial; customization pages for first-class mutations and crossovers including complete `PruneMutation` and `RootCrossover` examples; a dedicated v1-to-v2 migration page; and example sections for higher-arity operators, initial guesses, configurable mutation weights, and `D(f, i)` derivative templates.
+
+### Dependencies
+
+- [DynamicExpressions.jl](https://github.com/SymbolicML/DynamicExpressions.jl) `~2.10`, up from `~1.10.1`/`~1.11`, bringing `Node{T,D}`, `EvalContext`, and fused-kernel evaluation for boxed element types ([#198](https://github.com/SymbolicML/DynamicExpressions.jl/pull/198): 27.9% faster `String` keep-left, 15.5% faster custom-struct addition, about 1% for plain `Float64`, per that project's benchmarks).
+- [DynamicDiff.jl](https://github.com/MilesCranmer/DynamicDiff.jl) `0.3`, up from `0.2`, adding n-ary node support to the `D` operator in that project ([DynamicDiff #4](https://github.com/MilesCranmer/DynamicDiff.jl/pull/4)).
+- SymbolicUtils.jl pinned to `4` as an optional extension for symbolic conversion.
+- Optional extensions added for Mooncake, Enzyme, JSON3 (trace consumers), and Tables (the MLJ-free workflow); new direct dependencies include Preferences, NLSolversBase, ADTypes, and DifferentiationInterface for backend selection and configuration.
+- Requires Julia 1.10 or later.
+
+### Chores
+
+Beta-phase marker ([#671](https://github.com/astroautomata/SymbolicRegression.jl/issues/671)), JET cleanups, macro hygiene fixes, and minor test infrastructure maintenance.
+
+---
+
 ## [2.0.0-beta.9](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0-beta.8...v2.0.0-beta.9) (2026-08-23)
 
 ### Features
