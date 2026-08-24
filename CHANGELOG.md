@@ -25,10 +25,10 @@ Hook categories, each dispatching on the plugin type with no-op defaults:
 - Lifecycle observers: `on_search_start!`, `on_search_end!`, `on_generation_end!` (fires on the head node when a completed cycle arrives), `on_cycle_start!`/`on_cycle_end!` (worker side), and `on_mutation_end!` (receives the mutation as a typed argument plus a `MutationEvent`).
 - Multipliers: `tournament_cost_multiplier` and `mutation_acceptance_multiplier`, composed multiplicatively across plugins.
 - Conditioners: `condition_mutation!` and `prepare_mutation_context` for per-call mutation contexts introduced alongside the plugin work in #645.
-- Factories: `init_plugin_state` per (plugin, output), `fork_plugin_state` for per-dispatch worker copies (defaulting to `deepcopy`), `refresh_worker_plugin_state`, and `init_member` for population seeding.
+- Factories: `init_plugin_state` per (plugin, output), `fork_plugin_state` for the per-population worker state created before its first dispatch (defaulting to `deepcopy`), `refresh_worker_plugin_state` for later updates, and `init_member` for population seeding.
 - Operation defaults: `plugin_mutations` and `plugin_crossovers`.
 
-`on_generation_end!` runs serially on the head node; `on_cycle_end!` and `on_mutation_end!` run on workers against forked copies, so cross-worker aggregation needs `Channel`/`RemoteChannel`. A worked tutorial lives at `examples/plugin_tutorial.jl` and on the Plugins documentation page.
+`on_generation_end!` runs serially on the head node; `on_cycle_end!` and `on_mutation_end!` run on workers against state retained for that population across dispatches, so cross-worker aggregation needs `Channel`/`RemoteChannel`. A worked tutorial lives at `examples/plugin_tutorial.jl` and on the Plugins documentation page.
 
 </details>
 
@@ -46,7 +46,7 @@ New and notable mutation types:
 <details>
 <summary>Built-in mutation defaults</summary>
 
-From the current `Options` documentation: `ConstantMutation() => 0.0353`, `OperatorMutation() => 3.63`, `FeatureMutation() => 0.1`, `SwapOperandsMutation() => 0.00608`, `RotateTreeMutation() => 1.42`, `AddNodeMutation() => 0.0771`, `InsertNodeMutation() => 2.44`, `DeleteNodeMutation() => 0.369`, `SimplifyMutation() => 0.00148`, `RandomizeMutation() => 0.00695`, `DoNothingMutation() => 0.431`, `OptimizeMutation() => 0.0`, `BacksolveMutation() => 0.0`, `FormConnectionMutation() => 0.5`, `BreakConnectionMutation() => 0.1`. The last two operate only on graph-backed expressions.
+The effective weighted mutations constructed by `Options()` are `ConstantMutation() => 0.0346`, `OperatorMutation() => 0.293`, `FeatureMutation() => 0.1`, `SwapOperandsMutation() => 0.198`, `RotateTreeMutation() => 4.26`, `AddNodeMutation() => 2.47`, `InsertNodeMutation() => 0.0112`, `DeleteNodeMutation() => 0.870`, `SimplifyMutation() => 0.00209`, `RandomizeMutation() => 0.000502`, `DoNothingMutation() => 0.273`, `OptimizeMutation() => 0.0`, `BacksolveMutation() => 0.0`, `FormConnectionMutation() => 0.5`, and `BreakConnectionMutation() => 0.1`. The last two operate only on graph-backed expressions.
 
 Supporting refactor: `AbstractPopMember` generalizes the member type used across selection, mutation, and crossover ([#540](https://github.com/astroautomata/SymbolicRegression.jl/issues/540)), and next-generation dispatch gained a function barrier per mutation type plus shallow copies for the immutable weight pairs (commits [5feb572](https://github.com/astroautomata/SymbolicRegression.jl/commit/5feb572434c03343e9105c5595d0de53a7418563) and [225f951](https://github.com/astroautomata/SymbolicRegression.jl/commit/225f9513321e5dcf570366f4b63f49403f7fc20a)).
 
@@ -112,13 +112,13 @@ Options(;
 
 ### Breaking changes
 
-- Automatic batching engages by default above 1000 rows; reported losses become minibatch estimates ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)).
+- Automatic batching engages by default above 1000 rows. Minibatches guide the inner evolution, while hall-of-fame members are reevaluated on the full dataset before they are returned ([#676](https://github.com/astroautomata/SymbolicRegression.jl/pull/676)).
 - Adaptive mutation weights are enabled by default and adjust mutation probabilities during the run ([#678](https://github.com/astroautomata/SymbolicRegression.jl/pull/678)).
 - Default `crossover_probability` rose to 0.20 ([#643](https://github.com/astroautomata/SymbolicRegression.jl/pull/643)).
-- `ParametricExpression` and `ParametricNode` removed; use parameterized `TemplateExpressionSpec` ([#656](https://github.com/astroautomata/SymbolicRegression.jl/pull/656)).
+- `ParametricExpression`, `ParametricNode`, and `ParametricExpressionSpec` were removed; use parameterized `TemplateExpressionSpec` ([#656](https://github.com/astroautomata/SymbolicRegression.jl/pull/656)).
 - Debug recording centralized into versioned JSONL tracing; `use_recorder`/`recorder_file` become `use_tracing`/`tracing_file` ([#651](https://github.com/astroautomata/SymbolicRegression.jl/pull/651)). Memory scales with in-flight records rather than the whole search history, and disabled tracing is designed to be zero-allocation.
 - `Options`, `SearchState`, and `TemplateExpressionSpec` gained type parameters, changing concrete type arity; `SearchState` replaces `all_running_search_statistics` with `plugin_states`.
-- Internal helpers `delete_random_op!` and `_random_op` carry generalized n-ary signatures, affecting custom mutations written against internals.
+- The internal `delete_random_op!` helper gained an n-ary signature. `_random_op` was removed; custom mutations should use `append_random_op`, `insert_random_op`, or `prepend_random_op` as appropriate.
 - At the DynamicExpressions level, `Node{T}` becomes `Node{T,D}` ([#127](https://github.com/SymbolicML/DynamicExpressions.jl/pull/127)), and `EvalOptions` becomes `EvalContext` with caller-owned arena lifetimes ([#187](https://github.com/SymbolicML/DynamicExpressions.jl/pull/187), [#192](https://github.com/SymbolicML/DynamicExpressions.jl/pull/192)). `EvalOptions` survives as a deprecated alias; the `Node` type arity changed.
 
 <details>
