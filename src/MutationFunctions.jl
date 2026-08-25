@@ -17,11 +17,11 @@ using DynamicExpressions:
     get_child,
     set_child!,
     max_degree
-using Statistics: median
 using ..CoreModule:
     AbstractOptions, DATA_TYPE, init_value, sample_value, Dataset, ConstantMutation
-using ..EvaluateInverseModule: eval_inverse_tree_array, is_bad_array
+using ..EvaluateInverseModule: eval_inverse_tree_array_masked
 using ..BacksolveModule: fit_sparse_expression, configured_backsolve
+using ..ComplexityModule: compute_complexity
 
 import ..CoreModule: mutate_value
 
@@ -657,7 +657,13 @@ end
 
 """
 Invert a random non-root node by solving for its target values, then replace it with
-a sparse-expression fit or a representative constant.
+a sparse-expression fit to those values.
+
+The inversion is row-masked: only data rows where the surrounding context is
+invertible contribute to the fit. The current subtree is included in the fit's
+library, so it can be retained (with a coefficient) when it is already useful,
+and the fit is trimmed to respect the complexity budget implied by
+`curmaxsize`. If any step fails, the tree is returned unchanged.
 
 !!! warning
     This mutation is experimental and will change in minor version increments.
@@ -669,6 +675,7 @@ function backsolve_rewrite_random_node(
     rng::AbstractRNG=default_rng();
     backsolve_options=configured_backsolve(options),
     population_for_backsolve=nothing,
+    curmaxsize::Int=options.maxsize,
 ) where {T<:DATA_TYPE}
     throw(
         ArgumentError(
@@ -684,10 +691,11 @@ function backsolve_rewrite_random_node(
     rng::AbstractRNG=default_rng();
     backsolve_options=configured_backsolve(options),
     population_for_backsolve=nothing,
+    curmaxsize::Int=options.maxsize,
 ) where {T<:DATA_TYPE}
     tree = get_contents(ex)
     new_tree = backsolve_rewrite_random_node(
-        tree, dataset, options, rng; backsolve_options, population_for_backsolve
+        tree, dataset, options, rng; backsolve_options, population_for_backsolve, curmaxsize
     )
     return with_contents(ex, new_tree)
 end
@@ -699,6 +707,7 @@ function backsolve_rewrite_random_node(
     rng::AbstractRNG=default_rng();
     backsolve_options=configured_backsolve(options),
     population_for_backsolve=nothing,
+    curmaxsize::Int=options.maxsize,
 ) where {T<:DATA_TYPE}
     if !(T <: Union{AbstractFloat,Complex{<:AbstractFloat}})
         throw(
@@ -712,13 +721,16 @@ function backsolve_rewrite_random_node(
 
     node_to_invert = rand(rng, NodeSampler(; tree, filter=Base.Fix2(!==, tree)))
 
-    target_values, success = eval_inverse_tree_array(
+    target_values, valid_mask = eval_inverse_tree_array_masked(
         tree, dataset.X, options.operators, node_to_invert, dataset.y
     )
 
-    if !success || is_bad_array(target_values)
-        return tree
-    end
+    count(valid_mask) < min(10, length(target_values)) && return tree
+
+    budget =
+        curmaxsize -
+        (compute_complexity(tree, options) - compute_complexity(node_to_invert, options))
+    budget < 1 && return tree
 
     nfeatures = size(dataset.X, 1)
     new_node = fit_sparse_expression(
@@ -729,21 +741,12 @@ function backsolve_rewrite_random_node(
         nfeatures;
         backsolve_options,
         population_for_backsolve,
+        valid_mask,
+        extra_term=node_to_invert,
+        max_complexity=budget,
     )
 
-    if new_node !== nothing
-        parent, idx = _find_parent(tree, node_to_invert)
-        set_child!(parent, new_node, idx)
-        return tree
-    end
-
-    representative_val = if T <: Real
-        median(target_values)
-    else
-        sum(target_values) / length(target_values)
-    end
-
-    new_node = constructorof(typeof(tree))(; val=T(representative_val))
+    new_node === nothing && return tree
 
     parent, idx = _find_parent(tree, node_to_invert)
     set_child!(parent, new_node, idx)

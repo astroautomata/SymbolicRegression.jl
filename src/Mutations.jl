@@ -88,18 +88,33 @@ struct BreakConnectionMutation <: AbstractMutation end
 struct RotateTreeMutation <: AbstractMutation end
 
 """
-    BacksolveMutation(; max_library_size=500, lambda=0.01, max_iter=10)
+    BacksolveMutation(; max_library_size=500, max_terms=8, min_improvement=1e-3, node_attempts=8)
 
-Invert a random non-root node by solving for its target values, then
-replace it with a sparse-expression fit (STLSQ).
+Invert a random non-root node by solving for its target values, then replace
+it with a sparse-expression fit to those values, built by greedy forward
+selection under the current complexity budget (`curmaxsize`), so proposed
+rewrites respect the search's size constraint by construction.
+
+The inversion is row-masked, so rows where the surrounding context is not
+invertible are excluded from the fit instead of failing the whole mutation.
+The subtree being replaced is included in the fit's library (so it can be
+retained when already useful). Each mutation event tries up to
+`node_attempts` random nodes and only returns a child whose cost improves on
+the parent's; otherwise the mutation is reported as failed.
+
+- `max_library_size`: maximum number of basis terms in the library.
+- `max_terms`: maximum number of selected terms in the fitted weighted sum.
+- `min_improvement`: minimum relative reduction of the residual norm required
+  to add another term.
 
 !!! warning
     Experimental. May change in minor version increments.
 """
 Base.@kwdef struct BacksolveMutation <: AbstractMutation
     max_library_size::Int = 500
-    lambda::Float64 = 0.01
-    max_iter::Int = 10
+    max_terms::Int = 8
+    min_improvement::Float64 = 1e-3
+    node_attempts::Int = 8
 end
 
 """Algebraically simplify the tree (e.g. fold constants)."""

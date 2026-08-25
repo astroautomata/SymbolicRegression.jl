@@ -124,16 +124,16 @@ end
     @test default_backsolve == BacksolveMutation()
 
     custom = Options(;
-        default_mutations=(), mutations=[BacksolveMutation(; lambda=0.2) => 1.0]
+        default_mutations=(), mutations=[BacksolveMutation(; max_terms=4) => 1.0]
     )
     @test length(custom.mutations) == 1
-    @test custom.mutations[1].first.lambda == 0.2
+    @test custom.mutations[1].first.max_terms == 4
 
-    with_override = Options(; mutations=(BacksolveMutation(; lambda=0.3) => 1.0,))
+    with_override = Options(; mutations=(BacksolveMutation(; max_terms=5) => 1.0,))
     @test length(with_override.mutations) == length(default_mutations())
-    @test first(with_override.mutations) == (BacksolveMutation(; lambda=0.3) => 1.0)
+    @test first(with_override.mutations) == (BacksolveMutation(; max_terms=5) => 1.0)
     @test count(p -> p.first isa BacksolveMutation, with_override.mutations) == 1
-    @test configured_backsolve(with_override).lambda == 0.3
+    @test configured_backsolve(with_override).max_terms == 5
     @test_throws ArgumentError configured_backsolve(Options(; default_mutations=()))
 
     @test isempty(Options(; default_mutations=()).mutations)

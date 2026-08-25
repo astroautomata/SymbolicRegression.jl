@@ -147,10 +147,7 @@ end
         binary_operators=(+, *),
         unary_operators=(sin, cos),
         default_mutations=(),
-        mutations=(
-            BacksolveMutation(; lambda=0.01, max_iter=10, max_library_size=500, kws...) =>
-                1.0,
-        ),
+        mutations=(BacksolveMutation(; max_library_size=500, kws...) => 1.0,),
     )
     options = make_options()
 
@@ -282,9 +279,7 @@ end
         binary_operators=(+, *),
         unary_operators=(sin, cos),
         default_mutations=(),
-        mutations=(
-            BacksolveMutation(; lambda=0.01, max_iter=10, max_library_size=500) => 1.0,
-        ),
+        mutations=(BacksolveMutation(; max_library_size=500) => 1.0,),
     )
 
     X = Float64[1.0 2.0 3.0 4.0; 0.5 1.0 1.5 2.0]  # 2 features x 4 samples
@@ -325,9 +320,7 @@ end
         binary_operators=(+, *, -),
         unary_operators=(sin, cos),
         default_mutations=(),
-        mutations=(
-            BacksolveMutation(; lambda=0.01, max_iter=10, max_library_size=500) => 1.0,
-        ),
+        mutations=(BacksolveMutation(; max_library_size=500) => 1.0,),
     )
 
     X = Float64[1.0 2.0 3.0 4.0; 0.5 1.0 1.5 2.0]  # 2 features x 4 samples
@@ -369,7 +362,7 @@ end
         binary_operators=(),
         unary_operators=(),
         default_mutations=(),
-        mutations=(BacksolveMutation(; lambda=0.01, max_iter=10) => 1.0,),
+        mutations=(BacksolveMutation() => 1.0,),
     )
 
     X = Float64[1.0 2.0 3.0]
@@ -387,7 +380,7 @@ end
         default_mutations=(),
         mutations=(BacksolveMutation(; kws...) => 1.0,),
     )
-    options = make_options(; lambda=1e10, max_iter=10)
+    options = make_options(; min_improvement=1e10)
 
     result2 = fit_sparse_expression(tree_prototype, y, dataset, options, 1)
 
@@ -409,7 +402,7 @@ end
     X_inf = Float64[1.0 2.0 3.0]
     y_inf = Float64[1.0, Inf, 3.0]
     dataset_inf = Dataset(X_inf, y_inf)
-    options_inf = make_options(; lambda=0.01, max_iter=10)
+    options_inf = make_options()
 
     result5 = fit_sparse_expression(tree_prototype, y_inf, dataset_inf, options_inf, 1)
 
@@ -430,7 +423,7 @@ end
     y_fit_complex = (2.0 + 1.0im) .* X_complex[1, :]
     dataset_complex = Dataset(X_complex, y_fit_complex)
     tree_prototype_complex = Node(ComplexF64; feature=1)
-    options_complex = make_options(; lambda=0.01)
+    options_complex = make_options()
 
     result_complex = fit_sparse_expression(
         tree_prototype_complex, y_fit_complex, dataset_complex, options_complex, 1
@@ -444,6 +437,6 @@ end
     dataset_int = Dataset(Int[1 2 3 4], Int[2, 4, 6, 8], Float64)
     tree_prototype_int = Node(Int; feature=1)
     @test_throws MethodError fit_sparse_expression(
-        tree_prototype_int, dataset_int.y, dataset_int, make_options(; lambda=0.1), 1
+        tree_prototype_int, dataset_int.y, dataset_int, make_options(), 1
     )
 end
