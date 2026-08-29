@@ -1,5 +1,13 @@
 # Changelog
 
+## [2.1.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0...v2.1.0) (2026-08-29)
+
+
+### Features
+
+* generalize inverse evaluation for arbitrary arity ([#616](https://github.com/astroautomata/SymbolicRegression.jl/issues/616)) ([99f3f3c](https://github.com/astroautomata/SymbolicRegression.jl/commit/99f3f3c2907aacf20bb102e250c23506ed3970eb))
+* stop searches gracefully on interrupt via stop flag or pipe fd ([#704](https://github.com/astroautomata/SymbolicRegression.jl/issues/704)) ([50d9db0](https://github.com/astroautomata/SymbolicRegression.jl/commit/50d9db00a4f55eb98f7f1ecb2f27919cd12854e7))
+
 ## [2.0.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v1.13.4...v2.0.0) (2026-08-24)
 
 Version 2.0 restructures SymbolicRegression.jl around composable parts: a plugin interface for the search loop, first-class mutation and crossover objects, and operators of arbitrary arity over the `Node{T,D}` tree from DynamicExpressions 2.x. New capabilities include user-provided guesses that mix into the populations throughout the search, generic optimizable template parameters, an MLJ-free tabular workflow, and a reusable evaluation arena that cut allocations sharply on this project's own benchmark. Defaults changed for batching, crossover probability, and adaptive mutation weights; see [Changed defaults](#changed-defaults) and [Breaking changes](#breaking-changes).
