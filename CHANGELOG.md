@@ -2,15 +2,13 @@
 
 ## [2.2.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.1.0...v2.2.0) (2026-09-01)
 
-
 ### Features
 
-* poll Windows sockets for external stop requests ([#710](https://github.com/astroautomata/SymbolicRegression.jl/issues/710)) ([58b4699](https://github.com/astroautomata/SymbolicRegression.jl/commit/58b46994037babee06e6e2b11945f35098eeb4db))
-
+- poll Windows sockets for external stop requests ([#710](https://github.com/astroautomata/SymbolicRegression.jl/issues/710)) ([58b4699](https://github.com/astroautomata/SymbolicRegression.jl/commit/58b46994037babee06e6e2b11945f35098eeb4db))
 
 ### Bug Fixes
 
-* ignore template keyword order ([#692](https://github.com/astroautomata/SymbolicRegression.jl/issues/692)) ([1c349ab](https://github.com/astroautomata/SymbolicRegression.jl/commit/1c349ab8bb6c9ec6a1da91f265471624f9e249d7))
+- ignore template keyword order ([#692](https://github.com/astroautomata/SymbolicRegression.jl/issues/692)) ([1c349ab](https://github.com/astroautomata/SymbolicRegression.jl/commit/1c349ab8bb6c9ec6a1da91f265471624f9e249d7))
 
 ## [2.1.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.0.0...v2.1.0) (2026-08-29)
 
