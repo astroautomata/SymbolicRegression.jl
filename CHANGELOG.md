@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.2.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.2.0...v2.2.1) (2026-09-04)
+
+### Bug Fixes
+
+- use `first` over `only` for traced snapshot lookup ([#711](https://github.com/astroautomata/SymbolicRegression.jl/issues/711)) ([d04b130](https://github.com/astroautomata/SymbolicRegression.jl/commit/d04b130e5f7cbccfc5c7d9defb59c26783ab0419))
+
 ## [2.2.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.1.0...v2.2.0) (2026-09-01)
 
 ### Features
