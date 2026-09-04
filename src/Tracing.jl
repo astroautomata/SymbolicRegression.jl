@@ -129,7 +129,7 @@ end
     )
     death_event = TraceType("type" => "death", "time" => time())
     old_entry = get!(mutations, string(old_ref)) do
-        entry = copy(only(member for member in trace["members"] if member["ref"] == old_ref))
+        entry = copy(first(member for member in trace["members"] if member["ref"] == old_ref))
         entry["events"] = Vector{TraceType}()
         entry
     end

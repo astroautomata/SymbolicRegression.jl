@@ -29,6 +29,34 @@
     @test [e["type"] for e in events] == ["tuning", "death"]
 end
 
+@testitem "trace_optimization! tolerates a reference held by several slots" begin
+    using SymbolicRegression
+    using SymbolicRegression: Options, TraceType, PopMember, Expression
+    using SymbolicRegression.TracingModule: trace_optimization!
+    using Test
+
+    options = Options(; binary_operators=(+, *), default_plugins=(), use_tracing=true)
+    mutations = TraceType()
+    old_member = TraceType(
+        "tree" => "x1", "cost" => 2.0, "loss" => 2.0, "parent" => 0, "ref" => 1
+    )
+
+    # One reference occupying several slots, as migration leaves it.
+    trace = TraceType("members" => [old_member, copy(old_member)], "mutations" => mutations)
+    expression = Expression(Node{Float64}(; feature=1); operators=options.operators)
+    member = PopMember(expression, 1.0, 1.0; deterministic=true)
+    member.ref = 2
+    member.parent = 1
+
+    trace_optimization!(trace, member, 1, 2, false, options)
+
+    old_entry = mutations["1"]
+    @test all(
+        old_entry[key] == old_member[key] for key in ("tree", "cost", "loss", "parent")
+    )
+    @test [e["type"] for e in old_entry["events"]] == ["tuning", "death"]
+end
+
 @testitem "Tracing worker pipeline smoke test" begin
     using Distributed: myid
     using SymbolicRegression
