@@ -205,7 +205,7 @@ function _save_kwargs(log_variable::Symbol, fdef::Expr)
     end
 end
 
-json3_write(args...; kws...) = error("Please load the JSON3.jl package.")
+json_write(args...; kws...) = error("Please load the JSON.jl package.")
 
 """
     PerTaskCache{T,F}
