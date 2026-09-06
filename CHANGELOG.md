@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.3.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.2.1...v2.3.0) (2026-09-06)
+
+
+### Features
+
+* support parameter vectors in template guesses ([#713](https://github.com/astroautomata/SymbolicRegression.jl/issues/713)) ([8bd8c20](https://github.com/astroautomata/SymbolicRegression.jl/commit/8bd8c20115c1e2e4fb1321b02da41af50063eab3))
+
 ## [2.2.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.2.0...v2.2.1) (2026-09-04)
 
 ### Bug Fixes
