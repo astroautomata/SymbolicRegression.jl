@@ -69,3 +69,10 @@ end
     @test structure.num_features == (; f=2, g=1)
     @test structure.num_parameters == (; p=3, q=4)
 end
+@testitem "TemplateStructure requires disjoint expression and parameter names" begin
+    using SymbolicRegression
+
+    @test_throws ArgumentError TemplateStructure{(:f,),(:f,)}(
+        ((; f), parameters, (x,)) -> f(x); num_features=(; f=1), num_parameters=(; f=1)
+    )
+end

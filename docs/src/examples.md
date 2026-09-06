@@ -507,8 +507,15 @@ and also discover the `+ 0.1` term inside the sinusoid, whereas
 this might have been difficult to discover as fast from the normal search.
 
 You can also provide multiple guesses. For a template expression,
-your guesses should be an array of named tuples, such as
-`(; f="cos(#1) + 0.1", g="sin(#2) - 0.9")`.
+each guess is a named tuple whose expression fields use `#N` placeholders. Templates
+with parameters accept parameter vectors in the same tuple:
+
+```julia
+guesses = [(; f="cos(#1) + 0.1", g="sin(#2) - 0.9", p=[5.0, 10.0])]
+```
+
+Parameter names and lengths must match the template structure. You may omit parameter
+fields to use their default initialization, and supplied vectors are copied before search.
 
 ## 12. Higher-arity operators
 

@@ -634,3 +634,49 @@ end
         PopMember{Vec2,Float64}, ["MissingVec2(1.0, 2.0)"], [dataset], options
     )
 end
+@testitem "Template guesses preserve supplied parameters" begin
+    using SymbolicRegression
+    using SymbolicRegression: calculate_pareto_frontier, parse_guesses, Dataset, PopMember
+    using DynamicExpressions: get_metadata
+
+    X = [1.0 2.0 3.0 4.0; 1.0 2.0 1.0 2.0]
+    supplied = [5.0, 10.0]
+    y = X[1, :] .* supplied[Int.(X[2, :])]
+    dataset = Dataset(X, y)
+    template = @template_spec(expressions = (f,), parameters = (p=2,)) do x, category
+        f(x, p[category])
+    end
+    options = Options(;
+        binary_operators=(*,),
+        expression_spec=template,
+        should_optimize_constants=false,
+        deterministic=true,
+        verbosity=0,
+        progress=false,
+    )
+    guess = (; f="#1 * #2", p=supplied)
+
+    @test_throws ArgumentError parse_guesses(
+        PopMember{Float64,Float64}, [(; f="#1 * #2", p="x1")], [dataset], options
+    )
+    member = only(
+        only(parse_guesses(PopMember{Float64,Float64}, [guess], [dataset], options))
+    )
+    candidate_parameters = get_metadata(member.tree).parameters.p._data
+    @test candidate_parameters == supplied
+    @test candidate_parameters !== supplied
+    @test supplied == [5.0, 10.0]
+
+    supplied[1] = -1.0
+    @test candidate_parameters == [5.0, 10.0]
+
+    hof = equation_search(
+        X,
+        y;
+        niterations=0,
+        options,
+        guesses=[(; f="#1 * #2", p=[5.0, 10.0])],
+        parallelism=:serial,
+    )
+    @test any(m -> m.loss < 1e-12, calculate_pareto_frontier(hof))
+end

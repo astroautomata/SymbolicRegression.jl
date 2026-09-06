@@ -75,7 +75,19 @@
     parsed_inner = first(values(get_contents(parsed)))
     @test parsed_inner isa WrappedExpression
     @test get_metadata(parsed_inner).tag == :custom_inner
-
+    parameter_structure = TemplateStructure{(:f,),(:p,)}(
+        ((; f), (; p), (x,)) -> f(x) + p[1]; num_features=(; f=1), num_parameters=(; p=1)
+    )
+    parameter_spec = TemplateExpressionSpec(;
+        structure=parameter_structure,
+        inner_expression_type=WrappedExpression,
+        inner_expression_options=(; tag=:custom_inner),
+    )
+    parsed_with_parameters = parse_expression(
+        (; f="#1", p=[2.0]); expression_spec=parameter_spec, operators
+    )
+    @test get_metadata(parsed_with_parameters).parameters.p == [2.0]
+    @test get_metadata(parsed_with_parameters.trees.f).tag == :custom_inner
     copied_inner = copy(parsed_inner)
     @test copied_inner isa WrappedExpression
     @test typeof(copied_inner) === typeof(parsed_inner)
