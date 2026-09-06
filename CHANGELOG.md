@@ -1,5 +1,11 @@
 # Changelog
 
+## [2.4.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.3.0...v2.4.0) (2026-09-06)
+
+### Dependencies
+
+- replace deprecated JSON3 with JSON.jl 1.8 or later for tracing, supporting Parsers 3. Load `JSON` instead of `JSON3` to enable tracing; JSON Lines output and non-finite values are preserved ([#715](https://github.com/astroautomata/SymbolicRegression.jl/pull/715)).
+
 ## [2.3.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.2.1...v2.3.0) (2026-09-06)
 
 ### Features
