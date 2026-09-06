@@ -131,6 +131,8 @@ function TemplateStructure{K,Kp}(
     num_parameters::Union{NamedTuple,Nothing}=nothing,
     prototype=nothing,
 ) where {K,Kp,E<:Function}
+    isdisjoint(K, Kp) ||
+        throw(ArgumentError("Template expression and parameter names must be disjoint"))
     if _deprecated_num_features !== nothing
         Base.depwarn(
             "Passing `num_features` as an argument is deprecated, pass it explicitly as a keyword argument instead",
@@ -352,21 +354,36 @@ function TemplateExpression(
     operators = get_operators(example_tree, operators)
     variable_names = get_variable_names(example_tree, variable_names)
     final_parameters = if has_params(structure)
-        resolved_parameters = @something parameters begin
-            # Auto-initialize parameters to zeros when not provided
-            NamedTuple{keys(structure.num_parameters)}(
-                map(Base.Fix1(zeros, T), values(structure.num_parameters))
-            )
-        end
-        for k in keys(structure.num_parameters)
-            @assert(
-                length(resolved_parameters[k]) == structure.num_parameters[k],
-                "Expected `parameters.$k` to have length $(structure.num_parameters[k]), got $(length(resolved_parameters[k]))"
-            )
-        end
-        # TODO: Delete this extra check once we are confident that it works
-        NamedTuple{keys(structure.num_parameters)}(
-            map(p -> p isa ParamVector ? p : ParamVector(p::Vector), resolved_parameters),
+        supplied_parameters = @something(parameters, NamedTuple())
+        expected_keys = keys(structure.num_parameters)
+        issubset(keys(supplied_parameters), expected_keys) || throw(
+            ArgumentError(
+                "Template parameter names $(keys(supplied_parameters)) must be a subset of $(expected_keys)",
+            ),
+        )
+        NamedTuple{expected_keys}(
+            map(expected_keys, values(structure.num_parameters)) do key, expected_length
+                parameter = if hasproperty(supplied_parameters, key)
+                    supplied_parameters[key]
+                else
+                    T[CM.init_value(T) for _ in 1:expected_length]
+                end
+                parameter isa AbstractVector || throw(
+                    ArgumentError(
+                        "Expected `parameters.$key` to be an `AbstractVector`, got $(typeof(parameter))",
+                    ),
+                )
+                length(parameter) == expected_length || throw(
+                    DimensionMismatch(
+                        "Expected `parameters.$key` to have length $expected_length, got $(length(parameter))",
+                    ),
+                )
+                return if parameter isa ParamVector{T}
+                    parameter
+                else
+                    ParamVector(convert(Vector{T}, parameter))
+                end
+            end,
         )
     else
         @assert(
@@ -1260,17 +1277,17 @@ end
 """
     parse_expression(ex::NamedTuple; kws...)
 
-Extension of `parse_expression` to handle NamedTuple input for creating template expressions.
-Each key in the NamedTuple should map to a string expression using #N placeholder syntax.
+Extension of `parse_expression` to handle named-tuple input for template expressions.
+Expression names map to strings using `#N` placeholder syntax. Parameter names may map
+to vectors in the same tuple, or may be supplied through the `parameters` keyword.
 
 # Example
 ```julia
-# With expression_spec (recommended for template expressions):
-spec = TemplateExpressionSpec(; structure=TemplateStructure{(:f, :g)}(...))
-parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_spec=spec, operators=operators, variable_names=["x1", "x2"])
-
-# Or with explicit parameters:
-parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=TemplateExpression, operators=operators, variable_names=["x1", "x2"])
+operators = OperatorEnum(; binary_operators=(+,))
+spec = @template_spec(expressions = (f,), parameters = (p=2,)) do x
+    f(x) + p[1]
+end
+parse_expression((; f="#1", p=[2.0, 3.0]); expression_spec=spec, operators)
 ```
 """
 @unstable function DE.parse_expression(
@@ -1285,6 +1302,7 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
     variable_names::Union{AbstractVector,Nothing}=nothing,
     expression_type::Union{Type,Nothing}=nothing,
     node_type::Union{Type,Nothing}=nothing,
+    parameters::Union{NamedTuple,Nothing}=nothing,
     kws...,
 )
     eval_context = _process_eval_options(eval_context, kws, :parse_expression)
@@ -1325,9 +1343,54 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
         else
             NamedTuple()
         end
-
-    inner_expressions = NamedTuple{keys(ex)}(
-        map(values(ex)) do expr_str
+    structure = resolved_expression_options.structure
+    function_keys = get_function_keys(structure)
+    parameter_keys = get_parameter_keys(structure)
+    supplied_keys = keys(ex)
+    allowed_keys = (function_keys..., parameter_keys...)
+    issubset(supplied_keys, allowed_keys) || throw(
+        ArgumentError(
+            "Template guess names $(supplied_keys) must be expression or parameter names from $(allowed_keys)",
+        ),
+    )
+    issubset(function_keys, supplied_keys) || throw(
+        ArgumentError("Template guesses must provide every expression in $(function_keys)"),
+    )
+    flat_parameter_keys = Tuple(k for k in parameter_keys if hasproperty(ex, k))
+    isempty(flat_parameter_keys) ||
+        parameters === nothing ||
+        throw(
+            ArgumentError(
+                "Template parameters must be supplied either as flat NamedTuple entries or with the `parameters` keyword, not both",
+            ),
+        )
+    supplied_parameters = if isempty(flat_parameter_keys)
+        parameters
+    else
+        NamedTuple{flat_parameter_keys}(map(k -> getproperty(ex, k), flat_parameter_keys))
+    end
+    resolved_parameters = if supplied_parameters === nothing
+        nothing
+    else
+        NamedTuple{keys(supplied_parameters)}(
+            map(keys(supplied_parameters), values(supplied_parameters)) do key, parameter
+                parameter isa AbstractVector || throw(
+                    ArgumentError(
+                        "Expected `parameters.$key` to be an `AbstractVector`, got $(typeof(parameter))",
+                    ),
+                )
+                copy(parameter)
+            end,
+        )
+    end
+    inner_expressions = NamedTuple{function_keys}(
+        map(function_keys) do key
+            expr_str = getproperty(ex, key)
+            expr_str isa AbstractString || throw(
+                ArgumentError(
+                    "Expected template expression `$key` to be a string, got $(typeof(expr_str))",
+                ),
+            )
             max_var_index = 0
             for m in eachmatch(r"#(\d+)", expr_str)
                 capture = m.captures[1]
@@ -1364,9 +1427,10 @@ parse_expression((; f="cos(#1) - 1.5", g="exp(#2) - #1"); expression_type=Templa
 
     return DE.constructorof(resolved_expression_type)(
         inner_expressions;
-        structure=resolved_expression_options.structure,
+        structure,
         operators,
         variable_names=nothing,
+        parameters=resolved_parameters,
         kws...,
     )
 end

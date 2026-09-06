@@ -79,3 +79,71 @@
     @test get_metadata(ex).parameters.p._data ==
         [Vec2(10.0, 20.0), Vec2(30.0, 40.0), Vec2(50.0, 60.0)]
 end
+@testitem "template parser splits and validates flat parameter entries" begin
+    using SymbolicRegression
+    using DynamicExpressions: get_metadata
+
+    structure = TemplateStructure{(:f,),(:p, :q)}(
+        ((; f), (; p, q), (x,)) -> f(x) + p[1] + q[1];
+        num_features=(; f=1),
+        num_parameters=(; p=2, q=1),
+    )
+    operators = OperatorEnum(; binary_operators=(+,), unary_operators=())
+    spec = TemplateExpressionSpec(; structure)
+
+    expression_only = parse_expression((; f="#1"); expression_spec=spec, operators)
+    @test get_metadata(expression_only).parameters.p == [0.0, 0.0]
+    @test get_metadata(expression_only).parameters.q == [0.0]
+
+    partial = parse_expression((; q=[3], f="#1"); expression_spec=spec, operators)
+    @test get_metadata(partial).parameters.p == [0.0, 0.0]
+    @test get_metadata(partial).parameters.q == [3.0]
+    @test keys(get_metadata(partial).parameters) == (:p, :q)
+
+    explicit = parse_expression(
+        (; f="#1"); expression_spec=spec, operators, parameters=(; p=[1, 2],)
+    )
+    @test get_metadata(explicit).parameters.p == [1.0, 2.0]
+    @test get_metadata(explicit).parameters.q == [0.0]
+
+    @test_throws ArgumentError parse_expression(
+        (; f="#1", unknown=[1.0]); expression_spec=spec, operators
+    )
+    @test_throws DimensionMismatch parse_expression(
+        (; f="#1", p=[1.0]); expression_spec=spec, operators
+    )
+    @test_throws ArgumentError parse_expression(
+        (; f="#1", p=1.0); expression_spec=spec, operators
+    )
+    @test_throws ArgumentError parse_expression(
+        (; f="#1", p=[1.0, 2.0]); expression_spec=spec, operators, parameters=(; q=[3.0],)
+    )
+end
+
+@testitem "template parser accepts custom value parameter vectors" begin
+    using SymbolicRegression
+    using DynamicExpressions: get_metadata
+
+    struct GuessVec2
+        x::Float64
+        y::Float64
+    end
+    SymbolicRegression.init_value(::Type{GuessVec2}) = GuessVec2(0.0, 0.0)
+
+    structure = TemplateStructure{(:f,),(:p,)}(
+        ((; f), (; p), (x,)) -> f(x); num_features=(; f=1), num_parameters=(; p=2)
+    )
+    operators = OperatorEnum(; binary_operators=(), unary_operators=())
+    options = Options(; operators, expression_spec=TemplateExpressionSpec(; structure))
+    supplied = [GuessVec2(1.0, 2.0), GuessVec2(3.0, 4.0)]
+    parsed = parse_expression(
+        (; f="#1", p=supplied);
+        options.expression_options,
+        expression_type=TemplateExpression,
+        node_type=Node{GuessVec2},
+        operators,
+    )
+
+    @test get_metadata(parsed).parameters.p._data == supplied
+    @test get_metadata(parsed).parameters.p._data !== supplied
+end

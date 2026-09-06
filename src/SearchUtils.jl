@@ -940,14 +940,19 @@ end
     ::Type{T}, g::NamedTuple, dataset::Dataset, options::AbstractOptions
 ) where {T}
     # Check if any expression in the NamedTuple uses actual variable names instead of placeholder syntax
-    for expr_str in values(g), var_name in dataset.variable_names
-        if occursin(Regex("\\b\\Q$(var_name)\\E\\b"), expr_str)
-            throw(
-                ArgumentError(
-                    "Found variable name '$(var_name)' in TemplateExpression guess. " *
-                    "Use placeholder syntax '#1', '#2', etc., (for argument 1, 2, etc.) instead of actual variable names.",
-                ),
-            )
+    function_keys = keys(options.expression_options.structure.num_features)
+    for (key, expr_str) in pairs(g)
+        key in function_keys || continue
+        expr_str isa AbstractString || continue
+        for var_name in dataset.variable_names
+            if occursin(Regex("\\b\\Q$(var_name)\\E\\b"), expr_str)
+                throw(
+                    ArgumentError(
+                        "Found variable name '$(var_name)' in TemplateExpression guess. " *
+                        "Use placeholder syntax '#1', '#2', etc., (for argument 1, 2, etc.) instead of actual variable names.",
+                    ),
+                )
+            end
         end
     end
 
