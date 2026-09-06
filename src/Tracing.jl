@@ -3,7 +3,7 @@ module TracingModule
 using DynamicExpressions: string_tree
 using ..CoreModule: AbstractOptions, MaybeTrace, TraceType
 using ..ComplexityModule: compute_complexity
-using ..UtilsModule: json3_write
+using ..UtilsModule: json_write
 
 const TRACE_SCHEMA_VERSION = 1
 
@@ -57,7 +57,7 @@ end
 end
 
 @inline function write_trace(trace::MaybeTrace, filename; append::Bool=true)
-    !isnothing(trace) && json3_write(trace, filename; append)
+    !isnothing(trace) && json_write(trace, filename; append)
     return nothing
 end
 

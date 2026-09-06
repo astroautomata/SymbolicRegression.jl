@@ -72,6 +72,21 @@ end
     )
 end
 
+@testitem "Tracing requires JSON.jl" begin
+    using SymbolicRegression: TraceType
+    using SymbolicRegression.TracingModule: write_trace
+    using Test
+
+    err = try
+        write_trace(TraceType("loss" => Inf), tempname())
+        nothing
+    catch caught
+        caught
+    end
+    @test err isa ErrorException
+    @test err.msg == "Please load the JSON.jl package."
+end
+
 @testitem "Disabled tracing is allocation-free" begin
     using SymbolicRegression: Options, TraceType
     using SymbolicRegression.TracingModule:

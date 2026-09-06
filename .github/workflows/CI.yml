@@ -125,7 +125,7 @@ jobs:
           - ext/mlj/templates
           - ext/mlj/parametric_search
           - ext/symbolicutils
-          - ext/json3_tracing
+          - ext/json_tracing
           - ext/dynamicquantities_units
           - ext/loopvectorization
           - examples/readme
