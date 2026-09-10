@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.4.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.4.0...v2.4.1) (2026-09-10)
+
+
+### Bug Fixes
+
+* require DynamicExpressions 2.11 for custom invalid values ([#718](https://github.com/astroautomata/SymbolicRegression.jl/issues/718)) ([cbb4d78](https://github.com/astroautomata/SymbolicRegression.jl/commit/cbb4d786ca809184adba91cd843af8f6a38c24da))
+
 ## [2.4.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.3.0...v2.4.0) (2026-09-06)
 
 ### Dependencies
