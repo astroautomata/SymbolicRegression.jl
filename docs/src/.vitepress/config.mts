@@ -10,7 +10,7 @@ function getBaseRepository(base: string): string {
 }
 
 const baseTemp = {
-  base: '/symbolicregression/dev/',// TODO: replace this in makedocs!
+  base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
 }
 
 const navTemp = {
@@ -33,7 +33,7 @@ const nav = [
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: '/symbolicregression/dev/',// TODO: replace this in makedocs!
+  base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   title: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   description: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   lastUpdated: true,
@@ -94,7 +94,7 @@ export default defineConfig({
     },
     nav,
     sidebar: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
-    editLink: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
+    editLink: { pattern: 'https://github.com/astroautomata/SymbolicRegression.jl/edit/master/docs/src/:path' },
     socialLinks: [
       { icon: 'github', link: 'https://github.com/MilesCranmer/SymbolicRegression.jl' }
     ],
