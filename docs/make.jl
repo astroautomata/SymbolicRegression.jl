@@ -198,48 +198,6 @@ function preprocess_source_index()
     return true
 end
 
-# Fix VitePress base path for dual deployment
-function fix_vitepress_base_path()
-    deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
-
-    # Determine the correct base path for each deployment
-    base_path = if deployment_target == "cambridge"
-        "/symbolicregression/dev/"
-    else
-        "/SymbolicRegression.jl/dev/"
-    end
-
-    # The version picker should link to sibling versions that live one
-    # directory above the active version, e.g. `/symbolicregression/v1.12.0/`.
-    # Compute that shared prefix (always the first path segment) so that we can
-    # rewrite `__DEPLOY_ABSPATH__` accordingly.
-    stripped = isempty(base_path) ? base_path : rstrip(base_path, '/')
-    segments = split(stripped, '/'; keepempty=false)
-    deploy_abspath = isempty(segments) ? "/" : "/" * first(segments) * "/"
-
-    # Find and fix VitePress SOURCE config file (before build)
-    config_paths = [joinpath(@__DIR__, "src", ".vitepress", "config.mts")]
-
-    for config_path in config_paths
-        if isfile(config_path)
-            @info "Fixing VitePress base path in $config_path for deployment target: $deployment_target"
-            content = read(config_path, String)
-
-            # Replace the base path with the correct one for this deployment
-            # Look for existing base: '...' patterns and replace them
-            content = replace(content, r"base:\s*'[^']*'" => "base: '$base_path'")
-            content = replace(
-                content,
-                r"__DEPLOY_ABSPATH__\s*:\s*JSON\.stringify\('[^']*'\)" => "__DEPLOY_ABSPATH__: JSON.stringify('$deploy_abspath')",
-            )
-
-            write(config_path, content)
-            @info "Updated VitePress base path to: $base_path (deploy abspath: $deploy_abspath)"
-        else
-            @warn "VitePress config not found at: $config_path"
-        end
-    end
-end
 
 # Generate favicon files from logo.png
 function generate_favicons()
@@ -286,8 +244,6 @@ preprocess_source_index()
 # Generate favicons before building docs
 generate_favicons()
 
-# Fix VitePress base path BEFORE makedocs() - this is crucial for timing!
-fix_vitepress_base_path()
 
 # Configure deployment based on target
 deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
@@ -347,7 +303,9 @@ makedocs(;
     clean=get(ENV, "DOCUMENTER_PRODUCTION", "false") == "true",
     warnonly=[:docs_block, :cross_references, :missing_docs],
     format=DocumenterVitepress.MarkdownVitepress(;
-        repo="github.com/astroautomata/SymbolicRegression.jl",
+        repo=deployment_target == "cambridge" ?
+             "github.com/ai-damtp-cam-ac-uk/symbolicregression" :
+             "github.com/astroautomata/SymbolicRegression.jl",
         devbranch="master",
         devurl="dev",
         deploy_url=nothing,
@@ -406,7 +364,6 @@ end
 
 fix_empty_bases()
 
-# Fix VitePress base path BEFORE building (moved to before makedocs)
 
 # Additional post-processing for VitePress production build issues
 function fix_vitepress_production_output()
