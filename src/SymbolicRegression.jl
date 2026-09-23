@@ -379,7 +379,8 @@ using .MutationFunctionsModule:
     gen_random_tree, gen_random_tree_fixed_size, random_node, crossover_trees
 using .InterfaceDynamicExpressionsModule:
     @extend_operators, require_copy_to_workers, make_example_inputs
-using .LossFunctionsModule: eval_loss, eval_cost, update_baseline_loss!, score_func
+using .LossFunctionsModule:
+    create_eval_context, eval_loss, eval_cost, update_baseline_loss!, score_func
 using .ConstantOptimizationModule:
     optimize_constants,
     get_constants_for_optimization,
@@ -839,6 +840,16 @@ end
     ]
 
     seed_members = [Vector{PMType}() for j in 1:nout]
+    # One evaluation buffer per population slot, grown on first use and reused
+    # across iterations. Workers on other processes cannot share it.
+    eval_contexts = if ropt.parallelism == :multiprocessing
+        [fill(nothing, options.populations) for j in 1:nout]
+    else
+        [
+            [create_eval_context(datasets[j], options, 0) for i in 1:(options.populations)] for j in 1:nout
+        ]
+    end
+    EvalContextType = eltype(eltype(eval_contexts))
 
     return SearchState{
         T,
@@ -850,6 +861,7 @@ end
         typeof(trace),
         PluginStatesType,
         WorkerPluginStatesType,
+        EvalContextType,
     }(;
         procs=procs,
         we_created_procs=we_created_procs,
@@ -869,6 +881,7 @@ end
         seed_members=seed_members,
         plugin_states=plugin_states,
         worker_plugin_states=worker_plugin_states,
+        eval_contexts=eval_contexts,
     )
 end
 function _initialize_search!(
@@ -1030,6 +1043,7 @@ function _warmup_search!(
             TraceStateType,
             eltype(eltype(state.worker_plugin_states)),
         )
+        eval_context = state.eval_contexts[j][i]
         updated_pop = @sr_spawner(
             begin
                 _dispatch_s_r_cycle(
@@ -1042,6 +1056,7 @@ function _warmup_search!(
                     ropt.verbosity,
                     cur_maxsize,
                     plugin_states=worker_plugin_states,
+                    eval_context,
                 )::DefaultWorkerOutputType{
                     Population{T,L,N},
                     HallOfFame{T,L,N},
@@ -1211,6 +1226,7 @@ function _main_search_loop!(
                         worker_state, latest_head_state, plugin, dataset
                     )
                 end
+                eval_context = state.eval_contexts[j][i]
                 state.worker_output[j][i] = @sr_spawner(
                     begin
                         _dispatch_s_r_cycle(
@@ -1223,6 +1239,7 @@ function _main_search_loop!(
                             ropt.verbosity,
                             cur_maxsize,
                             plugin_states=worker_plugin_states,
+                            eval_context,
                         )
                     end,
                     parallelism = ropt.parallelism,
@@ -1379,6 +1396,7 @@ end
     verbosity,
     cur_maxsize::Int,
     plugin_states::Tuple,
+    eval_context,
 ) where {T,L,N}
     trace = new_trace(options)
     trace_iteration_start!(trace, out, pop, iteration, in_pop, options)
@@ -1392,6 +1410,7 @@ end
         options=options,
         trace=trace,
         plugin_states,
+        eval_context,
     )
     num_evals += evals_from_cycle
     out_pop, evals_from_optimize = optimize_and_simplify_population(

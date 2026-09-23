@@ -30,9 +30,16 @@ function create_eval_context(dataset::Dataset, options::AbstractOptions, num_arr
     if options.bumper isa Val{true} || !takes_eval_context(options.operators)
         return nothing
     end
-    array = similar(dataset.X, axes(dataset.X, 2))
-    arrays = [similar(array) for _ in 1:num_arrays]
+    A = expected_array_type(dataset.X, Nothing)
+    arrays = A[similar(dataset.X, axes(dataset.X, 2)) for _ in 1:num_arrays]
     return EvalContext(; turbo=options.turbo, buffer=ArrayBuffer(arrays, Ref(0)))
+end
+
+function grow_eval_context!(context::EvalContext, dataset::Dataset, num_arrays::Int)
+    while length(context.buffer.array) < num_arrays
+        push!(context.buffer.array, similar(dataset.X, axes(dataset.X, 2)))
+    end
+    return context
 end
 
 function _loss(
