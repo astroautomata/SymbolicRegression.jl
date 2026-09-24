@@ -1,5 +1,16 @@
 # Changelog
 
+## [2.4.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.4.1...v2.4.2) (2026-09-24)
+
+
+### Performance Improvements
+
+* allocation-free tournament selection and oldest-member scan ([#728](https://github.com/astroautomata/SymbolicRegression.jl/issues/728)) ([5df7912](https://github.com/astroautomata/SymbolicRegression.jl/commit/5df7912a021f349cc92fa0c3701bd97a57553c45))
+* hoist s_r_cycle plugin hook closures into functions ([#730](https://github.com/astroautomata/SymbolicRegression.jl/issues/730)) ([b65ffa1](https://github.com/astroautomata/SymbolicRegression.jl/commit/b65ffa185b4eb3fa82a42064f83d853b96791e10))
+* reuse a per-task scratch for conditioned mutation weights ([#731](https://github.com/astroautomata/SymbolicRegression.jl/issues/731)) ([1052b1c](https://github.com/astroautomata/SymbolicRegression.jl/commit/1052b1c93fd45aa7c5df69f93a2649cadb80d87a))
+* run optimize_and_simplify_population as a plain loop ([#727](https://github.com/astroautomata/SymbolicRegression.jl/issues/727)) ([a687898](https://github.com/astroautomata/SymbolicRegression.jl/commit/a687898e331b7eeca9babf34714757e9092fce93))
+* run population copy and hall-of-fame output as plain loops ([#726](https://github.com/astroautomata/SymbolicRegression.jl/issues/726)) ([0a370b4](https://github.com/astroautomata/SymbolicRegression.jl/commit/0a370b48a53fc51c79bdd22688a68cc07b20ab24))
+
 ## [2.4.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.4.0...v2.4.1) (2026-09-10)
 
 ### Bug Fixes
