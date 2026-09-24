@@ -52,7 +52,7 @@ using ..ComplexityModule: compute_complexity
 using ..LossFunctionsModule: eval_cost, loss_to_cost
 using ..CheckConstraintsModule: check_constraints
 using ..PopMemberModule: AbstractPopMember, PopMember, create_child
-using ..UtilsModule: strictmap
+using ..UtilsModule: strictmap, PerTaskCache
 using ..MutationFunctionsModule:
     mutate_constant,
     mutate_operator,
@@ -261,6 +261,16 @@ end
     return lastindex(mutations)
 end
 
+# The conditioned weights are rebuilt on every mutation; this keeps one
+# scratch vector per task instead of allocating a fresh copy each time.
+const MUTATION_WEIGHTS_SCRATCH = PerTaskCache{Vector{Pair{AbstractMutation,Float64}}}()
+
+function _mutation_weights_scratch(options::AbstractOptions)
+    weights = MUTATION_WEIGHTS_SCRATCH[]
+    resize!(weights, length(options.mutations))
+    return copyto!(weights, options.mutations)
+end
+
 # Go through one simulated options.annealing mutation cycle
 @inline function _fire_on_mutation_end!(
     options::AbstractOptions,
@@ -306,7 +316,7 @@ end
 
     nfeatures = max_features(dataset, options)
 
-    weights = copy(options.mutations)
+    weights = _mutation_weights_scratch(options)
 
     condition_mutation_weights!(weights, member, options, curmaxsize, nfeatures)
     strictmap(options.plugins, plugin_states) do plugin, pstate
