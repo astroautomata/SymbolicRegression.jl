@@ -416,8 +416,8 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     above inside the score, rather than just at the mutation accept/reject stage.
 - `plugins`: Plugin instances to run, as a tuple or vector. Vectors are converted
     to tuples when the options are constructed. Plugins may also contribute
-    weighted mutation and crossover defaults via [`plugin_mutations`](@ref) and
-    [`plugin_crossovers`](@ref).
+    weighted mutation and crossover defaults via `plugin_mutations` and
+    `plugin_crossovers`.
 - `default_plugins`: Default plugin instances appended after `plugins`. Set this
     to `()` to disable automatic defaults. An explicit plugin takes precedence
     over a default plugin of the same type.

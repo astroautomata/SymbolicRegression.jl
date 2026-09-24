@@ -1187,7 +1187,7 @@ end
     `parameter_initializer(rng, T, num_parameters)` when creating a new candidate.
     It must return a `NamedTuple` with the same keys and vector lengths as
     `num_parameters`. By default, template parameters are sampled with
-    [`sample_value`](@ref).
+    `sample_value`.
 """
 struct TemplateExpressionSpec{ST<:TemplateStructure,IET,IEO<:NamedTuple,PI} <:
        AbstractExpressionSpec

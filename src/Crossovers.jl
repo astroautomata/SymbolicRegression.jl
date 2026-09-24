@@ -5,7 +5,7 @@ module CrossoversModule
 
 A crossover kind is a struct (often `Base.@kwdef` for per-crossover config)
 subtyping `AbstractCrossover`. The engine dispatches the per-event
-[`crossover`](@ref) method on the crossover's type; weight sampling keys off
+`crossover` method on the crossover's type; weight sampling keys off
 the type.
 
 To add a new crossover kind, define a struct + a `crossover` method:
