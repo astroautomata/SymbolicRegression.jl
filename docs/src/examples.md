@@ -584,6 +584,6 @@ and their default weights.
 For the many other features available in SymbolicRegression.jl,
 check out the API page for `Options`. You might also find it useful
 to browse the documentation for the Python frontend
-[PySR](http://astroautomata.com/PySR), which has additional documentation.
-In particular, the [tuning page](http://astroautomata.com/PySR/tuning)
+[PySR](https://pysr.ai), which has additional documentation.
+In particular, the [tuning page](https://pysr.ai/tuning)
 is useful for improving search performance.

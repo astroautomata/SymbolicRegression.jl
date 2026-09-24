@@ -198,49 +198,6 @@ function preprocess_source_index()
     return true
 end
 
-# Fix VitePress base path for dual deployment
-function fix_vitepress_base_path()
-    deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
-
-    # Determine the correct base path for each deployment
-    base_path = if deployment_target == "cambridge"
-        "/symbolicregression/dev/"
-    else
-        "/SymbolicRegression.jl/dev/"
-    end
-
-    # The version picker should link to sibling versions that live one
-    # directory above the active version, e.g. `/symbolicregression/v1.12.0/`.
-    # Compute that shared prefix (always the first path segment) so that we can
-    # rewrite `__DEPLOY_ABSPATH__` accordingly.
-    stripped = isempty(base_path) ? base_path : rstrip(base_path, '/')
-    segments = split(stripped, '/'; keepempty=false)
-    deploy_abspath = isempty(segments) ? "/" : "/" * first(segments) * "/"
-
-    # Find and fix VitePress SOURCE config file (before build)
-    config_paths = [joinpath(@__DIR__, "src", ".vitepress", "config.mts")]
-
-    for config_path in config_paths
-        if isfile(config_path)
-            @info "Fixing VitePress base path in $config_path for deployment target: $deployment_target"
-            content = read(config_path, String)
-
-            # Replace the base path with the correct one for this deployment
-            # Look for existing base: '...' patterns and replace them
-            content = replace(content, r"base:\s*'[^']*'" => "base: '$base_path'")
-            content = replace(
-                content,
-                r"__DEPLOY_ABSPATH__\s*:\s*JSON\.stringify\('[^']*'\)" => "__DEPLOY_ABSPATH__: JSON.stringify('$deploy_abspath')",
-            )
-
-            write(config_path, content)
-            @info "Updated VitePress base path to: $base_path (deploy abspath: $deploy_abspath)"
-        else
-            @warn "VitePress config not found at: $config_path"
-        end
-    end
-end
-
 # Generate favicon files from logo.png
 function generate_favicons()
     logo_path = joinpath(@__DIR__, "src", "assets", "logo.png")
@@ -286,37 +243,17 @@ preprocess_source_index()
 # Generate favicons before building docs
 generate_favicons()
 
-# Fix VitePress base path BEFORE makedocs() - this is crucial for timing!
-fix_vitepress_base_path()
-
-# Configure deployment based on target
-deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
-
-if deployment_target == "cambridge"
-    ENV["GITHUB_REPOSITORY"] = "ai-damtp-cam-ac-uk/symbolicregression"
-    ENV["DOCUMENTER_KEY"] = get(ENV, "DOCUMENTER_KEY_CAM", "")
-end
+ENV["GITHUB_REPOSITORY"] = "ai-damtp-cam-ac-uk/symbolicregression"
+ENV["DOCUMENTER_KEY"] = get(ENV, "DOCUMENTER_KEY_CAM", "")
 
 deploy_config = Documenter.auto_detect_deploy_system()
-if deployment_target == "cambridge"
-    # Cambridge deployment with different base path
-    deploy_decision = Documenter.deploy_folder(
-        deploy_config;
-        repo="github.com/ai-damtp-cam-ac-uk/symbolicregression.git",
-        devbranch="master",
-        devurl="dev",
-        push_preview=true,
-    )
-else
-    # Default astroautomata deployment
-    deploy_decision = Documenter.deploy_folder(
-        deploy_config;
-        repo="github.com/astroautomata/SymbolicRegression.jl",
-        devbranch="master",
-        devurl="dev",
-        push_preview=true,
-    )
-end
+deploy_decision = Documenter.deploy_folder(
+    deploy_config;
+    repo="github.com/ai-damtp-cam-ac-uk/symbolicregression.git",
+    devbranch="master",
+    devurl="dev",
+    push_preview=true,
+)
 
 current_version = let
     version = get(ENV, "DOCUMENTER_VERSION", nothing)
@@ -350,7 +287,7 @@ makedocs(;
         repo="github.com/astroautomata/SymbolicRegression.jl",
         devbranch="master",
         devurl="dev",
-        deploy_url=nothing,
+        deploy_url="https://julia.pysr.ai/",
         deploy_decision,
         keep=:patch,
         build_vitepress=get(ENV, "DOCUMENTER_PRODUCTION", "false") == "true",
@@ -406,8 +343,6 @@ end
 
 fix_empty_bases()
 
-# Fix VitePress base path BEFORE building (moved to before makedocs)
-
 # Additional post-processing for VitePress production build issues
 function fix_vitepress_production_output()
     build_index_html = joinpath(@__DIR__, "build", "1", "index.html")
@@ -446,23 +381,9 @@ end
 # Apply additional fix for production build
 fix_vitepress_production_output()
 
-# Deploy based on environment variable - supports CI matrix strategy
-deployment_target = get(ENV, "DEPLOYMENT_TARGET", "astroautomata")
-
-if deployment_target == "astroautomata"
-    DocumenterVitepress.deploydocs(;
-        repo="github.com/astroautomata/SymbolicRegression.jl.git",
-        push_preview=true,
-        target="build",
-        devbranch="master",
-    )
-elseif deployment_target == "cambridge"
-    DocumenterVitepress.deploydocs(;
-        repo="github.com/ai-damtp-cam-ac-uk/symbolicregression.git",
-        push_preview=true,
-        target="build",
-        devbranch="master",
-    )
-else
-    @warn "Unknown DEPLOYMENT_TARGET: $deployment_target. Skipping deployment."
-end
+DocumenterVitepress.deploydocs(;
+    repo="github.com/ai-damtp-cam-ac-uk/symbolicregression.git",
+    push_preview=true,
+    target="build",
+    devbranch="master",
+)

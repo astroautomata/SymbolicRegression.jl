@@ -17,7 +17,7 @@ https://github.com/astroautomata/SymbolicRegression.jl/assets/7593028/f5b68f1f-9
 <tbody>
 <tr>
 <td align="center"><a href="https://juliahub.com/ui/Packages/SymbolicRegression/X2eIS"><img src="https://juliahub.com/docs/SymbolicRegression/version.svg" alt="version"></a></td>
-<td align="center"><a href="https://ai.damtp.cam.ac.uk/symbolicregression/dev/"><img src="https://img.shields.io/badge/docs-dev-blue.svg" alt="Dev"></a></td>
+<td align="center"><a href="https://julia.pysr.ai/dev/"><img src="https://img.shields.io/badge/docs-dev-blue.svg" alt="Dev"></a></td>
 <td align="center"><a href="https://github.com/astroautomata/PySR/discussions"><img src="https://img.shields.io/badge/discussions-github-informational" alt="Discussions"></a></td>
 <td align="center"><a href="https://arxiv.org/abs/2305.01582"><img src="https://img.shields.io/badge/arXiv-2305.01582-b31b1b" alt="Paper"></a></td>
 </tr>
@@ -130,7 +130,7 @@ where here we choose to evaluate the second equation.
 
 For fitting multiple outputs, one can use `MultitargetSRRegressor`
 (and pass an array of indices to `idx` in `predict` for selecting specific equations).
-For a full list of options available to each regressor, see the [API page](https://ai.damtp.cam.ac.uk/symbolicregression/dev/api/).
+For a full list of options available to each regressor, see the [API page](https://julia.pysr.ai/dev/api/).
 
 Inputs can be matrices, `NamedTuple`s of vectors, or any Tables.jl-compatible
 table (such as a `DataFrame`).
@@ -586,4 +586,4 @@ done | vims -l 'f a--> ' | sort
 
 ## Search options
 
-See https://ai.damtp.cam.ac.uk/symbolicregression/stable/api/#Options
+See https://julia.pysr.ai/stable/api/#Options

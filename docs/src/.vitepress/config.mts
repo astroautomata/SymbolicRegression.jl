@@ -3,14 +3,8 @@ import { tabsMarkdownPlugin } from 'vitepress-plugin-tabs'
 import mathjax3 from "markdown-it-mathjax3";
 import footnote from "markdown-it-footnote";
 
-function getBaseRepository(base: string): string {
-  if (!base || base === '/') return '/';
-  const parts = base.split('/').filter(Boolean);
-  return parts.length > 0 ? `/${parts[0]}/` : '/';
-}
-
 const baseTemp = {
-  base: '/symbolicregression/dev/',// TODO: replace this in makedocs!
+  base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
 }
 
 const navTemp = {
@@ -23,7 +17,7 @@ const nav = [
     text: 'Julia',
     items: [
       { text: 'Julia', link: '/' },
-      { text: 'Python', link: 'https://ai.damtp.cam.ac.uk/pysr/dev/' }
+      { text: 'Python', link: 'https://pysr.ai/' }
     ]
   },
   {
@@ -33,7 +27,7 @@ const nav = [
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: '/symbolicregression/dev/',// TODO: replace this in makedocs!
+  base: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   title: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   description: 'REPLACE_ME_DOCUMENTER_VITEPRESS',
   lastUpdated: true,
@@ -45,14 +39,13 @@ export default defineConfig({
     ['link', { rel: 'icon', type: 'image/png', sizes: '32x32', href: `${baseTemp.base}favicon-32x32.png` }],
     ['link', { rel: 'apple-touch-icon', sizes: '180x180', href: `${baseTemp.base}apple-touch-icon.png` }],
     ['link', { rel: 'stylesheet', href: `${baseTemp.base}nav-logo.css` }],
-    ['script', {src: `${getBaseRepository(baseTemp.base)}versions.js`}],
-    // ['script', {src: '/versions.js'], for custom domains, I guess if deploy_url is available.
+    ['script', {src: '/versions.js'}],
     ['script', {src: `${baseTemp.base}siteinfo.js`}]
   ],
   ignoreDeadLinks: true,
   vite: {
     define: {
-      __DEPLOY_ABSPATH__: JSON.stringify('REPLACE_ME_DOCUMENTER_VITEPRESS_DEPLOY_ABSPATH'),
+      __DEPLOY_ABSPATH__: JSON.stringify('/'),
     },
     optimizeDeps: {
       exclude: [
