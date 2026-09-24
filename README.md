@@ -130,7 +130,7 @@ where here we choose to evaluate the second equation.
 
 For fitting multiple outputs, one can use `MultitargetSRRegressor`
 (and pass an array of indices to `idx` in `predict` for selecting specific equations).
-For a full list of options available to each regressor, see the [API page](https://julia.pysr.ai/dev/api/).
+For a full list of options available to each regressor, see the [API page](https://julia.pysr.ai/dev/api).
 
 Inputs can be matrices, `NamedTuple`s of vectors, or any Tables.jl-compatible
 table (such as a `DataFrame`).
@@ -586,4 +586,4 @@ done | vims -l 'f a--> ' | sort
 
 ## Search options
 
-See https://julia.pysr.ai/stable/api/#Options
+See https://julia.pysr.ai/stable/api#Options

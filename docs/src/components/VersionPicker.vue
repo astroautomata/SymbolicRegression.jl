@@ -34,6 +34,8 @@ function absoluteUrl(relative) {
 const props = defineProps<{ screenMenu?: boolean }>();
 const versions = ref<Array<{ text: string, link: string, class?: string }>>([]);
 const currentVersion = ref('Versions');
+// Releases display the minor version while retaining their full patch-version URL.
+const minorLabel = (v: string) => /^(v\d+\.\d+)\.\d+$/.exec(v)?.[1] ?? v;
 const isClient = ref(false);
 const { site } = useData();
 
@@ -71,10 +73,16 @@ const loadVersions = async () => {
       const scriptsLoaded = await waitForScriptsToLoad();
 
       if (scriptsLoaded && window.DOC_VERSIONS && window.DOCUMENTER_CURRENT_VERSION) {
-        versions.value = window.DOC_VERSIONS.map(v => ({
-          text: v,
-          link: absoluteUrl(`/${v}/`),
-        }));
+        const seenMinors = new Set<string>();
+        versions.value = window.DOC_VERSIONS
+          .filter(v => {
+            if (v === 'dev' || v === 'stable') return true;
+            const minor = /^(v\d+\.\d+)\.\d+$/.exec(v)?.[1];
+            if (!minor || seenMinors.has(minor)) return false;
+            seenMinors.add(minor);
+            return true;
+          })
+          .map(v => ({ text: minorLabel(v), link: absoluteUrl(`/${v}/`) }));
         currentVersion.value = window.DOCUMENTER_CURRENT_VERSION;
       } else {
         versions.value = [{ text: 'dev', link: absoluteUrl('/dev/') }];
@@ -92,7 +100,9 @@ const loadVersions = async () => {
 const versionItems = computed(() => {
   return versions.value.map((v) => ({
     text: v.text,
-    link: v.link
+    link: v.link,
+    target: '_self',
+    noIcon: true
   }));
 });
 
@@ -108,12 +118,12 @@ onMounted(() => {
   <template v-if="isClient">
     <VPNavBarMenuGroup
       v-if="!screenMenu && versions.length > 0"
-      :item="{ text: currentVersion, items: versionItems }"
+      :item="{ text: minorLabel(currentVersion), items: versionItems }"
       class="VPVersionPicker"
     />
     <VPNavScreenMenuGroup
       v-else-if="screenMenu && versions.length > 0"
-      :text="currentVersion"
+      :text="minorLabel(currentVersion)"
       :items="versionItems"
       class="VPVersionPicker"
     />

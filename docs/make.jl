@@ -138,6 +138,11 @@ readme = replace(readme, r"<!--.*?-->" => s"") # Remove markdown comments
 readme = replace(readme, r"<[/]?div.*" => s"") # Remove div tags
 readme = replace(readme, r"\*\*Contents\*\*:.*?(?=## )"s => s"") # Remove Contents TOC
 readme = replace(readme, r"## Contributors ✨.*$"s => s"") # Remove Contributors section onwards
+readme = replace(
+    readme,
+    r"(?<=href=\")((?:\./)?\.github/[^\"]+)" =>
+        s"https://github.com/astroautomata/SymbolicRegression.jl/blob/master/\1",
+)
 readme = replace( # Convert video URL to proper video tag wrapped in @raw html for VitePress
     readme,
     r"https://github.com/astroautomata/SymbolicRegression.jl/assets/7593028/f5b68f1f-9830-497f-a197-6ae332c94ee0" => """```@raw html

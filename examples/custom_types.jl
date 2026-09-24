@@ -143,7 +143,7 @@ into any other constant value.
 
 The `temperature` argument reflects per-call mutation scaling, including
 simulated annealing. You can use it as you see fit, or ignore it.
-The `mutation` argument contains the selected [`ConstantMutation`](@ref) configuration.
+The `mutation` argument contains the selected `ConstantMutation` configuration.
 =#
 
 using SymbolicRegression.UtilsModule: poisson_sample

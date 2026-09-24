@@ -12,7 +12,11 @@ const navTemp = {
 }
 
 const nav = [
-  ...navTemp.nav.filter(item => item.text !== 'Migrating from v1'),
+  ...navTemp.nav.filter(item => item.text === 'Home' || item.text === 'Examples'),
+  {
+    text: 'API',
+    items: navTemp.nav.filter(item => ['API', 'Losses', 'Types', 'Customization', 'Plugins'].includes(item.text))
+  },
   {
     text: 'Julia',
     items: [
