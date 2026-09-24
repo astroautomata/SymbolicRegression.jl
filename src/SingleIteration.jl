@@ -1,8 +1,7 @@
 module SingleIterationModule
 
-using ADTypes: AutoEnzyme
 using DynamicExpressions: AbstractExpression, simplify_tree!, combine_operators
-using ..UtilsModule: @threads_if, strictmap
+using ..UtilsModule: strictmap
 using ..CoreModule:
     AbstractOptions,
     Dataset,
@@ -85,9 +84,6 @@ function optimize_and_simplify_population(
 )::Tuple{P,Float64} where {T,L,D<:Dataset{T,L},P<:Population{T,L}}
     array_num_evals = zeros(Float64, pop.n)
     do_optimization = rand(pop.n) .< options.optimizer_probability
-    # Note: we have to turn off this threading loop due to Enzyme, since we need
-    # to manually allocate a new task with a larger stack for Enzyme.
-    should_thread = !(options.deterministic) && !(isa(options.autodiff_backend, AutoEnzyme))
 
     batched_dataset = if batching_required(options, dataset)
         batch(dataset, get_batch_size(options, dataset.n))
@@ -95,7 +91,7 @@ function optimize_and_simplify_population(
         dataset
     end
 
-    @threads_if should_thread for j in 1:(pop.n)
+    for j in 1:(pop.n)
         if options.should_simplify
             tree = pop.members[j].tree
             tree = simplify_tree!(tree, options.operators)

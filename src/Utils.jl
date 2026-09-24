@@ -156,16 +156,6 @@ function poisson_sample(λ::T) where {T}
     return poisson_sample(default_rng(), λ)
 end
 
-macro threads_if(flag, ex)
-    return quote
-        if $flag
-            Threads.@threads $ex
-        else
-            $ex
-        end
-    end |> esc
-end
-
 """
     @save_kwargs variable function ... end
 
