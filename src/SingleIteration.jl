@@ -46,9 +46,7 @@ function s_r_cycle(
     eval_context = create_eval_context(batched_dataset, options, curmaxsize)
 
     for cycle_idx in 1:ncycles
-        strictmap(options.plugins, plugin_states) do plugin, pstate
-            return on_cycle_start!(pstate, plugin, cycle_idx, ncycles, options)
-        end
+        _on_cycle_start!(plugin_states, cycle_idx, ncycles, options)
         pop, tmp_num_evals = reg_evol_cycle(
             batched_dataset,
             pop,
@@ -61,14 +59,25 @@ function s_r_cycle(
         )
         num_evals += tmp_num_evals
         _update_hall_of_fame_unchecked!(best_examples_seen, pop.members, options)
-        strictmap(options.plugins, plugin_states) do plugin, pstate
-            return on_cycle_end!(
-                pstate, plugin, pop, batched_dataset, best_examples_seen, options
-            )
-        end
+        _on_cycle_end!(plugin_states, pop, batched_dataset, best_examples_seen, options)
     end
 
     return (pop, best_examples_seen, num_evals)
+end
+
+# The plugin hooks live in their own functions: a closure inside the loop above
+# would box `pop` (it is reassigned there) and re-materialize `options` each cycle.
+function _on_cycle_start!(plugin_states, cycle_idx, ncycles, options)
+    strictmap(options.plugins, plugin_states) do plugin, pstate
+        return on_cycle_start!(pstate, plugin, cycle_idx, ncycles, options)
+    end
+    return nothing
+end
+function _on_cycle_end!(plugin_states, pop, dataset, best_examples_seen, options)
+    strictmap(options.plugins, plugin_states) do plugin, pstate
+        return on_cycle_end!(pstate, plugin, pop, dataset, best_examples_seen, options)
+    end
+    return nothing
 end
 
 function optimize_and_simplify_population(
