@@ -21,7 +21,7 @@ using ..TracingModule:
     trace_crossover!,
     trace_mutation_attempts!,
     trace_mutation_step!
-using ..UtilsModule: argmin_fast, strictmap
+using ..UtilsModule: strictmap
 
 """
 One precomposed mutation-middleware layer.
@@ -153,11 +153,7 @@ function reg_evol_cycle(
             mutation_accepted = selected_result.accepted
 
             should_replace = mutation_accepted || !options.skip_mutation_failures
-            oldest = if should_replace
-                argmin_fast([pop.members[member].birth for member in 1:(pop.n)])
-            else
-                0
-            end
+            oldest = should_replace ? argmin(i -> pop.members[i].birth, 1:(pop.n)) : 0
 
             trace_mutation_attempts!(
                 trace,
@@ -175,6 +171,10 @@ function reg_evol_cycle(
         else # Crossover
             allstar1 = best_of_sample(pop, options; plugin_states)
             allstar2 = best_of_sample(pop, options; plugin_states)
+            # `crossover_trees` errors on identical inputs (`tree1 === tree2`). The
+            # parents are only read, so a copy of one is enough when both
+            # tournaments picked the same member.
+            allstar1 === allstar2 && (allstar2 = copy(allstar2))
 
             crossover_trace = new_trace(trace)
             baby1, baby2, crossover_accepted, tmp_num_evals = crossover_generation(
@@ -197,16 +197,18 @@ function reg_evol_cycle(
                 )
             end
 
-            if !crossover_accepted && options.skip_mutation_failures
-                continue
+            if !crossover_accepted
+                options.skip_mutation_failures && continue
+                # The tournament winners are the population's own members;
+                # inserting them again needs distinct objects.
+                baby1, baby2 = copy(baby1), copy(baby2)
             end
 
             # Find the oldest members to replace:
-            oldest1 = argmin_fast([pop.members[member].birth for member in 1:(pop.n)])
-            BT = typeof(first(pop.members).birth)
-            oldest2 = argmin_fast([
-                i == oldest1 ? typemax(BT) : pop.members[i].birth for i in 1:(pop.n)
-            ])
+            oldest1 = argmin(i -> pop.members[i].birth, 1:(pop.n))
+            oldest2 = argmin(
+                i -> i == oldest1 ? typemax(Int) : pop.members[i].birth, 1:(pop.n)
+            )
 
             trace_crossover!(
                 trace,

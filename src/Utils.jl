@@ -143,10 +143,6 @@ function findmin_fast(x::AbstractVector{T}) where {T}
     return minval, indmin
 end
 
-function argmin_fast(x::AbstractVector{T}) where {T}
-    return findmin_fast(x)[2]
-end
-
 function poisson_sample(rng::AbstractRNG, λ::T) where {T}
     iszero(λ) && return 0
     k, p, L = 0, one(T), exp(-λ)

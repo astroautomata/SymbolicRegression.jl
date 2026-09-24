@@ -17,7 +17,7 @@ using ..LossFunctionsModule: eval_cost, update_baseline_loss!
 using ..MutationFunctionsModule: gen_random_tree
 using ..PopMemberModule: AbstractPopMember, PopMember
 import ..PopMemberModule: popmember_type
-using ..UtilsModule: bottomk_fast, argmin_fast, PerTaskCache, strictmap
+using ..UtilsModule: bottomk_fast, PerTaskCache, strictmap
 # A list of members of the population, with easy constructors,
 #  which allow for random generation of new populations
 struct Population{
@@ -152,48 +152,64 @@ function Base.copy(pop::P)::P where {T,L,N,PM,P<:Population{T,L,N,PM}}
     return Population(copied_members)
 end
 
-# Sample random members of the population, and make a new one
-function sample_pop(pop::P, options::AbstractOptions)::P where {P<:Population}
-    return Population(
-        StatsBase.sample(pop.members, options.tournament_selection_n; replace=false)
-    )
+# `n` distinct indices in `1:N` by rejection; allocation-free for tournament sizes.
+const TOURNAMENT_INDICES_SCRATCH = PerTaskCache{Vector{Int}}()
+function _sample_indices!(idxs::Vector{Int}, N::Int, n::Int)
+    resize!(idxs, n)
+    for i in 1:n
+        candidate = rand(1:N)
+        while candidate in view(idxs, 1:(i - 1))
+            candidate = rand(1:N)
+        end
+        idxs[i] = candidate
+    end
+    return idxs
 end
 
-# Sample the population, and get the best member from that sample
+"""
+    best_of_sample(pop, options; plugin_states)
+
+Sample a tournament from the population and return its winner. The winner is
+the population's own member, not a copy: callers that insert it back into a
+population must copy it themselves.
+"""
 function best_of_sample(
     pop::Population{T,L,N}, options::AbstractOptions; plugin_states::Tuple
 ) where {T,L,N}
-    sample = sample_pop(pop, options)
-    return copy(_best_of_sample(sample.members, options; plugin_states))
+    idxs = _sample_indices!(
+        TOURNAMENT_INDICES_SCRATCH[], pop.n, options.tournament_selection_n
+    )
+    return _best_of_sample(pop.members, idxs, options; plugin_states)
 end
 function _best_of_sample(
-    members::Vector{P}, options::AbstractOptions; plugin_states::Tuple
+    members::Vector{P}, idxs::Vector{Int}, options::AbstractOptions; plugin_states::Tuple
 ) where {T,L,N,P<:AbstractPopMember{T,L,N}}
     p = options.tournament_selection_p
-    n = length(members)  # == tournament_selection_n
-    adjusted_costs = Vector{L}(undef, n)
-    for i in eachindex(members, adjusted_costs)
-        member = members[i]
+    n = length(idxs)  # == tournament_selection_n
+    function adjusted_cost(i)
+        member = members[idxs[i]]
         multipliers = strictmap(options.plugins, plugin_states) do plugin, pstate
             return L(tournament_cost_multiplier(pstate, plugin, member, options))
         end
-        adjusted_costs[i] = L(member.cost) * prod(multipliers)
+        L(member.cost) * prod(multipliers)
     end
 
-    chosen_idx = if p == 1.0
-        argmin_fast(adjusted_costs)
-    else
-        # First, decide what place we take (usually 1st place wins):
-        tournament_winner = StatsBase.sample(get_tournament_selection_weights(options))
-        # Then, find the member that won that place, given
-        # their fitness:
-        if tournament_winner == 1
-            argmin_fast(adjusted_costs)
-        else
-            bottomk_fast(adjusted_costs, tournament_winner)[2][end]
+    # First, decide what place we take (usually 1st place wins):
+    tournament_winner =
+        p == 1.0 ? 1 : StatsBase.sample(get_tournament_selection_weights(options))
+    chosen_idx = if tournament_winner == 1
+        # Strict `<`: the first minimum wins, and a NaN cost never does.
+        best_i, best_cost = 1, adjusted_cost(1)
+        for i in 2:n
+            cost = adjusted_cost(i)
+            cost < best_cost && ((best_i, best_cost) = (i, cost))
         end
+        best_i
+    else
+        # Then, find the member that won that place, given their fitness:
+        bottomk_fast(L[adjusted_cost(i) for i in 1:n], tournament_winner)[2][end]
     end
-    return members[chosen_idx]
+    return members[idxs[chosen_idx]]
 end
 _get_cost(member::AbstractPopMember) = member.cost
 
