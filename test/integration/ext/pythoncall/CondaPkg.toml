@@ -1,0 +1,6 @@
+# Python 3.15.0 conda-forge builds ship no shared libpython, which
+# PythonCall.jl (as of v0.9.36) cannot initialize against; its own bound
+# (`<4`) predates the 3.15.0 release (2026-10-09) and lets the solver pick
+# it. Restrict to the last known-good major until PythonCall excludes it.
+[deps.python]
+version = ">=3.10,!=3.14.0,!=3.14.1,<3.15"
