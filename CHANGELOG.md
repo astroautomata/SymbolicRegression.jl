@@ -1,5 +1,17 @@
 # Changelog
 
+## [2.7.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.0...v2.7.1) (2026-10-14)
+
+
+### deps
+
+* require DynamicExpressions 2.13 ([#772](https://github.com/astroautomata/SymbolicRegression.jl/issues/772)) ([8cfb1ef](https://github.com/astroautomata/SymbolicRegression.jl/commit/8cfb1ef11afd431efbae71390b9567217ee28f6b))
+
+
+### Performance Improvements
+
+* allocation-free operator constraint check ([#762](https://github.com/astroautomata/SymbolicRegression.jl/issues/762)) ([6eb0c33](https://github.com/astroautomata/SymbolicRegression.jl/commit/6eb0c33fb5cfef11720a57534f58b3bd01097963))
+
 ## [2.7.0](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.6.0...v2.7.0) (2026-10-06)
 
 
