@@ -1,5 +1,0 @@
-# conda-forge's python 3.15 no longer ships the shared library PythonCall loads, and the
-# separate libpython package needs a newer libstdc++ than Julia 1.10 bundles.
-# Remove once PythonCall handles 3.15 (JuliaPy/PythonCall.jl#838).
-[deps]
-python = "<3.15"
