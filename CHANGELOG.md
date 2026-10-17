@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.1...v2.7.2) (2026-10-17)
+
+
+### Bug Fixes
+
+* keep other stdin readers alive in close_reader! ([#774](https://github.com/astroautomata/SymbolicRegression.jl/issues/774)) ([05ffcf6](https://github.com/astroautomata/SymbolicRegression.jl/commit/05ffcf6fadfebbdc8e28611b955fbce72c060a08))
+
 ## [2.7.1](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.0...v2.7.1) (2026-10-14)
 
 
