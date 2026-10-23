@@ -1,5 +1,12 @@
 # Changelog
 
+## [2.7.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.2...v2.7.3) (2026-10-23)
+
+
+### Bug Fixes
+
+* match operator-keyed options against opmap-replaced operators ([#782](https://github.com/astroautomata/SymbolicRegression.jl/issues/782)) ([daae84e](https://github.com/astroautomata/SymbolicRegression.jl/commit/daae84e531f6d31afc44768f4d295fc1306dcd74))
+
 ## [2.7.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.1...v2.7.2) (2026-10-17)
 
 
