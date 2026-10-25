@@ -1,5 +1,20 @@
 # Changelog
 
+## [2.7.3](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.2...v2.7.3) (2026-10-25)
+
+
+### Bug Fixes
+
+* count shared GraphNode subtrees once in weighted complexity ([#786](https://github.com/astroautomata/SymbolicRegression.jl/issues/786)) ([edbe678](https://github.com/astroautomata/SymbolicRegression.jl/commit/edbe678e4f74a1688100db192d21d35cf3a53ce3))
+* keep NaN losses off the Pareto frontier ([#790](https://github.com/astroautomata/SymbolicRegression.jl/issues/790)) ([103f5d4](https://github.com/astroautomata/SymbolicRegression.jl/commit/103f5d4299222fa4af70110f4886ced4f3fdac1b))
+* match operator-keyed options against opmap-replaced operators ([#782](https://github.com/astroautomata/SymbolicRegression.jl/issues/782)) ([daae84e](https://github.com/astroautomata/SymbolicRegression.jl/commit/daae84e531f6d31afc44768f4d295fc1306dcd74))
+* optimize a child in the optimize mutation instead of the parent ([#789](https://github.com/astroautomata/SymbolicRegression.jl/issues/789)) ([8be1fc0](https://github.com/astroautomata/SymbolicRegression.jl/commit/8be1fc036538910642b8c6eb27dd4fd9719f7d2d))
+
+
+### Dependencies
+
+* require PythonCall 0.9.37 ([#770](https://github.com/astroautomata/SymbolicRegression.jl/issues/770)) ([c6b5c79](https://github.com/astroautomata/SymbolicRegression.jl/commit/c6b5c790a67736d306d0e8511deb12439cc133ac))
+
 ## [2.7.2](https://github.com/astroautomata/SymbolicRegression.jl/compare/v2.7.1...v2.7.2) (2026-10-17)
 
 
