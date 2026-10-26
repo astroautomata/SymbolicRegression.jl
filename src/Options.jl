@@ -467,8 +467,9 @@ const OPTION_DESCRIPTIONS = """- `defaults`: What set of defaults to use for `Op
     though support for some is gradually being added.
 - `perturbation_factor`: When mutating a constant, either
     multiply or divide by (1+perturbation_factor)^(rand()+1).
-- `probability_negate_constant`: Probability of negating a constant in the equation
-    when mutating it.
+- `probability_flip_constant_sign`: Probability of flipping the sign of a constant
+    when mutating it. The deprecated `probability_negate_constant` sets this to
+    `1 - probability_negate_constant`.
 - `mutations`: Override or extend the default mutation weights, as a vector of
     `MutationType() => weight` pairs. All of the defaults listed below are active
     unless you change them. An entry here replaces the default weight for that
@@ -602,7 +603,7 @@ $(OPTION_DESCRIPTIONS)
     @nospecialize(annealing::Union{Bool,Nothing} = nothing),
     @nospecialize(alpha::Union{Nothing,Real} = nothing),
     ###           perturbation_factor
-    ###           probability_negate_constant
+    ###           probability_flip_constant_sign
     ###           skip_mutation_failures
     ## 6. Tournament Selection:
     @nospecialize(tournament_selection_n::Union{Nothing,Integer} = nothing),
@@ -662,7 +663,7 @@ $(OPTION_DESCRIPTIONS)
     should_simplify::Union{Nothing,Bool}=nothing,
     ## 5. Mutations:
     perturbation_factor::Union{Nothing,Real}=nothing,
-    probability_negate_constant::Union{Real,Nothing}=nothing,
+    probability_flip_constant_sign::Union{Real,Nothing}=nothing,
     skip_mutation_failures::Bool=true,
     ## 6. Tournament Selection
     ## 7. Constant Optimization:
@@ -724,6 +725,7 @@ $(OPTION_DESCRIPTIONS)
     fast_cycle::Bool=false,
     npopulations::Union{Nothing,Integer}=nothing,
     npop::Union{Nothing,Integer}=nothing,
+    probability_negate_constant::Union{Real,Nothing}=nothing,
     deprecated_return_state::Union{Bool,Nothing}=nothing,
     unary_operators=nothing,
     binary_operators=nothing,
@@ -800,6 +802,18 @@ $(OPTION_DESCRIPTIONS)
         Base.depwarn("`npopulations` is deprecated. Use `populations` instead.", :Options)
         populations = npopulations
     end
+    if probability_negate_constant !== nothing
+        probability_flip_constant_sign !== nothing && throw(
+            ArgumentError(
+                "Pass only one of `probability_flip_constant_sign` and the deprecated `probability_negate_constant`.",
+            ),
+        )
+        Base.depwarn(
+            "`probability_negate_constant` is deprecated. Use `probability_flip_constant_sign = 1 - probability_negate_constant` instead.",
+            :Options,
+        )
+        probability_flip_constant_sign = 1 - probability_negate_constant
+    end
     if optimizer_algorithm isa AbstractString
         Base.depwarn(
             "The `optimizer_algorithm` argument should be an `AbstractOptimizer`, not a string.",
@@ -859,7 +873,7 @@ $(OPTION_DESCRIPTIONS)
     annealing = something(annealing, _default_options.annealing)
     alpha = something(alpha, _default_options.alpha)
     perturbation_factor = something(perturbation_factor, _default_options.perturbation_factor)
-    probability_negate_constant = something(probability_negate_constant, _default_options.probability_negate_constant)
+    probability_flip_constant_sign = something(probability_flip_constant_sign, _default_options.probability_flip_constant_sign)
     tournament_selection_n = something(tournament_selection_n, _default_options.tournament_selection_n)
     tournament_selection_p = something(tournament_selection_p, _default_options.tournament_selection_p)
     fraction_replaced = something(fraction_replaced, _default_options.fraction_replaced)
@@ -1084,7 +1098,7 @@ $(OPTION_DESCRIPTIONS)
                 base[i] =
                     MutationsModule.ConstantMutation(;
                         perturbation_factor=Float64(perturbation_factor),
-                        probability_negate=Float64(probability_negate_constant),
+                        probability_flip_sign=Float64(probability_flip_constant_sign),
                     ) => base[i].second
             end
         end
@@ -1236,7 +1250,7 @@ $(OPTION_DESCRIPTIONS)
         verbosity,
         Val(print_precision),
         save_to_file,
-        probability_negate_constant,
+        probability_flip_constant_sign,
         nops,
         seed,
         elementwise_loss,
@@ -1306,7 +1320,7 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
             annealing=false,
             alpha=0.1,
             perturbation_factor=0.076,
-            probability_negate_constant=0.01,
+            probability_flip_constant_sign=0.99,
             # Tournament Selection
             tournament_selection_n=12,
             tournament_selection_p=0.86,
@@ -1352,7 +1366,7 @@ function default_options(@nospecialize(version::Union{VersionNumber,Nothing} = n
         annealing=true,
         alpha=3.17,
         perturbation_factor=0.129,
-        probability_negate_constant=0.00743,
+        probability_flip_constant_sign=0.99257,
         # Tournament Selection
         tournament_selection_n=15,
         tournament_selection_p=0.982,

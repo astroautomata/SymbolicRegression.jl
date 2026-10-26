@@ -68,7 +68,7 @@ end
     struct TemperatureAwareValue
         temperature::Float64
         perturbation_factor::Float64
-        probability_negate::Float64
+        probability_flip_sign::Float64
     end
 
     function SymbolicRegression.mutate_value(
@@ -78,7 +78,9 @@ end
         mutation::ConstantMutation,
     )
         return TemperatureAwareValue(
-            Float64(temperature), mutation.perturbation_factor, mutation.probability_negate
+            Float64(temperature),
+            mutation.perturbation_factor,
+            mutation.probability_flip_sign,
         )
     end
 
@@ -87,5 +89,19 @@ end
     result = _mutate_value(
         Random.default_rng(), TemperatureAwareValue(1.0, 0.0, 0.0), 0.25, mutation, options
     )
-    @test result == TemperatureAwareValue(0.25, 0.2, 0.01)
+    @test result == TemperatureAwareValue(0.25, 0.2, 0.99)
+end
+
+@testitem "Default constant mutation flips the sign at the default rate" begin
+    using SymbolicRegression
+    using SymbolicRegression.MutationFunctionsModule: mutate_factor
+    using Random
+
+    options = Options()
+    @test options.probability_flip_constant_sign == 0.99257
+    m = only(first(p) for p in options.mutations if first(p) isa ConstantMutation)
+    rng = Xoshiro(0)
+    n = 100_000
+    flipped = count(_ -> mutate_factor(Float64, 1.0, m, rng) < 0, 1:n)
+    @test abs(flipped / n - 0.99257) < 0.002
 end

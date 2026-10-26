@@ -178,7 +178,7 @@ function mutate_factor(::Type{T}, temperature, m::ConstantMutation, rng) where {
 
     factor = makeConstBigger ? factor : 1 / factor
 
-    if rand(rng) > m.probability_negate
+    if rand(rng) > 1 - m.probability_flip_sign
         factor *= -1
     end
     return factor

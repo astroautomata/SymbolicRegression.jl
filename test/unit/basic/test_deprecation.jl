@@ -61,6 +61,33 @@
     @test member.cost == 0.5
 end
 
+@testitem "Deprecated constant sign probability names" begin
+    using SymbolicRegression
+
+    constant_mutation(options) = only(
+        first(p) for p in options.mutations if first(p) isa ConstantMutation
+    )
+    new = Options(; probability_flip_constant_sign=0.75)
+    for old in (
+        @test_deprecated(Options(; probability_negate_constant=0.25)),
+        @test_deprecated(Options(; probNegate=0.25)),
+    )
+        @test old.probability_flip_constant_sign == new.probability_flip_constant_sign
+        @test constant_mutation(old) == constant_mutation(new)
+    end
+    @test (@test_deprecated ConstantMutation(; probability_negate=0.25)) ==
+        ConstantMutation(; probability_flip_sign=0.75)
+    @test (@test_deprecated ConstantMutation(; probability_flip_sign=0.75).probability_negate) ==
+        0.25
+
+    @test_throws ArgumentError Options(;
+        probability_negate_constant=0.25, probability_flip_constant_sign=0.75
+    )
+    @test_throws ArgumentError ConstantMutation(;
+        probability_negate=0.25, probability_flip_sign=0.75
+    )
+end
+
 @testitem "Test deprecated evaluation context names" begin
     using SymbolicRegression
     using SymbolicRegression: eval_cost, eval_loss

@@ -233,7 +233,7 @@ struct Options{
     verbosity::Union{Int,Nothing}
     v_print_precision::Val{print_precision}
     save_to_file::Bool
-    probability_negate_constant::Float64
+    probability_flip_constant_sign::Float64
     nops::NOPS
     seed::Union{Int,Nothing}
     elementwise_loss::Union{SupervisedLoss,Function}
