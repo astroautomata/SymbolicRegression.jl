@@ -31,8 +31,9 @@ with TemporaryDirectory() as directory:
         path.write_text(yaml.safe_dump(dict(bug, **changes)), encoding="utf-8")
         return checker.check(path, refuted)
 
-    assert checker.main() == 0  # The template is ignored until saved as a report.
+    assert checker.main() == 1  # Refuted ids need a report; the template doesn't count.
     assert not check()
+    assert checker.main() == 1  # example-other is still unreported.
     assert not check(covers=["example-other"])
     assert checker.main() == 0
     assert check(covers=["example-proven"])

@@ -109,6 +109,17 @@ def main() -> int:
         print(err)
         return 1
     problems = [problem for path in files for problem in check(path, refuted)]
+    reported = {path.stem for path in files}
+    for path in files:
+        try:
+            bug = yaml.safe_load(path.read_text(encoding="utf-8"))
+        except (yaml.YAMLError, UnicodeError):
+            continue  # check() already reported it
+        covers = bug.get("covers") if isinstance(bug, dict) else None
+        if isinstance(covers, list):
+            reported.update(c for c in covers if isinstance(c, str))
+    problems += [f"registry.tsv: refuted {id!r} has no bug report or covers entry"
+                 for id in sorted(refuted - reported)]
     for problem in problems:
         print(problem)
     print(f"BUGS {len(files)} PROBLEMS {len(problems)}")
