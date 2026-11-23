@@ -27,3 +27,27 @@
         end
     end
 end
+
+@testitem "bottomk_fast with nonfinite and typemax values" begin
+    using SymbolicRegression.UtilsModule: bottomk_fast
+
+    for x in (
+        [5.0, Inf],
+        [Inf, 5.0],
+        [5.0, 6.0, Inf],
+        [Inf, Inf, Inf],
+        [NaN, 5.0],
+        [5.0, NaN],
+        [NaN, Inf, 5.0],
+        [NaN, NaN],
+        Float32[2.0f0, Inf32, NaN32],
+        [typemax(Int), 1, typemax(Int)],
+    )
+        for k in 1:length(x)
+            vals, idxs = bottomk_fast(x, k)
+            expected_idxs = sortperm(x)[1:k]
+            @test idxs == expected_idxs
+            @test isequal(vals, x[expected_idxs])
+        end
+    end
+end

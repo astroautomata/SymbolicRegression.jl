@@ -105,7 +105,17 @@ end
 
 function _bottomk_dispatch(x::AbstractVector{T}, ::Val{k}) where {T,k}
     if k == 1
-        return (p -> [p]).(findmin_fast(x))
+        i1 = firstindex(x)
+        indmin = i1
+        minval = x[i1]
+        @inbounds for i in Iterators.drop(eachindex(x), 1)
+            xi = x[i]
+            if isless(xi, minval)
+                minval = xi
+                indmin = i
+            end
+        end
+        return [minval], [indmin]
     end
     indmin = MutableTuple(Val(k), Int, ntuple(_ -> 1, Val(k)))
     minval = MutableTuple(Val(k), T, ntuple(_ -> typemax(T), Val(k)))
@@ -113,17 +123,26 @@ function _bottomk_dispatch(x::AbstractVector{T}, ::Val{k}) where {T,k}
     return _to_vec(minval), _to_vec(indmin)
 end
 function _bottomk!(x, minval, indmin)
+    k = lastindex(minval)
+    filled = 0
     @inbounds for i in eachindex(x)
-        new_min = x[i] < minval[end]
-        if new_min
-            minval[end] = x[i]
-            indmin[end] = i
-            for ki in lastindex(minval):-1:(firstindex(minval) + 1)
-                need_swap = minval[ki] < minval[ki - 1]
-                if need_swap
-                    minval[ki], minval[ki - 1] = minval[ki - 1], minval[ki]
-                    indmin[ki], indmin[ki - 1] = indmin[ki - 1], indmin[ki]
-                end
+        xi = x[i]
+        if filled < k
+            filled += 1
+            pos = filled
+        elseif isless(xi, minval[end])
+            pos = k
+        else
+            continue
+        end
+        minval[pos] = xi
+        indmin[pos] = i
+        for ki in pos:-1:(firstindex(minval) + 1)
+            if isless(minval[ki], minval[ki - 1])
+                minval[ki], minval[ki - 1] = minval[ki - 1], minval[ki]
+                indmin[ki], indmin[ki - 1] = indmin[ki - 1], indmin[ki]
+            else
+                break
             end
         end
     end
