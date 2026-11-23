@@ -1,0 +1,84 @@
+id: "loss-baseline-average"
+title: "Numeric search normalizes loss using a zero predictor"
+priority: "P0"
+kind: "wrong-result"
+area: "Loss"
+files: ["src/LossFunctions.jl"]
+functions: ["update_baseline_loss!"]
+summary: |-
+  Squared loss on ordinary noncentered numeric targets is normalized against zero rather than the documented mean predictor.
+likelihood: |-
+  PySR default-path likelihood: default |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, update_baseline_loss!, eval_loss, eval_cost, create_expression
+  using SymbolicRegression: MutationAcceptanceContext, mutation_acceptance_multiplier
+  using SymbolicRegression.SimulatedAnnealingModule: SimulatedAnnealingPlugin, SimulatedAnnealingState
+  using DynamicExpressions
+  using Random
+
+  println("Julia ", VERSION, "; DynamicExpressions ", pkgversion(DynamicExpressions))
+
+  options = Options(; binary_operators=[+])
+  dataset = Dataset(reshape(Float32[1, 2], 1, :), Float32[99, 101])
+  update_baseline_loss!(dataset, options)
+  average = sum(dataset.y) / length(dataset.y)
+  mean_tree = create_expression(average, options, dataset)
+  expected = eval_loss(mean_tree, dataset, options)
+  cost, raw_loss = eval_cost(dataset, mean_tree, options)
+  println("avg_y=", dataset.avg_y, " target_average=", average, " baseline_loss=", dataset.baseline_loss,
+          " loss_at_average=", expected, " use_baseline=", dataset.use_baseline)
+  println("mean predictor: raw loss=", raw_loss, ", actual cost=", cost,
+          ", cost with mean baseline=", raw_loss / expected + options.parsimony)
+
+  # Hold the proposed change in raw loss fixed so only the normalization differs.
+  centered = Dataset(dataset.X, dataset.y .- average)
+  update_baseline_loss!(centered, options)
+  annealing = only(p for p in options.plugins if p isa SimulatedAnnealingPlugin)
+  temperature = SimulatedAnnealingState(1.0)
+  multiplier(delta) = mutation_acceptance_multiplier(
+      temperature, annealing, MutationAcceptanceContext(nothing, nothing, zero(delta), delta),
+      options,
+  )
+  actual_multiplier = multiplier(1 / dataset.baseline_loss)
+  expected_multiplier = multiplier(1 / centered.baseline_loss)
+  draws = rand(Xoshiro(42), 10_000)
+  println("At T=1, alpha=", annealing.alpha, ", raw loss increase=1: ",
+          "acceptance probability (offset vs centered) ", actual_multiplier, " vs ", expected_multiplier,
+          "; accepted out of 10000 identical seeded draws: ",
+          count(<=(actual_multiplier), draws), " vs ", count(<=(expected_multiplier), draws))
+  if average == 100 && dataset.baseline_loss == 10001 && expected == raw_loss == 1 &&
+      dataset.use_baseline && cost ≈ 1f0 / 10001f0 + Float32(options.parsimony)
+      println("REPRODUCED loss-baseline-average")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    Julia 1.12.6; DynamicExpressions 2.13.0
+    avg_y=nothing target_average=100.0 baseline_loss=10001.0 loss_at_average=1.0 use_baseline=true
+    mean predictor: raw loss=1.0, actual cost=9.999e-5, cost with mean baseline=1.0
+    At T=1, alpha=3.17, raw loss increase=1: acceptance probability (offset vs centered) 0.9999684579106142 vs 0.7294551355029247; accepted out of 10000 identical seeded draws: 10000 vs 7209
+    REPRODUCED loss-baseline-average
+expected: |-
+  For targets 99 and 101, the mean predictor has loss 1, so a candidate with raw loss 1 should contribute 1 to cost before the parsimony term.
+promised_by: |-
+  Dataset.jl:36-38 documents the loss of predicting the average target. With default alpha 3.17 and T=1, annealing accepts a raw loss increase of 1 with probability 0.999968 on the offset data instead of 0.729455 on the equivalent centered data. For 10,000 identical fixed-seed draws, every worse proposal is accepted on the offset data, compared with 7,209 on the centered data.
+cause: |-
+  src/LossFunctions.jl:260-263: Squared loss on ordinary noncentered numeric targets is normalized against zero rather than the documented mean predictor.
+possible_fix: "Construct the baseline using the numeric target mean when the expression type supports it."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'",
+      "gh search issues --repo astroautomata/PySR 'baseline loss'",
+    ]
+lean:
+  property: "SymReg.Loss.baseline_average"
+  theorem: "SymReg.Loss.baseline_average_refuted"
+covers: []

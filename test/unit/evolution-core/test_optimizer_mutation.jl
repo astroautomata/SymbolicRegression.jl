@@ -36,3 +36,25 @@
             1e-3
     end
 end
+
+@testitem "Optimization mutation leaves the parent unchanged" begin
+    using SymbolicRegression
+    using SymbolicRegression: Dataset
+    using SymbolicRegression.MutateModule: next_generation
+    using Random
+
+    Random.seed!(0)
+    X = randn(2, 20)
+    dataset = Dataset(X, X[1, :] .+ 1)
+    options = Options(; binary_operators=[+, *], mutation_weights=(; optimize=1e30))
+    plugin_states = SymbolicRegression.init_plugin_states(options, dataset)
+    x1 = Node(Float64; feature=1)
+    member = PopMember(dataset, x1 * 0.5 + 0.1, options; deterministic=false)
+    before = (string(member.tree), member.cost, member.birth)
+    new_member, _, _ = next_generation(
+        dataset, member, 10, options; tmp_trace=nothing, plugin_states
+    )
+    @test (string(member.tree), member.cost, member.birth) == before
+    @test new_member !== member
+    @test new_member.parent == member.ref
+end

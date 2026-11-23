@@ -1,0 +1,64 @@
+id: "pop-tournament-nan"
+title: "A NaN cost can win a first-place tournament"
+priority: "P1"
+kind: "wrong-result"
+area: "Population"
+files: ["src/Population.jl"]
+functions: ["_best_of_sample", "best_of_sample"]
+summary: |-
+  The first NaN adjusted cost survives all strict comparisons despite the stated ordering.
+likelihood: |-
+  PySR default-path likelihood: conditional, nonfinite adjusted cost |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `pop-tournament-nan` (SymReg/Population/Tournament.lean).
+  # With tournament_selection_p = 1.0 the first-place loop (src/Population.jl:203-209) starts from
+  # the first sampled member; a NaN cost there is never beaten, although the comment says a NaN
+  # cost never wins.
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.PopulationModule: _best_of_sample
+  using Random
+
+  Random.seed!(0)
+  options = Options(; binary_operators=[+, *], default_plugins=(), tournament_selection_p=1.0,
+      tournament_selection_n=2, population_size=10)
+  X = randn(1, 20)
+  dataset = Dataset(X, X[1, :])
+  function member_with_cost(c)
+      m = PopMember(dataset, Node{Float64}(; feature=1), options; deterministic=false)
+      m.cost = c
+      return m
+  end
+  members = [member_with_cost(NaN), member_with_cost(1.0)]
+  winner = _best_of_sample(members, [1, 2], options; plugin_states=())
+  println("sample costs [NaN, 1.0], p = 1.0: winner cost = ", winner.cost, " (expected 1.0)")
+  if isnan(winner.cost)
+      println("REPRODUCED pop-tournament-nan")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    sample costs [NaN, 1.0], p = 1.0: winner cost = NaN (expected 1.0)
+    REPRODUCED pop-tournament-nan
+expected: |-
+  Select the member with ordered cost when it competes with a NaN cost.
+promised_by: |-
+  Population.jl:202 says a NaN cost never wins the strict comparison.
+cause: |-
+  src/Population.jl:202-209: The first NaN adjusted cost survives all strict comparisons despite the stated ordering.
+possible_fix: "Use a comparison that ranks NaN last, including for the first sample."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Population.tournament_nan"
+  theorem: "SymReg.Population.tournament_nan_refuted"
+covers: []

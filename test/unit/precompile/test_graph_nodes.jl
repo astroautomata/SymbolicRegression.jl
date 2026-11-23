@@ -35,6 +35,26 @@ end
     @test compute_complexity(tree, options; break_sharing=Val(true)) == 22
 end
 
+@testitem "GraphNode complexity with a complexity mapping" begin
+    using SymbolicRegression
+    using SymbolicRegression: check_constraints
+
+    options = Options(;
+        binary_operators=[+, -, *, /],
+        unary_operators=[cos, sin],
+        maxsize=30,
+        complexity_of_variables=1,
+    )
+    x1, x2, x3 = [GraphNode(Float64; feature=i) for i in 1:3]
+
+    base_tree = cos(x1 - 3.2) * x2 - x3 * copy(x3)
+    tree = sin(base_tree) + base_tree
+
+    @test compute_complexity(tree, options) == 12
+    @test compute_complexity(tree, options; break_sharing=Val(true)) == 22
+    @test !check_constraints(tree, options, 5)
+end
+
 @testitem "GraphNode population" begin
     using SymbolicRegression
 

@@ -1,0 +1,53 @@
+id: "units-dimtype-abstract"
+title: "An abstract Quantity array loses the stored symbolic dimension type"
+priority: "P2"
+kind: "wrong-result"
+area: "Units"
+files: ["src/InterfaceDynamicQuantities.jl"]
+functions: ["get_dimensions_type"]
+summary: |-
+  The specialized path uses the abstract element type for `Quantity[us\"km\"]`; the `Any` vector correctly inspects its first quantity.
+likelihood: |-
+  PySR default-path likelihood: off, Python supplies unit strings |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.InterfaceDynamicQuantitiesModule: get_dimensions_type
+  using DynamicQuantities
+
+  # The same symbolic quantity, stored with an abstract `Quantity` or an `Any` element type.
+  typed = get_dimensions_type(Quantity[us"km"], Dimensions)
+  untyped = get_dimensions_type(Any[us"km"], Dimensions)
+  println("get_dimensions_type(Quantity[us\"km\"], Dimensions) = ", typed)
+  println("get_dimensions_type(Any[us\"km\"], Dimensions) = ", untyped)
+  if !(typed <: SymbolicDimensions) && untyped <: SymbolicDimensions
+      println("REPRODUCED units-dimtype-abstract")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    get_dimensions_type(Quantity[us"km"], Dimensions) = Dimensions{FRInt32}
+    get_dimensions_type(Any[us"km"], Dimensions) = SymbolicDimensions{FRInt32}
+    REPRODUCED units-dimtype-abstract
+expected: |-
+  Return the type of the first quantity’s dimensions in both abstract containers.
+promised_by: |-
+  InterfaceDynamicQuantities.jl describes finding a dimension type from the array.
+cause: |-
+  src/InterfaceDynamicQuantities.jl:74-85: The specialized path uses the abstract element type for `Quantity[us\"km\"]`; the `Any` vector correctly inspects its first quantity.
+possible_fix: "Inspect an element when the typed path cannot recover a concrete dimension type."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
+lean:
+  property: "SymReg.Units.units_dimtype_abstract"
+  theorem: "SymReg.Units.units_dimtype_abstract_refuted"
+covers: []

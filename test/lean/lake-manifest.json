@@ -1,0 +1,16 @@
+{"version": "1.2.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"url": "https://github.com/SymbolicML/DynamicExpressions.jl",
+   "type": "git",
+   "subDir": "test/lean",
+   "scope": "",
+   "rev": "097eaa548dcf7525dd1f9aa4d1504beb2795f467",
+   "name": "DynExpr",
+   "manifestFile": "lake-manifest.json",
+   "inputRev": "097eaa548dcf7525dd1f9aa4d1504beb2795f467",
+   "inherited": false,
+   "configFile": "lakefile.toml"}],
+ "name": "SymReg",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

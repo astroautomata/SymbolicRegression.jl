@@ -1,0 +1,59 @@
+id: "copt-scalar-alias-roundtrip"
+title: "Aliased constants appear as independent optimizer coordinates"
+priority: "P2"
+kind: "wrong-result"
+area: "Constant optimization"
+files: ["src/ConstantOptimization.jl"]
+functions: ["get_optimizable_parameters", "set_optimizable_parameters!"]
+summary: |-
+  Two references to the same mutable Node become separate optimizer coordinates; the last input overwrites the first.
+likelihood: |-
+  PySR default-path likelihood: conditional, reused mutable constant nodes |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: Expression, get_scalar_constants
+  using SymbolicRegression.ConstantOptimizationModule:
+      get_optimizable_parameters, set_optimizable_parameters!
+
+  options = Options(; binary_operators=[+])
+  shared = Node(Float64; val=1.0)
+  ex = Expression(Node(Float64; op=1, l=shared, r=shared))
+  original, refs = get_optimizable_parameters(ex, options)
+  requested = [2.0, 3.0]
+  set_optimizable_parameters!(ex, requested, refs)
+  actual = first(get_scalar_constants(ex))
+  println("original = ", original, "; requested optimizer vector = ", requested,
+      "; actual getter vector = ", actual, "; shared node = ", shared.val)
+  @assert original == [1.0, 1.0]
+  @assert actual == [3.0, 3.0]
+  if actual != requested
+      println("REPRODUCED copt-scalar-alias-roundtrip")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    original = [1.0, 1.0]; requested optimizer vector = [2.0, 3.0]; actual getter vector = [3.0, 3.0]; shared node = 3.0
+    REPRODUCED copt-scalar-alias-roundtrip
+expected: |-
+  Expose one optimizer coordinate per shared constant or represent the equality constraint explicitly.
+promised_by: |-
+  Each optimizer coordinate should be independently settable within the exposed parameter vector.
+cause: |-
+  src/ConstantOptimization.jl:82-97: Two references to the same mutable Node become separate optimizer coordinates; the last input overwrites the first.
+possible_fix: "Deduplicate reference identities when flattening parameters."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
+lean:
+  property: "SymReg.ConstOpt.scalarAliasRoundtrip"
+  theorem: "SymReg.ConstOpt.scalarAliasRoundtrip_refuted"
+covers: []

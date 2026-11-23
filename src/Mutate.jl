@@ -949,9 +949,18 @@ function mutate!(
     options::AbstractOptions;
     trace::MaybeTrace,
     dataset::Dataset,
+    parent_ref=parent_member.ref,
     kws...,
 ) where {N<:AbstractExpression,P<:AbstractPopMember}
-    cur_member, new_num_evals = optimize_constants(dataset, parent_member, options)
+    child = create_child(
+        parent_member,
+        new_tree,
+        parent_member.cost,
+        parent_member.loss,
+        options;
+        parent_ref=parent_ref,
+    )
+    cur_member, new_num_evals = optimize_constants(dataset, child, options)
     trace_mutation_type!(trace, "optimize")
     return MutationResult{N,P}(;
         member=cur_member, num_evals=new_num_evals, return_immediately=true

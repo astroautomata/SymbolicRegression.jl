@@ -1,0 +1,62 @@
+id: units-sound
+title: "A shared GraphNode constant divided by itself passes for a length target"
+priority: P3
+kind: wrong-result
+area: Dimensional analysis
+files: [src/DimensionalAnalysis.jl]
+functions:
+  [violates_dimensional_constraints, violates_dimensional_constraints_dispatch]
+summary: |
+  A GraphNode that divides one constant object by itself is marked as a wildcard
+  and accepted for a length target, although a single unit assignment to that
+  object makes the quotient dimensionless.
+likelihood: |
+  GraphNode is opt-in and marked experimental (src/SymbolicRegression.jl:728–729).
+  Default searches use Node (src/Options.jl:988; DynamicExpressions src/Expression.jl:111–112)
+  and are unaffected by this graph-specific case.
+maybe_intended: "The checker explicitly requests a separate visit for each occurrence."
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.DimensionalAnalysisModule:
+      violates_dimensional_constraints, violates_dimensional_constraints_dispatch
+  using SymbolicRegression: Dataset
+
+  options = Options(; node_type=GraphNode, binary_operators=[/])
+  dataset = Dataset([1.0 2.0], [1.0, 1.0]; X_units=["1"], y_units="m")
+  c = GraphNode(Float64; val=2.0)
+  tree = GraphNode(; op=1, children=(c, c))
+  shared = tree.l === tree.r
+  result = violates_dimensional_constraints_dispatch(
+      tree, dataset.X_units, view(dataset.X, :, 1), options.operators, true
+  )
+  violates = violates_dimensional_constraints(tree, dataset, options)
+  println("shared = ", shared, ", wildcard = ", result.wildcard, ", violates = ", violates)
+  if shared && result.wildcard && !violates
+      println("REPRODUCED units-sound")
+      println("REPRODUCED units-wildcard-any")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    shared = true, wildcard = true, violates = false
+    REPRODUCED units-sound
+    REPRODUCED units-wildcard-any
+expected: |
+  Under a single dimension assignment per constant object, the quotient is
+  dimensionless and should fail the length-target check.
+promised_by: |
+  src/DimensionalAnalysis.jl:219–221 describes a dimensional consistency check.
+cause: |
+  src/DimensionalAnalysis.jl:208–214 traverses with break_sharing=true. Lines
+  64–69 mark the quotient wildcard if either operand is wildcard; lines 249–254
+  skip the target comparison when the result is wildcard.
+possible_fix: "Track dimensional constraints by object identity for GraphNode."
+duplicates:
+  issues: []
+  queries: ["GraphNode wildcard dimensions"]
+lean:
+  property: SymReg.Units.graphUnitsSound
+  theorem: SymReg.Units.graphUnitsSound_refuted
+covers: [units-wildcard-any]

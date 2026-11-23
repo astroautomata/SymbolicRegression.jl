@@ -1,0 +1,58 @@
+id: "mut-mutate-operator-changes"
+title: "Operator mutation can retain the current operator"
+priority: "P3"
+kind: "documentation"
+area: "Mutations"
+files: ["src/MutationFunctions.jl"]
+functions: ["mutate_operator"]
+summary: |-
+  Uniform resampling includes the current operator despite the docstring's “another”; resampling with replacement is a defensible search choice.
+likelihood: |-
+  PySR default-path likelihood: default |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mut-mutate-operator-changes` (SymReg/Mutations/Refute.lean).
+  # mutate_operator draws the new operator from all operators of the node's degree, including
+  # the current one (src/MutationFunctions.jl:118), so it often leaves the tree unchanged.
+  using SymbolicRegression, DynamicExpressions, Random
+  using SymbolicRegression.MutationFunctionsModule: mutate_operator
+
+  options = Options(; binary_operators=[+, *], unary_operators=[cos])
+  x1 = Node(Float64; feature=1)
+  kept = 0
+  for seed in 1:1000
+      tree = Node(1, x1, copy(x1))  # x1 + x1
+      out = mutate_operator(tree, options, Xoshiro(seed))
+      global kept += (out.degree == 2 && out.op == 1)
+  end
+  println("mutations that kept operator + out of 1000: ", kept)
+  if kept > 0
+      println("REPRODUCED mut-mutate-operator-changes")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    mutations that kept operator + out of 1000: 465
+    REPRODUCED mut-mutate-operator-changes
+expected: |-
+  Describe operator mutation as resampling from all operators of the same arity, including the current one.
+promised_by: |-
+  MutationFunctions.jl describes converting an operator into “another one.”
+cause: |-
+  src/MutationFunctions.jl:103-118: Uniform resampling includes the current operator despite the docstring's “another”; resampling with replacement is a defensible search choice.
+possible_fix: "Clarify the docstring if resampling with replacement is intended."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Mutations.mutate_operator_changes"
+  theorem: "SymReg.Mutations.mutate_operator_changes_refuted"
+covers: []

@@ -1,0 +1,35 @@
+# Save as bugs/<id>.yaml. Use a refuted registry id with repro/<id>.jl.
+id: example-property
+title: "Title for a potential upstream issue"
+priority: P2  # P0 | P1 | P2 | P3; see ARCHITECTURE.md
+kind: wrong-result  # wrong-result | wrong-exception | missing-error | crash | hang | documentation
+area: Example
+files: [src/Example.jl]
+functions: [example]
+summary: |
+  Describe what goes wrong and on which inputs.
+likelihood: |
+  Explain how likely real code is to hit it.
+maybe_intended: ""  # Explain any plausible intended behavior, with a reference.
+reproducer: |
+  Paste the minimal Julia example from repro/<id>.jl.
+runtime:
+  julia_version: "X.Y.Z"
+  sr_commit: "0123456789abcdef0123456789abcdef01234567"
+  de_version: "X.Y.Z"
+  output: |
+    Paste the verbatim output of the reproducer on the recorded versions.
+expected: |
+  State the correct result.
+promised_by: |
+  Quote the documentation with a source citation, or state the invariant.
+cause: |
+  Cite and explain the responsible source lines at the recorded commit.
+possible_fix: ""  # Suggest a fix if one is clear.
+duplicates:
+  issues: []  # Each item has number, relation (duplicate or related), and optional state.
+  queries: ["Paste the queries used to look for existing issues."]
+lean:
+  property: SymReg.Example.example_property
+  theorem: SymReg.Example.example_property_refuted
+covers: []  # Optional: other refuted ids exercised by the same reproducer.

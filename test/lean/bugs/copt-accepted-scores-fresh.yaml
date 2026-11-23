@@ -1,0 +1,64 @@
+id: copt-accepted-scores-fresh
+title: "Constant optimization reuses cached complexity after a constant-dependent mapping changes"
+priority: P2
+kind: wrong-result
+area: Constant optimization
+files: [src/ConstantOptimization.jl, src/PopMember.jl, src/LossFunctions.jl]
+functions: [optimize_constants, compute_complexity, loss_to_cost]
+summary: |
+  An accepted constant optimization updates a member's expression and loss in place. If a custom complexity mapping depends on the optimized constant, the member's cached complexity may now be stale. Cost computation still uses the old complexity.
+likelihood: |
+  Requires a populated member cache and a custom complexity mapping that changes with the value of an optimized constant. The ordinary PopMember constructor populates the cache. The default structure-based mapping is unaffected.
+maybe_intended: "Caching is appropriate when complexity depends only on expression structure, since constant optimization does not change that structure."
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, Node, PopMember, get_tree
+  using SymbolicRegression.ComplexityModule: compute_complexity
+  using SymbolicRegression.ConstantOptimizationModule: optimize_constants
+  using SymbolicRegression.LossFunctionsModule: loss_to_cost
+
+  mapping(ex) = get_tree(ex).val < 2.0 ? 1 : 3
+  objective(ex, _, _) = abs2(get_tree(ex).val - 3.0)
+  options = Options(; binary_operators=[+], complexity_mapping=mapping, parsimony=0.125,
+      deterministic=true, optimizer_nrestarts=0, autodiff_backend=nothing,
+      loss_function_expression=objective)
+  dataset = Dataset(zeros(1, 4), fill(3.0, 4))
+  member = PopMember(dataset, Node(Float64; val=1.0), options; deterministic=true)
+  old_loss = member.loss
+  old_complexity = compute_complexity(member, options)
+  returned, _ = optimize_constants(dataset, member, options)
+  actual_complexity = compute_complexity(returned, options)
+  fresh_complexity = compute_complexity(returned.tree, options)
+  fresh_cost = loss_to_cost(returned.loss, dataset.use_baseline, dataset.baseline_loss,
+      returned, options, fresh_complexity)
+  println("complexity: before=$old_complexity cached=$actual_complexity fresh=$fresh_complexity")
+  println("cost: stored=$(returned.cost) fresh=$fresh_cost")
+  if returned === member && returned.loss < old_loss && old_complexity == actual_complexity &&
+      actual_complexity != fresh_complexity && returned.cost != fresh_cost
+      println("REPRODUCED copt-accepted-scores-fresh")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    complexity: before=1 cached=1 fresh=3
+    cost: stored=0.125 fresh=0.375
+    REPRODUCED copt-accepted-scores-fresh
+expected: |
+  Once the constant changes, cost uses the new complexity 3 and equals 0.375.
+promised_by: |
+  src/Options.jl:396-399 accepts a function that computes complexity from an AbstractExpression. src/PopMember.jl:20 defines cost as including the complexity penalty and normalization.
+cause: |
+  src/ConstantOptimization.jl:230-235 mutates tree constants and calculates cost without invalidating the complexity field. src/LossFunctions.jl:218 uses compute_complexity(member), which returns a populated cache without calling the custom mapping (src/PopMember.jl:187-200).
+possible_fix: "Recompute or invalidate cached complexity after accepted parameter changes when the mapping is a function."
+duplicates:
+  issues: []
+  queries:
+    [
+      'site:github.com/astroautomata/SymbolicRegression.jl/issues "complexity_mapping" "cache" "constant optimization"',
+    ]
+lean:
+  property: SymReg.ConstOpt.acceptedScoresFresh
+  theorem: SymReg.ConstOpt.acceptedScoresFresh_refuted

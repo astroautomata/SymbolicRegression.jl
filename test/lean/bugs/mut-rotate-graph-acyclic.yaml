@@ -1,0 +1,72 @@
+id: "mut-rotate-graph-acyclic"
+title: "Tree rotation can create a cycle in a GraphNode"
+priority: "P1"
+kind: "wrong-result"
+area: "Mutations"
+files: ["src/MutationFunctions.jl"]
+functions: ["randomly_rotate_tree!", "_valid_rotation_root"]
+summary: |-
+  Rotating a shared pivot can introduce a back edge, breaking the acyclic graph invariant used by tree traversals.
+likelihood: |-
+  PySR default-path likelihood: conditional, GraphNode search.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mut-rotate-graph-acyclic` (SymReg/Mutations/Refute.lean).
+  # randomly_rotate_tree! (src/MutationFunctions.jl:626-656) on a GraphNode whose root holds the
+  # same pivot object in two slots: set_child!(root, grand_child, pivot_idx) replaces only one of
+  # them, then set_child!(pivot, root, grand_child_idx) makes the pivot point back to the root,
+  # which still points to the pivot through its other slot: a cycle.
+  using SymbolicRegression, DynamicExpressions, Random
+  using SymbolicRegression.MutationFunctionsModule: randomly_rotate_tree!
+  using DynamicExpressions: get_child
+
+  function has_cycle(n, onpath=IdDict{Any,Bool}())
+      haskey(onpath, n) && return true
+      onpath[n] = true
+      for i in 1:(n.degree)
+          has_cycle(get_child(n, i), onpath) && return true
+      end
+      delete!(onpath, n)
+      return false
+  end
+
+  cycles = 0
+  for seed in 1:100
+      x = GraphNode(Float64; feature=1)
+      p = GraphNode(1, x)        # sin(x1)
+      tree = GraphNode(1, p, p)  # sin(x1) + sin(x1), one shared object
+      @assert !has_cycle(tree)
+      out = randomly_rotate_tree!(tree, Xoshiro(seed))
+      has_cycle(out) && (global cycles += 1)
+  end
+  println("rotations of p + p (p shared) that produced a cycle, out of 100 seeds: ", cycles)
+  if cycles > 0
+      println("REPRODUCED mut-rotate-graph-acyclic")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    rotations of p + p (p shared) that produced a cycle, out of 100 seeds: 100
+    REPRODUCED mut-rotate-graph-acyclic
+expected: |-
+  Rotating an acyclic GraphNode preserves acyclicity even if a child is shared.
+promised_by: |-
+  Subsequent node counting and traversal assume acyclicity.
+cause: |-
+  src/MutationFunctions.jl:626-656: Rotating a shared pivot can introduce a back edge, breaking the acyclic graph invariant used by tree traversals.
+possible_fix: "Reject rewrites that leave a second route to the pivot before adding a back edge."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Mutations.rotate_graph_acyclic"
+  theorem: "SymReg.Mutations.rotate_graph_acyclic_refuted"
+covers: []

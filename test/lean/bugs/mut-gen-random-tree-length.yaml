@@ -1,0 +1,65 @@
+id: "mut-gen-random-tree-length"
+title: "A zero random draw aborts initial tree generation"
+priority: "P2"
+kind: "wrong-exception"
+area: "Mutations"
+files: ["src/MutationFunctions.jl"]
+functions: ["gen_random_tree"]
+summary: |-
+  The same arity-picker boundary as mut-pick-degree-has-operator reaches the initial tree builder.
+likelihood: |-
+  Outside ordinary PySR defaults; depends on a direct helper call, optional templates, or an exceptionally rare zero draw.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression, DynamicExpressions, Random
+  using SymbolicRegression.MutationFunctionsModule:
+      append_random_op, insert_random_op, prepend_random_op
+
+  # rand(rng) is 0.0; every other draw comes from an inner Xoshiro.
+  struct ZeroFloatRNG <: Random.AbstractRNG
+      inner::Xoshiro
+  end
+  Random.rand(r::ZeroFloatRNG, ::Random.SamplerType{S}) where {S<:Union{Bool,Base.BitInteger}} =
+      rand(r.inner, S)
+  Random.rand(r::ZeroFloatRNG, ::Random.SamplerTrivial{Random.CloseOpen01{Float64}}) = 0.0
+  Random.rng_native_52(::ZeroFloatRNG) = UInt64
+  using SymbolicRegression.MutationFunctionsModule: gen_random_tree
+
+  options = Options(; binary_operators=[], unary_operators=[cos])
+  control = gen_random_tree(1, options, 1, Float64, Xoshiro(1))
+  @assert count_nodes(control) == 2
+  caught = try
+      gen_random_tree(1, options, 1, Float64, ZeroFloatRNG(Xoshiro(1)))
+      nothing
+  catch e
+      e
+  end
+  println("Unary operators only: an ordinary draw yields ", count_nodes(control),
+          " nodes; a zero draw yields ", caught)
+  @assert caught isa ArgumentError
+  println("REPRODUCED mut-gen-random-tree-length")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    Unary operators only: an ordinary draw yields 2 nodes; a zero draw yields ArgumentError("collection must be non-empty")
+    REPRODUCED mut-gen-random-tree-length
+expected: |-
+  Generate a two-node tree from a single append with unary operators.
+promised_by: |-
+  Expected invariant for gen_random_tree at src/MutationFunctions.jl.
+cause: |-
+  The same arity-picker boundary as mut-pick-degree-has-operator reaches the initial tree builder.
+possible_fix: ""
+duplicates:
+  issues: []
+  queries:
+    [
+      "Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches",
+    ]
+lean:
+  property: "SymReg.Mutations.gen_random_tree_length"
+  theorem: "SymReg.Mutations.gen_random_tree_length_refuted"
+covers: []

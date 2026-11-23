@@ -1,0 +1,58 @@
+id: "ide-print-pretty-consistency"
+title: "print_tree ignores SR pretty formatting"
+priority: "P3"
+kind: "wrong-result"
+area: "DynamicExpressions interface"
+files: ["src/InterfaceDynamicExpressions.jl"]
+functions: ["print_tree", "string_tree"]
+summary: |-
+  `print_tree(pretty=true)` bypasses SR's pretty names.
+likelihood: |-
+  PySR default-path likelihood: off |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: string_tree, print_tree
+
+  # InterfaceDynamicExpressions.jl:335,343 dispatch directly to the DE printer,
+  # bypassing the SR variable formatter at lines 282-286.
+  options = Options(; binary_operators=[+])
+  tree = Node(Float64; feature=1)
+  expected = string_tree(tree, options; pretty=true) * "\n"
+  io = IOBuffer()
+  returned = print_tree(io, tree, options; pretty=true)
+  actual = String(take!(io))
+  println("pretty print_tree: actual=", repr(actual), "; expected=", repr(expected),
+      "; return=", repr(returned))
+  @assert returned === nothing
+  @assert actual == "x1\n"
+  @assert expected == "x₁\n"
+  @assert actual != expected
+  println("REPRODUCED ide-print-pretty-consistency")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    pretty print_tree: actual="x1\n"; expected="x₁\n"; return=nothing
+    REPRODUCED ide-print-pretty-consistency
+expected: |-
+  With pretty=true, print the same equation as string_tree followed by a newline.
+promised_by: |-
+  The two formatting entry points should share the same pretty option semantics.
+cause: |-
+  src/InterfaceDynamicExpressions.jl:335,343: `print_tree(pretty=true)` bypasses SR's pretty names.
+possible_fix: "Print using the SR string_tree wrapper."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
+lean:
+  property: "SymReg.Interface.printStringConsistency"
+  theorem: "SymReg.Interface.printStringConsistency_refuted"
+covers: []

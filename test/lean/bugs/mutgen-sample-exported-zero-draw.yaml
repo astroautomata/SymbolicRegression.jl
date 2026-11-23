@@ -1,0 +1,56 @@
+id: "mutgen-sample-exported-zero-draw"
+title: "sample_mutation can select a zero-weight first entry"
+priority: "P2"
+kind: "wrong-result"
+area: "Mutation sampling"
+files: ["src/MutationWeights.jl"]
+functions: ["sample_mutation"]
+summary: |-
+  StatsBase can select a zero-weight first entry when its draw is exactly zero.
+likelihood: |-
+  PySR default-path likelihood: off, search uses a different sampler |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mutgen-sample-exported-zero-draw` (SymReg/MutateGen/SampleProps.lean).
+  # sample_mutation (src/MutationWeights.jl:159-164) uses StatsBase.sample, whose scan
+  # `while cw < t` stops at index 1 when the draw is exactly 0.0 (a legal rand() value), so a
+  # zero-weight first mutation is returned. The task-local Xoshiro state below makes the next
+  # rand() return 0.0.
+  using SymbolicRegression
+  using Random
+
+  copy!(Random.default_rng(), Random.Xoshiro(0x0, 0x1, 0x2, 0x0))
+  choice = SymbolicRegression.sample_mutation([OperatorMutation() => 0.0, ConstantMutation() => 1.0])
+  copy!(Random.default_rng(), Random.Xoshiro(0x0, 0x1, 0x2, 0x0))
+  draw = rand()
+  println("next rand() = ", draw, "; sample_mutation([OperatorMutation() => 0.0, ConstantMutation() => 1.0]) = ", choice)
+  if draw == 0.0 && choice isa OperatorMutation
+      println("REPRODUCED mutgen-sample-exported-zero-draw")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    next rand() = 0.0; sample_mutation([OperatorMutation() => 0.0, ConstantMutation() => 1.0]) = OperatorMutation()
+    REPRODUCED mutgen-sample-exported-zero-draw
+expected: |-
+  With weights [0, 1], the second mutation is always returned.
+promised_by: |-
+  The sample_mutation docstring promises to pick by weight.
+cause: |-
+  src/MutationWeights.jl:159-164: StatsBase can select a zero-weight first entry when its draw is exactly zero.
+possible_fix: "Skip zero-weight entries even when the random draw is exactly zero."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.MutateGen.exported_positive"
+  theorem: "SymReg.MutateGen.exported_positive_refuted"
+covers: []

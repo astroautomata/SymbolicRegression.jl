@@ -1,0 +1,64 @@
+id: "ops-gamma-total"
+title: "The gamma wrapper throws at negative integer poles"
+priority: "P1"
+kind: "wrong-exception"
+area: "Operators"
+files: ["src/Operators.jl"]
+functions: ["gamma"]
+summary: |-
+  SpecialFunctions throws at negative integer poles before the wrapper can return a typed NaN.
+likelihood: |-
+  PySR default-path likelihood: conditional, gamma operator |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  const O = SymbolicRegression.CoreModule.OperatorsModule
+
+  function reproduces()
+      x = -1.0
+      base_error = try
+          O.SpecialFunctions.gamma(x)
+          false
+      catch error
+          error isa DomainError
+      end
+      wrapper_error = try
+          O.gamma(x)
+          false
+      catch error
+          println("gamma(-1.0) throws ", typeof(error), "; expected NaN at the pole")
+          error isa DomainError
+      end
+      @assert base_error && wrapper_error
+      @assert isnan(O.gamma(0.0))
+      return true
+  end
+
+  reproduces() && println("REPRODUCED ops-gamma-total")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    gamma(-1.0) throws DomainError; expected NaN at the pole
+    REPRODUCED ops-gamma-total
+expected: |-
+  Return a typed NaN at the pole, as the wrapper does at zero.
+promised_by: |-
+  The operator wrapper represents out-of-domain numeric results as NaN.
+cause: |-
+  src/Operators.jl:14-17: SpecialFunctions throws at negative integer poles before the wrapper can return a typed NaN.
+possible_fix: "Check nonpositive integer poles before calling SpecialFunctions.gamma."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'gamma'",
+      "gh search issues --repo astroautomata/PySR 'gamma'",
+    ]
+lean:
+  property: "SymReg.Operators.gammaTotal"
+  theorem: "SymReg.Operators.gammaTotal_refuted"
+covers: []

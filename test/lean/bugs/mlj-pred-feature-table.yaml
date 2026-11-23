@@ -1,0 +1,69 @@
+id: "mlj-pred-feature-table"
+title: "MLJ predict mistakes ordinary columns for a selection request"
+priority: "P2"
+kind: "wrong-exception"
+area: "MLJ"
+files: ["src/MLJInterface.jl"]
+functions: ["_predict", "predict"]
+summary: |-
+  A fitted feature table with an ordinary `data` or `idx` column can be rejected as a malformed selector.
+likelihood: |-
+  PySR default-path likelihood: off, MLJ prediction only |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mlj-pred-feature-table` (SymReg/MLJ/PredictProps.lean).
+  # `_predict` (src/MLJInterface.jl:570-576) treats any NamedTuple with a key `data` or `idx`
+  # as the `(data=..., idx=...)` selector. A feature table with a column named `data` fits,
+  # but predicting on the same table throws.
+  using SymbolicRegression
+  using SymbolicRegression: machine, fit!, predict
+  using SymbolicRegression.MLJInterfaceModule: SRTestRegressor
+  using Random
+
+  Random.seed!(0)
+  X = (; data=randn(30), x2=randn(30))
+  y = 2 .* X.data
+  model = SRTestRegressor(;
+      binary_operators=[+, *], populations=1, population_size=20, ncycles_per_iteration=10,
+      parallelism=:serial,
+  )
+  mach = machine(model, X, y)
+  fit!(mach; verbosity=0)
+  result = try
+      predict(mach, X)
+  catch e
+      e
+  end
+  println("predict(mach, X) with columns (:data, :x2) returned: ", result isa Exception ? sprint(showerror, result) : result[1:3])
+  println("expected: a vector of 30 predictions")
+  if result isa AssertionError
+      println("REPRODUCED mlj-pred-feature-table")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    predict(mach, X) with columns (:data, :x2) returned: AssertionError: If specifying an equation index during prediction, you must use a named tuple with keys `idx` and `data`.
+    expected: a vector of 30 predictions
+    REPRODUCED mlj-pred-feature-table
+expected: |-
+  A fitted table with columns data and x2 can predict on the same table.
+promised_by: |-
+  Predict must accept the same feature schema that fit accepts.
+cause: |-
+  src/MLJInterface.jl:570-576: A fitted feature table with an ordinary `data` or `idx` column can be rejected as a malformed selector.
+possible_fix: "Separate array selection requests from arbitrary feature-table column names."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
+lean:
+  property: "SymReg.MLJ.pred_feature_table"
+  theorem: "SymReg.MLJ.pred_feature_table_refuted"
+covers: []

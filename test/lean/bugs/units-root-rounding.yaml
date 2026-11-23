@@ -1,0 +1,62 @@
+id: "units-root-rounding"
+title: "Unit exponent rounding rejects equivalent expressions"
+priority: "P2"
+kind: "wrong-result"
+area: "Units"
+files: ["src/DimensionalAnalysis.jl", "src/Dataset.jl"]
+functions: ["sqrt", "cbrt", "safe_sqrt", "violates_dimensional_constraints"]
+summary: |-
+  Fixed-denominator unit exponents round independently, so algebraically equivalent root products can compare unequal.
+likelihood: |-
+  PySR default-path likelihood: conditional, units and repeated roots |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset
+  using SymbolicRegression.DimensionalAnalysisModule: violates_dimensional_constraints
+  using DynamicQuantities
+
+  # (s5 * s5) / s4 with s4 = x1^(1/16), s5 = x1^(1/32) is dimensionless.
+  options = Options(; binary_operators=[*, /], unary_operators=[sqrt])
+  dataset = Dataset(reshape([1.0, 2.0], 1, :), [1.0, 2.0]; X_units=["m"], y_units="1")
+  x1 = Node(Float64; feature=1)
+  s(t) = sqrt(t)
+  s4 = s(s(s(s(x1))))
+  s5 = s(s4)
+  tree = (s5 * s5) / s4
+  println("dimension(u\"m\")^(1//32) = ", dimension(u"m")^(1 // 32))
+  println("violates(s4 / s4) = ", violates_dimensional_constraints(s4 / s4, dataset, options))
+  println("violates((s5 * s5) / s4) = ", violates_dimensional_constraints(tree, dataset, options))
+  if violates_dimensional_constraints(tree, dataset, options) &&
+      !violates_dimensional_constraints(s4 / s4, dataset, options)
+      println("REPRODUCED units-root-rounding")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    dimension(u"m")^(1//32) = m⁷⁸⁷ᐟ²⁵²⁰⁰
+    violates(s4 / s4) = false
+    violates((s5 * s5) / s4) = true
+    REPRODUCED units-root-rounding
+expected: |-
+  Treat algebraically equivalent unit dimensions consistently despite repeated roots.
+promised_by: |-
+  Arithmetic on the same physical dimensions should not fail a dimensional check due to operation order.
+cause: |-
+  src/DimensionalAnalysis.jl:86-91; src/Dataset.jl:201-210: Fixed-denominator unit exponents round independently, so algebraically equivalent root products can compare unequal.
+possible_fix: "Use exact or suitably checked unit exponents in the dimensional analysis path."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
+lean:
+  property: "SymReg.Units.units_root_rounding"
+  theorem: "SymReg.Units.units_root_rounding_refuted"
+covers: []

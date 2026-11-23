@@ -1,0 +1,14 @@
+name = "SymReg"
+defaultTargets = ["SymReg"]
+
+# Reuse the DynamicExpressions.jl runtime, expression model, and registry types.
+[[require]]
+name = "DynExpr"
+git = "https://github.com/SymbolicML/DynamicExpressions.jl"
+rev = "097eaa548dcf7525dd1f9aa4d1504beb2795f467"
+subDir = "test/lean"
+
+[[lean_lib]]
+name = "SymReg"
+# Per-file memory cap (MB), as in the DE formalization.
+moreLeanArgs = ["-M8000"]

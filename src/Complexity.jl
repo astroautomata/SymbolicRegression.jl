@@ -58,7 +58,7 @@ function _compute_complexity(
         tree,
         CT;
         break_sharing=break_sharing,
-        f_on_shared=(result, is_shared) -> is_shared ? result : zero(CT),
+        f_on_shared=(result, is_shared) -> is_shared ? zero(CT) : result,
     )
 end
 

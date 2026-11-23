@@ -57,6 +57,31 @@ end
     @test best_idx_linear == 4  # Simply picks minimum loss (0.2)
 end
 
+@testitem "NaN losses stay off the Pareto frontier" begin
+    using SymbolicRegression
+    using SymbolicRegression: Dataset
+    using SymbolicRegression.HallOfFameModule: format_hall_of_fame
+    using SymbolicRegression.MLJInterfaceModule: choose_best
+
+    for loss_scale in (:log, :linear)
+        options = Options(; binary_operators=[+, *], loss_scale)
+        dataset = Dataset(randn(1, 10), randn(10))
+        hof = HallOfFame(options, dataset)
+        x1 = Node(Float64; feature=1)
+        trees = [x1, x1 + 1.0, x1 * 2.0 + 1.0, (x1 * 2.0 + 1.0) * x1]
+        for (tree, loss) in zip(trees, [2.0, NaN, 1.4, 1.0])
+            member = PopMember(dataset, tree, options; deterministic=false)
+            member.loss = loss
+            c = compute_complexity(member, options)
+            hof.members[c] = member
+            hof.exists[c] = true
+        end
+        formatted = format_hall_of_fame(hof, options)
+        @test formatted.losses == [2.0, 1.4, 1.0]
+        @test choose_best(; formatted..., options) == 3
+    end
+end
+
 @testitem "loss_scale in pareto_volume" begin
     using SymbolicRegression.LoggingModule: pareto_volume
 

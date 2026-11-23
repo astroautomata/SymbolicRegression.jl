@@ -1,0 +1,49 @@
+id: "loss-dataset-average"
+title: "Numeric Dataset leaves avg_y unset"
+priority: "P0"
+kind: "wrong-result"
+area: "Loss"
+files: ["src/Dataset.jl"]
+functions: ["Dataset"]
+summary: |-
+  `isa Number` tests the type object itself, so both weighted and unweighted numeric averages are missing.
+likelihood: |-
+  PySR default-path likelihood: default, observable to Julia callbacks |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset
+
+  plain = Dataset(reshape([1.0, 2.0], 1, :), [2.0, 4.0])
+  weighted = Dataset(reshape([1.0, 2.0], 1, :), [2.0, 4.0]; weights=[1.0, 3.0])
+  println("plain avg_y=", plain.avg_y, " expected=3.0; weighted avg_y=", weighted.avg_y,
+          " expected=3.5; eltype(y) isa Number=", eltype(plain.y) isa Number)
+  if plain.avg_y === nothing && weighted.avg_y === nothing
+      println("REPRODUCED loss-dataset-average")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    plain avg_y=nothing expected=3.0; weighted avg_y=nothing expected=3.5; eltype(y) isa Number=false
+    REPRODUCED loss-dataset-average
+expected: |-
+  The unweighted mean is 3 and the weighted mean is 3.5 in the reproducer.
+promised_by: |-
+  Dataset.jl:33 documents the weighted average when weights are supplied.
+cause: |-
+  src/Dataset.jl:183-191: `isa Number` tests the type object itself, so both weighted and unweighted numeric averages are missing.
+possible_fix: "Use a subtype check for the numeric element type."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'",
+      "gh search issues --repo astroautomata/PySR 'baseline loss'",
+    ]
+lean:
+  property: "SymReg.Loss.dataset_average"
+  theorem: "SymReg.Loss.dataset_average_refuted"
+covers: []
