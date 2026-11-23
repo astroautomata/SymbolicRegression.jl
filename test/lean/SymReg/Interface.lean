@@ -169,7 +169,7 @@ def entries : List Entry := [
     status := .proven, prop := ``genericHooksFail, thm := some ``genericHooksFail_holds },
   { id := "idt-constant-mutation", juliaFile := "src/InterfaceDataTypes.jl",
     juliaFns := ["mutate_value"],
-    statement := "Numeric mutation delegates unchanged temperature, perturbation_factor and probability_negate to the existing mutation algorithm; generic ConstantMutation fallback never silently mutates custom values.", preconditions := "Existing Mutations.mutateValue model; range/RNG laws owned by mut-mutate-value.",
+    statement := "Numeric mutation delegates unchanged temperature, perturbation_factor and probability_flip_sign to the existing mutation algorithm; generic ConstantMutation fallback never silently mutates custom values.", preconditions := "Existing Mutations.mutateValue model; range/RNG laws owned by mut-mutate-value.",
     status := .todo, prop := ``constantMutationForwarding, thm := none, notes := "Numerical forwarding restored for arbitrary modeled parameters; missing generic unsupported-type dispatch through the ConstantMutation entry point and typed runtime arithmetic." }
 ]
 end SymReg.Interface

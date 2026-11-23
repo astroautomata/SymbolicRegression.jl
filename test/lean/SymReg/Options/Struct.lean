@@ -60,7 +60,7 @@ def optionFieldNames : List String :=
    "mutations", "crossovers", "crossover_probability", "warmup_maxsize_by", "use_frequency",
    "use_frequency_in_tournament", "adaptive_parsimony_scaling", "population_size",
    "ncycles_per_iteration", "fraction_replaced", "fraction_replaced_hof", "fraction_replaced_guesses",
-   "topn", "verbosity", "v_print_precision", "save_to_file", "probability_negate_constant", "nops",
+   "topn", "verbosity", "v_print_precision", "save_to_file", "probability_flip_constant_sign", "nops",
    "seed", "elementwise_loss", "loss_function", "loss_function_expression", "loss_scale",
    "node_type", "expression_type", "expression_options", "progress", "terminal_width",
    "optimizer_algorithm", "optimizer_probability", "optimizer_nrestarts", "optimizer_options",

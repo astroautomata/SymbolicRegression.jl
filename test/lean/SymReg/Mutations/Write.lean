@@ -233,13 +233,13 @@ theorem mutate_operator_spec_holds : mutate_operator_spec := by
 
 /-! ### `mutate_constant` -/
 
-theorem mutateFactor_ok (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) (s : St T) :
-    mutateFactor (T := T) pw pert temperature pneg s =
-      .ok (factorAt pw pert temperature pneg s.rng s.rng.cursor,
+theorem mutateFactor_ok (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (s : St T) :
+    mutateFactor (T := T) pw pert temperature pflip s =
+      .ok (factorAt pw pert temperature pflip s.rng s.rng.cursor,
         { s with rng := adv (adv (adv s.rng)) }) := rfl
 
 theorem mutate_constant_spec_holds : mutate_constant_spec := by
-  intro T g D fuel tree t rng mul pw pert temperature pneg hu hna hdeg
+  intro T g D fuel tree t rng mul pw pert temperature pflip hu hna hdeg
   have hany := anyM_kind (⟨g, rng⟩ : St T) D fuel tree t
     (fun _ c => c.degree == 0 && c.constant) isConstT (fun _ _ => rfl) lk_const hu hdeg
   cases hq : (preorder t).any isConstT
@@ -252,10 +252,10 @@ theorem mutate_constant_spec_holds : mutate_constant_spec := by
   obtain ⟨c, hcx, _, _, hcase⟩ := cell_of_unfold hun
   rcases hcase with ⟨hd, ⟨hk, v, hv, rfl⟩ | ⟨hk, rfl⟩⟩ | ⟨hd, ts, _, rfl⟩
   · let s1 : St T := { g := g, rng := adv rng }
-    let fct := factorAt pw pert temperature pneg rng (rng.cursor + 1)
+    let fct := factorAt pw pert temperature pflip rng (rng.cursor + 1)
     obtain ⟨g2, hset, hx2, hoth, _⟩ :=
       setValM_ok (s := ({ s1 with rng := adv (adv (adv s1.rng)) } : St T)) (x := x) hcx (mul v fct)
-    have hrun : mutateConstant D fuel mul pw pert temperature pneg tree ⟨g, rng⟩ =
+    have hrun : mutateConstant D fuel mul pw pert temperature pflip tree ⟨g, rng⟩ =
         .ok (tree, ⟨g2, adv (adv (adv s1.rng))⟩) := by
       simp only [mutateConstant]
       rw [bindM hany, hq]
@@ -264,7 +264,7 @@ theorem mutate_constant_spec_holds : mutate_constant_spec := by
       show (liftJ (match c.val with | some v => .ok v | none => .error .undefRefError) >>= _) s1 = _
       rw [hv]
       rw [bindM (rfl : liftJ (T := T) (.ok v) s1 = .ok (v, s1)),
-        bindM (show mutateValue' (T := T) mul pw pert temperature pneg v s1 =
+        bindM (show mutateValue' (T := T) mul pw pert temperature pflip v s1 =
           .ok (mul v fct, { s1 with rng := adv (adv (adv s1.rng)) }) from rfl),
         bindM hset]
       rfl

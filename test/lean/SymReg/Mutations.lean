@@ -46,12 +46,12 @@ def entries : List Entry := [
   { id := "mut-mutate-factor-negate"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_factor", "mutate_value", "ConstantMutation"]
-    statement := "mutate_factor negates the factor with probability m.probability_negate (ConstantMutation docstring: \"probability_negate is the chance of flipping the constant's sign\"): for draws in [0, 1) and a positive magnitude, the factor is negative exactly when the negation draw is below probability_negate."
-    preconditions := "perturbation_factor, temperature >= 0; 0 <= probability_negate <= 1; maxChange^r > 0 for maxChange > 0; real draws in [0, 1)."
-    status := .refuted
+    statement := "For draws in [0, 1) and a positive magnitude, mutate_factor returns a negative factor exactly when the sign draw is strictly greater than the Float64 result of 1 - m.probability_flip_sign."
+    preconditions := "perturbation_factor, temperature >= 0; probability_flip_sign a Float64 in [0, 1]; maxChange^r > 0 for maxChange > 0; real draws in [0, 1)."
+    status := .proven
     prop := ``mutate_factor_negate
-    thm := some ``mutate_factor_negate_refuted
-    notes := "Bug: `if rand(rng) > m.probability_negate; factor *= -1; end` (src/MutationFunctions.jl:181-183) negates with probability 1 - probability_negate. With the default probability_negate = 0.01, mutate_constant flips the sign of the mutated constant 99% of the time: count(_ -> mutate_value(rng, 2.5, 1.0, ConstantMutation()) < 0, 1:10_000) is about 9900, documented 100. The same comparison was used with options.probability_negate_constant in earlier versions, so the Options docstring (\"Probability of negating a constant\") is affected too. Fix: `rand(rng) < m.probability_negate`." },
+    thm := some ``mutate_factor_negate_holds
+    notes := "The documented flip probability is probability_flip_sign in the continuous uniform idealization. Julia uses a discrete draw and a rounded threshold; equality with the threshold leaves the sign unchanged." },
   { id := "mut-mutate-feature"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_feature"]
@@ -208,7 +208,7 @@ def entries : List Entry := [
   { id := "mut-mutate-value"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_value", "mutate_factor"]
-    statement := "mutate_value(rng, val, temperature, m) returns val * mutate_factor(typeof(val), temperature, m, rng), consuming exactly the three draws of mutate_factor; the factor's magnitude lies in [1/maxChange, maxChange] with maxChange = m.perturbation_factor * temperature + 1.1, and the factor is negative exactly when the negation draw exceeds m.probability_negate."
+    statement := "mutate_value(rng, val, temperature, m) returns val * mutate_factor(typeof(val), temperature, m, rng), consuming exactly the three draws of mutate_factor; the factor's magnitude lies in [1/maxChange, maxChange] with maxChange = m.perturbation_factor * temperature + 1.1, and the factor is negative exactly when the sign draw exceeds the Float64 result of 1 - m.probability_flip_sign."
     preconditions := "perturbation_factor >= 0, temperature >= 0; the power T(maxChange^r) lies in [1, maxChange] for r in [0, 1) (exact real powers; Float rounding not modelled); the exponent draw rand(rng, T) in [0, 1); val * factor an arbitrary function."
     status := .todo
     prop := ``mutate_value_spec

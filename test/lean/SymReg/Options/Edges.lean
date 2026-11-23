@@ -97,10 +97,11 @@ theorem emptyIntComplexity_all_layouts (ops : List (List Nat)) :
   rfl
 
 /-- All weight fields survive conversion, and the default ConstantMutation gets
-exactly the resolved perturbation and negation parameters. -/
+exactly the Float64 conversions of the resolved perturbation and sign-flip parameters. -/
 def constantMutationDefaults : Prop := ∀ (w : SymReg.MutateGen.MutationWeights) d,
   ∃ pairs, mutationBase w d = .ok pairs ∧
-    pairs.head? = some (⟨.constant, 0, some (d.perturbation, d.negateProbability)⟩, w.mutate_constant) ∧
+    pairs.head? = some (⟨.constant, 0, some (SymReg.Loss.LossPrecision.round .float64 d.perturbation,
+      SymReg.Loss.LossPrecision.round .float64 d.flipProbability)⟩, w.mutate_constant) ∧
     pairs.map Prod.snd = SymReg.MutateGen.convertVector w
 
 theorem constantMutationDefaults_holds : constantMutationDefaults := by

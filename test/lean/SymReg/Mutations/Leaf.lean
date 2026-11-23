@@ -112,24 +112,24 @@ def maxChange (pert temperature : Rat) : Rat := pert * temperature + 1 + 1 / 10
 /-- `mutate_value(rng, val, temperature, m)` returns `val * mutate_factor(typeof(val),
 temperature, m, rng)`, consuming exactly the three draws of `mutate_factor`; for a power
 `T(maxChange^r)` in `[1, maxChange]` (`r = rand(rng, T)` in `[0, 1)`), the factor's magnitude lies
-in `[1/maxChange, maxChange]`, and the factor is negative exactly when the negation draw exceeds
-`probability_negate`. -/
+in `[1/maxChange, maxChange]`, and the factor is negative exactly when the sign draw exceeds
+the Float64 threshold `1 - probability_flip_sign`. -/
 def mutate_value_spec : Prop :=
-  ∀ (T : Type) (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) (v : T)
+  ∀ (T : Type) (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (v : T)
     (s : St T),
     0 ≤ pert → 0 ≤ temperature → (∀ b r, 1 ≤ b → 0 ≤ r → r < 1 → 1 ≤ pw b r ∧ pw b r ≤ b) →
     0 ≤ s.rng.draws s.rng.cursor → s.rng.draws s.rng.cursor < 1 →
-    mutateValue mul pw pert temperature pneg v s =
-      .ok (mul v (factorAt pw pert temperature pneg s.rng s.rng.cursor),
+    mutateValue mul pw pert temperature pflip v s =
+      .ok (mul v (factorAt pw pert temperature pflip s.rng s.rng.cursor),
         { s with rng := advN s.rng 3 }) ∧
-    ((0 < factorAt pw pert temperature pneg s.rng s.rng.cursor ∧
-        factorAt pw pert temperature pneg s.rng s.rng.cursor ≤ maxChange pert temperature ∧
-        1 ≤ maxChange pert temperature * factorAt pw pert temperature pneg s.rng s.rng.cursor) ∨
-      (factorAt pw pert temperature pneg s.rng s.rng.cursor < 0 ∧
-        -factorAt pw pert temperature pneg s.rng s.rng.cursor ≤ maxChange pert temperature ∧
-        1 ≤ maxChange pert temperature * -factorAt pw pert temperature pneg s.rng s.rng.cursor)) ∧
-    (factorAt pw pert temperature pneg s.rng s.rng.cursor < 0 ↔
-      pneg < s.rng.draws (s.rng.cursor + 2))
+    ((0 < factorAt pw pert temperature pflip s.rng s.rng.cursor ∧
+        factorAt pw pert temperature pflip s.rng s.rng.cursor ≤ maxChange pert temperature ∧
+        1 ≤ maxChange pert temperature * factorAt pw pert temperature pflip s.rng s.rng.cursor) ∨
+      (factorAt pw pert temperature pflip s.rng s.rng.cursor < 0 ∧
+        -factorAt pw pert temperature pflip s.rng s.rng.cursor ≤ maxChange pert temperature ∧
+        1 ≤ maxChange pert temperature * -factorAt pw pert temperature pflip s.rng s.rng.cursor)) ∧
+    (factorAt pw pert temperature pflip s.rng s.rng.cursor < 0 ↔
+      drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) pflip = true)
 
 /-! ## Sampling -/
 
@@ -335,14 +335,14 @@ theorem maxChange_ge_one {pert temperature : Rat} (hp : 0 ≤ pert) (ht : 0 ≤ 
   grind
 
 theorem mutate_value_spec_holds : mutate_value_spec := by
-  intro T mul pw pert temperature pneg v s hp ht hpw hr0 hr1
+  intro T mul pw pert temperature pflip v s hp ht hpw hr0 hr1
   have hm := maxChange_ge_one hp ht
   obtain ⟨hf1, hfm⟩ := hpw (maxChange pert temperature) (s.rng.draws s.rng.cursor) hm hr0 hr1
-  have hrun : mutateValue mul pw pert temperature pneg v s =
-      .ok (mul v (factorAt pw pert temperature pneg s.rng s.rng.cursor),
+  have hrun : mutateValue mul pw pert temperature pflip v s =
+      .ok (mul v (factorAt pw pert temperature pflip s.rng s.rng.cursor),
         { s with rng := advN s.rng 3 }) := by
     unfold mutateValue
-    rw [bindM (mutateFactor_ok pw pert temperature pneg s)]
+    rw [bindM (mutateFactor_ok pw pert temperature pflip s)]
     rfl
   refine ⟨hrun, ?_⟩
   generalize hfac : pw (maxChange pert temperature) (s.rng.draws s.rng.cursor) = fac at hf1 hfm
@@ -377,11 +377,37 @@ theorem mutate_value_spec_holds : mutate_value_spec := by
   simp only [hfac']
   generalize ((s.rng.indexDraws 1 (s.rng.cursor + 1)).val = 1 : Bool) = b
   obtain ⟨h1, h2, h3⟩ := hmag b
-  by_cases hneg : s.rng.draws (s.rng.cursor + 2) > pneg
+  by_cases hneg : drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) pflip = true
   · rw [if_pos hneg]
     refine ⟨Or.inr ⟨by grind, by rw [Rat.neg_neg]; exact h2, by rw [Rat.neg_neg]; exact h3⟩,
       ⟨fun _ => hneg, fun _ => by grind⟩⟩
   · rw [if_neg hneg]
     exact ⟨Or.inl ⟨h1, h2, h3⟩, ⟨fun h => by grind, fun h => absurd h hneg⟩⟩
+
+theorem mutate_factor_negate_holds : mutate_factor_negate := by
+  intro T pw pert temperature pflip s hpw hp ht _ _ _ _
+  refine ⟨_, _, mutateFactor_ok pw pert temperature (.fin pflip) s, ?_⟩
+  have hb : 0 < pert * temperature + 1 + 1 / 10 := by
+    have h := maxChange_ge_one hp ht
+    unfold maxChange at h
+    grind
+  have hpos := hpw _ (s.rng.draws s.rng.cursor) hb
+  generalize hfac : pw (pert * temperature + 1 + 1 / 10) (s.rng.draws s.rng.cursor) = fac at hpos
+  have hmag : ∀ b : Bool, 0 < (if b then fac else 1 / fac) := by
+    intro b
+    cases b
+    · simp only [Bool.false_eq_true, ↓reduceIte]
+      rw [Rat.div_def, Rat.one_mul]
+      exact Rat.inv_pos.mpr hpos
+    · simpa using hpos
+  unfold factorAt
+  simp only [hfac]
+  generalize ((s.rng.indexDraws 1 (s.rng.cursor + 1)).val = 1 : Bool) = b
+  have h1 := hmag b
+  by_cases hneg : drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true
+  · rw [ite_eq_left hneg]
+    exact ⟨fun _ => hneg, fun _ => by grind⟩
+  · rw [ite_eq_right hneg]
+    exact ⟨fun h => by grind, fun h => absurd h hneg⟩
 
 end SymReg.Mutations
