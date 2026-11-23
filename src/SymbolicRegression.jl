@@ -379,7 +379,14 @@ using .MutationFunctionsModule:
     gen_random_tree, gen_random_tree_fixed_size, random_node, crossover_trees
 using .InterfaceDynamicExpressionsModule:
     @extend_operators, require_copy_to_workers, make_example_inputs
-using .LossFunctionsModule: eval_loss, eval_cost, update_baseline_loss!, score_func
+using .LossFunctionsModule:
+    eval_loss,
+    eval_cost,
+    update_baseline_loss!,
+    score_func,
+    EvalContextPool,
+    acquire_eval_context,
+    release_eval_context!
 using .ConstantOptimizationModule:
     optimize_constants,
     get_constants_for_optimization,
@@ -1089,6 +1096,20 @@ function _main_search_loop!(
     print_every_n_seconds = 5
     equation_speed = Float32[]
 
+    full_pools = if ropt.parallelism in (:serial, :multithreading)
+        [EvalContextPool(datasets[j], options) for j in 1:nout]
+    else
+        nothing
+    end
+    batch_pools = if ropt.parallelism in (:serial, :multithreading)
+        [
+            use_batching(options, datasets[j]) ?
+            EvalContextPool(eltype(full_pools[j].items)) : nothing for j in 1:nout
+        ]
+    else
+        nothing
+    end
+
     if ropt.parallelism in (:multiprocessing, :multithreading)
         for j in 1:nout, i in 1:(options.populations)
             # Start listening for each population to finish:
@@ -1234,7 +1255,9 @@ function _main_search_loop!(
                         iteration = iteration,
                         verbosity = ropt.verbosity,
                         cur_maxsize = cur_maxsize,
-                        worker_idx = worker_idx
+                        worker_idx = worker_idx,
+                        full_pool = full_pools === nothing ? nothing : full_pools[j],
+                        batch_pool = batch_pools === nothing ? nothing : batch_pools[j]
 
                         @sr_spawner(
                             (datasets, options) -> _dispatch_s_r_cycle(
@@ -1247,6 +1270,8 @@ function _main_search_loop!(
                                 verbosity,
                                 cur_maxsize,
                                 plugin_states=worker_plugin_states,
+                                full_pool,
+                                batch_pool,
                             ),
                             inputs = something(state.worker_inputs, (datasets, options)),
                             parallelism = ropt.parallelism,
@@ -1406,34 +1431,54 @@ end
     verbosity,
     cur_maxsize::Int,
     plugin_states::Tuple,
+    full_pool=nothing,
+    batch_pool=nothing,
 ) where {T,L,N}
     trace = new_trace(options)
     trace_iteration_start!(trace, out, pop, iteration, in_pop, options)
     num_evals = 0.0
-    out_pop, best_seen, evals_from_cycle = s_r_cycle(
-        dataset,
-        in_pop,
-        options.ncycles_per_iteration,
-        cur_maxsize;
-        verbosity=verbosity,
-        options=options,
-        trace=trace,
-        plugin_states,
-    )
-    num_evals += evals_from_cycle
-    out_pop, evals_from_optimize = optimize_and_simplify_population(
-        dataset, out_pop, options, cur_maxsize, trace
-    )
-    num_evals += evals_from_optimize
-    if use_batching(options, dataset)
-        for i_member in 1:(options.maxsize)
-            if best_seen.exists[i_member]
-                cost, result_loss = eval_cost(dataset, best_seen.members[i_member], options)
-                best_seen.members[i_member].cost = cost
-                best_seen.members[i_member].loss = result_loss
-                num_evals += 1
+    batched = use_batching(options, dataset)
+    full_ctx = acquire_eval_context(full_pool, dataset, options)
+    batch_ctx = batched ? acquire_eval_context(batch_pool, dataset, options) : full_ctx
+    local out_pop, best_seen
+    try
+        out_pop, best_seen, evals_from_cycle = s_r_cycle(
+            dataset,
+            in_pop,
+            options.ncycles_per_iteration,
+            cur_maxsize;
+            verbosity=verbosity,
+            options=options,
+            trace=trace,
+            plugin_states,
+            eval_context=batch_ctx,
+        )
+        num_evals += evals_from_cycle
+        out_pop, evals_from_optimize = optimize_and_simplify_population(
+            dataset,
+            out_pop,
+            options,
+            cur_maxsize,
+            trace;
+            eval_context=batch_ctx,
+            full_eval_context=full_ctx,
+        )
+        num_evals += evals_from_optimize
+        if batched
+            for i_member in 1:(options.maxsize)
+                if best_seen.exists[i_member]
+                    cost, result_loss = eval_cost(
+                        dataset, best_seen.members[i_member], options; eval_context=full_ctx
+                    )
+                    best_seen.members[i_member].cost = cost
+                    best_seen.members[i_member].loss = result_loss
+                    num_evals += 1
+                end
             end
         end
+    finally
+        release_eval_context!(full_pool, full_ctx)
+        batched && release_eval_context!(batch_pool, batch_ctx)
     end
     return (out_pop, best_seen, trace, num_evals, plugin_states)
 end

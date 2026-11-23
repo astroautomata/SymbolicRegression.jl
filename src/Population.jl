@@ -13,7 +13,7 @@ using ..CoreModule:
     resolve_init_member,
     tournament_cost_multiplier,
     use_batching
-using ..LossFunctionsModule: eval_cost, update_baseline_loss!
+using ..LossFunctionsModule: eval_cost, update_baseline_loss!, create_eval_context
 using ..MutationFunctionsModule: gen_random_tree
 using ..PopMemberModule: AbstractPopMember, PopMember
 import ..PopMemberModule: popmember_type
@@ -234,13 +234,19 @@ const CACHED_WEIGHTS =
 end
 
 function finalize_costs(
-    dataset::Dataset{T,L}, pop::P, options::AbstractOptions
+    dataset::Dataset{T,L},
+    pop::P,
+    options::AbstractOptions;
+    eval_context=nothing,
 )::Tuple{P,Float64} where {T,L,P<:Population{T,L}}
     need_recalculate = use_batching(options, dataset)
     num_evals = 0.0
     if need_recalculate
+        ctx =
+            isnothing(eval_context) ? create_eval_context(dataset, options, 0) :
+            eval_context
         for member in 1:(pop.n)
-            cost, loss = eval_cost(dataset, pop.members[member], options)
+            cost, loss = eval_cost(dataset, pop.members[member], options; eval_context=ctx)
             pop.members[member].cost = cost
             pop.members[member].loss = loss
         end
