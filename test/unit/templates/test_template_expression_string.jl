@@ -45,6 +45,13 @@ end
     @test string_tree(get_tree(ex_zero), operators) == "2.0 + (x1 * x2)"
     @test count_nodes(ex_zero) == 5
 
+    st_splat = TemplateStructure{(:f, :g)}(
+        ((; f, g), xs) -> f(xs...) + g(); num_features=(; f=2, g=0)
+    )
+    ex_splat = TemplateExpression((; f=x1 + x2, g=c1); structure=st_splat, operators)
+    @test string_tree(get_tree(ex_splat), operators) == "(x1 + x2) + 2.0"
+    @test count_nodes(ex_splat) == 5
+
     gx1 = ComposableExpression(GraphNode{Float64}(; feature=1); operators)
     ex_graph = TemplateExpression((; f=gx1); structure=st_single, operators)
     @test count_nodes(ex_graph) == 1

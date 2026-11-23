@@ -540,15 +540,6 @@ function DE.copy_into!(dest::PreallocatedTemplateExpression, src::TemplateExpres
     return with_metadata(with_contents(src, new_contents); parameters=new_parameters)
 end
 
-struct _TemplateFeatureVars{E,NT}
-    example_inner::E
-    node_type::Type{NT}
-end
-function Base.getindex(v::_TemplateFeatureVars, i::Integer)
-    return with_contents(v.example_inner, v.node_type(; feature=Int(i)))
-end
-Base.iterate(v::_TemplateFeatureVars, state::Int=1) = (v[state], state + 1)
-
 function DE.get_tree(ex::TemplateExpression{<:Any,<:Any,<:Any,E}) where {E}
     if has_params(ex)
         throw(
@@ -558,9 +549,17 @@ function DE.get_tree(ex::TemplateExpression{<:Any,<:Any,<:Any,E}) where {E}
         )
     end
     raw_contents = get_contents(ex)
+    total_num_features = sum(values(get_metadata(ex).structure.num_features))
     example_inner_ex = first(values(raw_contents))
     example_tree = get_contents(example_inner_ex)::AbstractExpressionNode
-    variable_expressions = _TemplateFeatureVars(example_inner_ex, typeof(example_tree))
+
+    variable_trees = [
+        DE.constructorof(typeof(example_tree))(; feature=i) for i in 1:total_num_features
+    ]
+    variable_expressions = [
+        with_contents(example_inner_ex, variable_tree) for variable_tree in variable_trees
+    ]
+
     return DE.get_tree(
         combine(get_metadata(ex).structure, raw_contents, variable_expressions)
     )
