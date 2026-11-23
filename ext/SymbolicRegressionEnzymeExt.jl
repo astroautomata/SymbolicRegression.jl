@@ -3,23 +3,38 @@ module SymbolicRegressionEnzymeExt
 using SymbolicRegression.LossFunctionsModule: eval_loss
 using SymbolicRegression.ConstantOptimizationModule:
     get_optimizable_parameters, set_optimizable_parameters!
+using SymbolicRegression.ComposableExpressionModule: ComposableExpression
+using SymbolicRegression.TemplateExpressionModule:
+    TemplateExpression, TemplateOptimizableRefs
+using DynamicExpressions: Expression, get_scalar_constants
 using ADTypes: AutoEnzyme
 using Enzyme: autodiff, Reverse, Active, Const, Duplicated, make_zero, remake_zero!
 
-import SymbolicRegression.ConstantOptimizationModule: Evaluator, GradEvaluator
+import SymbolicRegression.ConstantOptimizationModule:
+    Evaluator, GradEvaluator, extract_optimizable_gradient
+
+function extract_optimizable_gradient(grad::Expression, ::Expression, _refs)
+    return first(get_scalar_constants(grad))
+end
+function extract_optimizable_gradient(
+    grad::ComposableExpression, ::ComposableExpression, _refs
+)
+    return first(get_scalar_constants(grad))
+end
+function extract_optimizable_gradient(
+    grad::TemplateExpression, ::TemplateExpression, _refs::TemplateOptimizableRefs
+)
+    return first(get_scalar_constants(grad))
+end
 
 # We prepare a copy of the tree and all arrays
 function GradEvaluator(f::F, backend::AE) where {F<:Evaluator,AE<:AutoEnzyme}
     storage_tree = make_zero(f.tree)
-    _, storage_refs = get_optimizable_parameters(storage_tree, f.ctx.options)
     storage_dataset = make_zero(f.ctx.dataset)
     storage_options = make_zero(f.ctx.options)
     # TODO: It is super inefficient to deepcopy; how can we skip this
     return GradEvaluator(
-        f,
-        nothing,
-        backend,
-        (; storage_tree, storage_refs, storage_dataset, storage_options),
+        f, nothing, backend, (; storage_tree, storage_dataset, storage_options)
     )
 end
 
@@ -51,8 +66,8 @@ function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) wher
     end
 
     if G !== nothing
-        extracted_gradient = first(
-            get_optimizable_parameters(g.extra.storage_tree, g.e.ctx.options)
+        extracted_gradient = extract_optimizable_gradient(
+            g.extra.storage_tree, g.e.tree, g.e.refs
         )
         if length(extracted_gradient) != length(G)
             throw(

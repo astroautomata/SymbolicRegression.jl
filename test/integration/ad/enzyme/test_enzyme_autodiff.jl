@@ -41,6 +41,8 @@
     struct EnzymeSubsetCombiner <: Function end
     (::EnzymeSubsetCombiner)(fs, params, (x,)) = fs.f(x) * params.p[1]
     struct EnzymeSubsetRefs{R}
+        indices::Vector{Int}
+        full::Vector{Float64}
         inner::R
     end
     function SymbolicRegression.get_optimizable_parameters(
@@ -53,14 +55,21 @@
             ex,
             opts,
         )
-        return all_p[1:1], EnzymeSubsetRefs((all_p, all_refs))
+        indices = findall(>(2.5), all_p)
+        return all_p[indices], EnzymeSubsetRefs(indices, copy(all_p), all_refs)
     end
     function SymbolicRegression.set_optimizable_parameters!(
         ex::TemplateExpression, x, refs::EnzymeSubsetRefs
     )
-        full = copy(refs.inner[1])
-        full[1] = x[1]
-        return SymbolicRegression.set_optimizable_parameters!(ex, full, refs.inner[2])
+        full = copy(refs.full)
+        full[refs.indices] .= x
+        return SymbolicRegression.set_optimizable_parameters!(ex, full, refs.inner)
+    end
+    function SymbolicRegression.extract_optimizable_gradient(
+        grad::TemplateExpression, ex::TemplateExpression, refs::EnzymeSubsetRefs
+    )
+        full_grad = SymbolicRegression.extract_optimizable_gradient(grad, ex, refs.inner)
+        return full_grad[refs.indices]
     end
 
     st_subset = TemplateStructure{(:f,),(:p,)}(
