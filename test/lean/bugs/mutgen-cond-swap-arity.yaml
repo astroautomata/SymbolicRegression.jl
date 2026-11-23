@@ -60,7 +60,12 @@ cause: |-
 possible_fix: "Share the swap operator’s eligibility test with conditioning."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.MutateGen.swap_kept"
   theorem: "SymReg.MutateGen.swap_kept_refuted"

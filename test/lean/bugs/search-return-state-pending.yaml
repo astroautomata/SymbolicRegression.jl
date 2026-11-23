@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Search"
 files: ["src/SymbolicRegression.jl"]
-functions: ["_create_workers","_main_search_loop!","_format_output"]
+functions: ["_create_workers", "_main_search_loop!", "_format_output"]
 summary: |-
   A slow worker's population can be saved as a one-member placeholder and reinitialized on resume.
 likelihood: |-
@@ -72,7 +72,12 @@ cause: |-
 possible_fix: "Save initialized populations before launching evolution work."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'","gh search issues --repo astroautomata/PySR 'max_evals'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
 lean:
   property: "SymReg.Search.returned_population_sizes"
   theorem: "SymReg.Search.returned_population_sizes_refuted"

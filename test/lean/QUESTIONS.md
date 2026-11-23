@@ -157,9 +157,10 @@ DE's `JF` models exact rational finite arithmetic plus NaN and infinities, witho
 `skip_mutation_failures = false`, the two parents are copied with `copy(member)`, which keeps
 their `birth` (`src/PopMember.jl:170-179`). A failed mutation instead inserts
 `create_child(...)`, which gets a new birth (`src/Mutate.jl:475-487`).
+
 - Reading A: deliberate; the copies stand for the unchanged parents, so they keep their age.
 - Reading B: oversight; inserted copies should count as newborn, as failed mutations do.
-Modelled: as written (copies keep the parents' births). No property depends on the choice.
+  Modelled: as written (copies keep the parents' births). No property depends on the choice.
 
 ## Q14. `best_seen` without mutation middleware
 
@@ -169,26 +170,29 @@ present; without middleware they reach `best_seen` only through the scan of `pop
 after the cycle. With `tournament_selection_n = 1` (`n_evol_cycles = pop.n`) and crossovers
 (two replacements per pass), an accepted mutation child can be replaced again before that
 scan and never be seen by `best_seen`.
+
 - Reading A: acceptable; `best_seen` is a per-cycle summary of survivors plus crossover children.
 - Reading B: `best_seen` should see every accepted child, as it does with middleware.
-Modelled: as written; no property registered on this point.
+  Modelled: as written; no property registered on this point.
 
 ## Q15. Unvalidated `tournament_selection_p`
 
 `src/Population.jl:224-234`, `src/Options.jl:864`. `tournament_selection_p` is not validated.
 For `p = 0` every weight is 0 and `StatsBase.sample` returns place 1 (always the fittest); for
 `p > 1` some weights are negative.
+
 - Reading A: callers must pass `0 < p <= 1`.
 - Reading B: `Options` should reject other values.
-Modelled: properties assume `0 < p <= 1`.
+  Modelled: properties assume `0 < p <= 1`.
 
 ## Q16. Empty populations still evaluate a first member
 
 `src/Population.jl:77-98`. `Population(dataset; population_size=0)` still builds and evaluates
 `first_member`, then discards it (empty comprehension).
+
 - Reading A: harmless; `population_size >= 1` in practice.
 - Reading B: wasted evaluation and RNG draws.
-Modelled: as written (`pop-ctor-size` holds for every size, including 0).
+  Modelled: as written (`pop-ctor-size` holds for every size, including 0).
 
 ## Q17. Checks skipped by the leaf early return of `condition_mutation_weights!`
 
@@ -569,21 +573,27 @@ table target the `hcat` of a `NamedTuple` with vectors is not modelled (`predict
 `none` there).
 
 ## Q46. Custom complexity functions on templates
+
 `src/TemplateExpression.jl:707-716`. Reading A: a function-valued `complexity_mapping` should receive the whole `TemplateExpression` (as `src/Complexity.jl:20-27` does for other expressions). Reading B: it is meant to be applied to each inner expression and summed. Modelled: the code (B); entry `tmpl-complexity-custom` is refuted under A.
 
 ## Q47. Crossover key choice
+
 `src/TemplateExpression.jl:1003-1004`. Reading A: both parents should cross the same key, so subtrees stay within one function's arity. Reading B: independent keys are intended and invalid children are left to `check_constraints`. Modelled: the code (independent keys); `tmpl-crossover-valid` is refuted under A, `tmpl-crossover-same-key` proves the same-key case.
 
 ## Q48. Inner variable names after `embed_metadata`
+
 `src/ExpressionBuilder.jl:105-109`, `src/TemplateExpression.jl:605`. Reading A: `embed_metadata` should match `create_expression(..., Val(true))`, including inner expressions' `variable_names`. Reading B: inner expressions should never carry dataset names (their features are function arguments), so `create_expression` is the odd one. Modelled: the code; `tmpl-embed-create` refuted.
 
 ## Q49. Parameter vectors passed to the constructor are aliased
+
 `src/TemplateExpression.jl:381-385`. `ParamVector(convert(Vector{T}, p))` keeps the caller's vector, so `set_scalar_constants!` on the template mutates it (observed: caller vector became `[42.0, 43.0]`), while `parse_expression` copies (line 1382). Reading A: aliasing is intended (Julia constructor convention). Reading B: the constructor should copy. Modelled: values only (no entry depends on it).
 
 ## Q50. ParametricExpression support
+
 `src/ExpressionBuilder.jl:84-93`. SR has no ParametricExpression methods; with `expression_type=ParametricExpression` and `expression_options=(; parameters=P, ...)` every created expression shares `P`. Reading A: unsupported since the move to template parameters. Reading B: still supported through the generic builder. Modelled: the generic builder; `tmpl-create-independent` refuted.
 
 ## Q51. Zero-length template parameters
+
 `src/TemplateExpression.jl:1093`. `num_parameters=(p=0,)` is accepted by `TemplateStructure` and the constructor, but `mutate_constant` then throws. Reading A: zero lengths should be rejected at construction. Reading B: `mutate_constant` should skip empty vectors. Modelled: the code; `tmpl-mutconst-total` refuted.
 
 ## Q52. Counting the standalone baseline evaluation
@@ -776,7 +786,7 @@ Modelled Reading A, preserving the actual mod call. The source comment's stated 
 
 Transcendental values, Base power/modulo, SpecialFunctions.gamma, promoted scalar conversion and generic dispatch results are external exception-valued callbacks. JF's finite values are exact rationals and omit rounding, overflow and signed zero. Quantity dimensions and Dual derivatives stay in the external services; scalar guards and specialized-vs-generic dispatch are covered. For dimensionless quantities, 2^2=4, 0^-2=NaN and (-2)^0.5=NaN. Dimensioned examples give safe_pow(4m,0.5)=2m^(1/2), safe_pow(-4m,0.5)=NaN and safe_pow(1m,1m) raises DimensionError, matching test/integration/ext/dynamicquantities_units/test_units.jl:183-187. No extra Julia dependency was needed. The Units slice covers the WildcardQuantity dimensional-analysis path. The JF scalar model leaves dimensioned DynamicQuantities runtime behaviour external.
 
-Documentation check: docs/src/*.md contains no operator-specific relu/gamma/safe_* definitions or NaN promises; Operators.jl has no operator docstrings. Source inequalities and formulas are therefore the modelled reading, with ambiguous pole/masking conventions listed above.
+Documentation check: docs/src/_.md contains no operator-specific relu/gamma/safe__ definitions or NaN promises; Operators.jl has no operator docstrings. Source inequalities and formulas are therefore the modelled reading, with ambiguous pole/masking conventions listed above.
 
 ## Q69. Dataset weights shape omitted by configuration validation
 
@@ -817,6 +827,7 @@ Modelled as written. `pre-invalid-mode-diagnostic` refutes Reading A with `do_pr
 ## Infra slice: model boundaries and source coverage
 
 **Boundaries and reuse.** - All six requested Julia source files have entries. No whole Julia file is already fully covered by another slice.
+
 - `score_func` in `src/deprecates.jl:31-39` is already completely covered by `loss-score-deprecated`, using `SymReg.Loss.scoreFunc` and `SymReg.Loss.score_deprecated_holds`. Infra imports the existing definitions rather than reproducing its loss model.
 - Deprecated Options keyword renaming belongs to existing `opts-alias-precedence`, `opts-alias-autodiff-ignored`, `opts-population-alias-precedence`, `opts-return-state-order`, and `opts-weight-creation`. Infra imports `SymReg.Options.Properties`; the aliases are not recreated.
 - `EquationSearch(...;multithreaded=...)` preserves the deprecated keyword unchanged. `equation_search` rejects non-nothing values at `src/SymbolicRegression.jl:616-620`. It does not map a Boolean to a parallelism symbol. This is deliberate removal behavior, not an Infra forwarding bug.
@@ -867,15 +878,18 @@ Modelled as Reading A, matching the source comment. The theorem quantifies over 
 ## CrossMut slice: model boundaries and source coverage
 
 **Existing coverage reused.** - `src/MutationFunctions.jl`: crossover_trees is already `crossover-swap` (Crossover and Crossover* heap models). CrossMut models only dispatch and generation, leaving subtree swapping to that entry. Remaining mutation functions remain the existing Mutations slice.
+
 - `src/Mutate.jl`: mutate! interface and handler behavior already covered by `mutgen-mut-tree`, `mutgen-mut-add-node`, `mutgen-mut-do-nothing`, `mutgen-mut-unknown`, `mutgen-bs-success`, `mutgen-bs-restore` and SimpCons's simplification handler entries. No duplicate engine/handler model is introduced.
 - `src/MutationWeights.jl`: full conversion, field ordering and keyword defaults already `mutgen-weights-fields` and `mutgen-weights-kw`; CrossMut imports those definitions. New proofs add completeness and uniqueness across builtin/default/weight-field tables.
 - No entire assigned Julia file is skipped as already covered: Crossover.jl, Crossovers.jl, Mutations.jl and Utils.jl all receive entries.
 
 **Files without executable properties.** - `src/Core.jl:1-130` only declares an empty create_expression generic, includes modules, and imports bindings. Its include/import dependency graph is statically inspectable, but has no additional algorithm or method body to prove. Implementations of imported functions belong to their owning slices. No fake universally quantified input was added to a constant include-order fact.
+
 - `src/ProgramConstants.jl:1-9` only defines TraceType=Dict{String,Any}, MaybeTrace=Union{Nothing,TraceType}, DATA_TYPE=Any and LOSS_TYPE=Real. Those four aliases are statically checkable Julia declarations; they have no executable behavior or input-quantified correctness property. No registry entry is fabricated for them.
 - The annotated-string aliases in `src/Utils.jl:254-264` choose the Base types on Julia 1.12, already the environment used by every reproducer. The @ignore macro is covered as a function of its arbitrary syntax arguments by util-ignore-syntax.
 
 **Model scope.** - Reuses HofMig.Member and HofMig.poissonSample/poissonLoop/MigrationRuntime, MutateGen.Kind/defaultMutations/builtinKinds/fieldNames/documentedKind/mutationFromSymbol and sampleMutationR, plus DE JF/Jl/RNG. Mutable callback effects are threaded through arbitrary H for crossover constraint and scoring calls.
+
 - Crossovers use opaque expression identities; the actual tree operation is the existing heap-based crossover-swap theorem. Default PopMember construction stores caller-supplied births and references independently. Custom create_child implementations remain arbitrary external callbacks, as their user code is outside the assigned files.
 - Counters use exact Rat as in the existing slices. General Float64 accumulation rounding, signed zero, integer overflow and non-isbits MutableTuple pointer layouts are excluded explicitly. The Poisson refutation retains Float64 exponential rounding through an explicit runtime input confirmed in Julia.
 - String proofs operate on decoded Unicode character sequences. Chunk width is n=width+1, so positive chunk sizes include every legal positive input. Decimal subscript formatting operates on Julia digits' nonnegative decimal digit output.
@@ -884,6 +898,7 @@ Modelled as Reading A, matching the source comment. The theorem quantifies over 
 ## Q77. `^` on dimensioned bases with integer exponents (src/DimensionalAnalysis.jl:92-103)
 
 `Base.:^(::WildcardQuantity, ::WildcardQuantity)` accepts only a dimensionless-or-wildcard base and power, so `x1^2.0` with `x1` in metres is a violation even though m^2 is physically meaningful for an integer power.
+
 - Reading A: deliberate; the comment "Require both base and power to be dimensionless" states the rule (use `square`/`cube` for dimensioned powers).
 - Reading B: integer constant powers of a dimensioned base should yield the base's dimensions to that power.
 - Modelled: Reading A (`specRule .pow` requires both dimensionless), because the comment states it explicitly and the tests list `1.0 * (x1^(Node(; val=3.2)))` as bad.
@@ -891,6 +906,7 @@ Modelled as Reading A, matching the source comment. The theorem quantifies over 
 ## Q78. Value dependence of the dimensional check (src/DimensionalAnalysis.jl:142-145)
 
 `degn_eval` marks a node as violating whenever any argument value on the first data row (`X[:, 1]`, features scaled by their unit factors, e.g. km -> 1000 m) is nonfinite. For `x1 * inv(x1)` with `X[1,1] = 0`, `violates_dimensional_constraints(inv(x1)*x1, ...)` returns `true`.
+
 - Reading A: intended; a nonfinite value means the expression is invalid anyway, and normal evaluation also fails on that row.
 - Reading B: the dimensional check should depend only on units.
 - Modelled: as written (Reading A); recorded as the proven behaviour `units-degn-guard`, and `units-complete-arith` assumes finite first-row subexpressions.
@@ -898,6 +914,7 @@ Modelled as Reading A, matching the source comment. The theorem quantifies over 
 ## Q79. `safe_call` cache inside `@maybe_return_call` (src/Utils.jl:234-251, src/DimensionalAnalysis.jl:20-32)
 
 `safe_call` caches per `(F, argument types)` whether the first call threw `MethodError`. After a `Good` entry a later `MethodError` is no longer caught (and `@maybe_return_call` rethrows it); after a `Bad` entry the method is never called again.
+
 - Reading A: methods are assumed to depend on types only, so the cache is transparent.
 - Reading B: a user operator whose `MethodError` depends on values would make the check history-dependent or throw.
 - Modelled: uncached `safe_call` (Reading A); exact for every built-in operator, whose method applicability depends only on argument types.

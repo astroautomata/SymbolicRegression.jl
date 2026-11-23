@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-exception"
 area: "Mutations"
 files: ["src/MutationFunctions.jl"]
-functions: ["append_random_op","insert_random_op","prepend_random_op"]
+functions: ["append_random_op", "insert_random_op", "prepend_random_op"]
 summary: |-
   At zero the draw misses every interval and can fall into an empty last arity.
 likelihood: |-
@@ -67,7 +67,12 @@ cause: |-
 possible_fix: "Use half-open cumulative intervals and skip degrees with zero operators."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Mutations.pick_degree_has_operator"
   theorem: "SymReg.Mutations.pick_degree_has_operator_refuted"

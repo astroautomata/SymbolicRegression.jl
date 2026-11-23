@@ -4,7 +4,7 @@ priority: "P3"
 kind: "wrong-result"
 area: "DynamicExpressions interface"
 files: ["src/InterfaceDynamicExpressions.jl"]
-functions: ["print_tree","string_tree"]
+functions: ["print_tree", "string_tree"]
 summary: |-
   `print_tree(pretty=true)` bypasses SR's pretty names.
 likelihood: |-
@@ -46,7 +46,12 @@ cause: |-
 possible_fix: "Print using the SR string_tree wrapper."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
 lean:
   property: "SymReg.Interface.printStringConsistency"
   theorem: "SymReg.Interface.printStringConsistency_refuted"

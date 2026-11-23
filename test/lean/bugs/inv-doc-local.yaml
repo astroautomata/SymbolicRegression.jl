@@ -38,7 +38,12 @@ cause: |-
 possible_fix: "Use an example that the implementation actually supports."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Backsolve.docLocalInverse"
   theorem: "SymReg.Backsolve.docLocalInverse_refuted"

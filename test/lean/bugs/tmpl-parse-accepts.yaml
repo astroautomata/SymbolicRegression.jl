@@ -54,7 +54,12 @@ cause: |-
 possible_fix: "Pass a common scalar type to each parser or promote before constructing the template."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
 lean:
   property: "SymReg.Templates.parseAccepts"
   theorem: "SymReg.Templates.parseAccepts_refuted"

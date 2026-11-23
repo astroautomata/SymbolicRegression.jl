@@ -3,8 +3,8 @@ title: "Backsolve accepts a row whose original division is undefined"
 priority: "P2"
 kind: "wrong-result"
 area: "Backsolve"
-files: ["src/InverseFunctions.jl","src/EvaluateInverse.jl"]
-functions: ["eval_inverse_tree_array_masked","dispatch_degn_masked"]
+files: ["src/InverseFunctions.jl", "src/EvaluateInverse.jl"]
+functions: ["eval_inverse_tree_array_masked", "dispatch_degn_masked"]
 summary: |-
   Inverting division by zero can produce a finite value that passes the validity mask but cannot reproduce the target.
 likelihood: |-
@@ -49,7 +49,12 @@ cause: |-
 possible_fix: "Reject zero divisors while inverting division."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Backsolve.maskSound"
   theorem: "SymReg.Backsolve.maskSound_refuted"

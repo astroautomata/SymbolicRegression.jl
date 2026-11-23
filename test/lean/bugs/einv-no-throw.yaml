@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-exception"
 area: "Backsolve"
 files: ["src/EvaluateInverse.jl"]
-functions: ["eval_inverse_tree_array_masked","degn_invert!"]
+functions: ["eval_inverse_tree_array_masked", "degn_invert!"]
 summary: |-
   A later inverse can throw on a nonfinite row that an earlier step already marked invalid.
 likelihood: |-
@@ -53,7 +53,12 @@ cause: |-
 possible_fix: "Skip inverse application on rows with a false mask."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Backsolve.maskedNoThrow"
   theorem: "SymReg.Backsolve.maskedNoThrow_refuted"

@@ -41,7 +41,10 @@ cause: |-
 possible_fix: ""
 duplicates:
   issues: []
-  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+  queries:
+    [
+      "Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches",
+    ]
 lean:
   property: "SymReg.MLJ.cb_log_nan"
   theorem: "SymReg.MLJ.cb_log_nan_refuted"

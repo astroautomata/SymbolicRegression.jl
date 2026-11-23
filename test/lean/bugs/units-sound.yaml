@@ -4,7 +4,8 @@ priority: P3
 kind: wrong-result
 area: Dimensional analysis
 files: [src/DimensionalAnalysis.jl]
-functions: [violates_dimensional_constraints, violates_dimensional_constraints_dispatch]
+functions:
+  [violates_dimensional_constraints, violates_dimensional_constraints_dispatch]
 summary: |
   A GraphNode that divides one constant object by itself is marked as a wildcard
   and accepted for a length target, although a single unit assignment to that

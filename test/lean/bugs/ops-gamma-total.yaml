@@ -52,7 +52,12 @@ cause: |-
 possible_fix: "Check nonpositive integer poles before calling SpecialFunctions.gamma."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'gamma'","gh search issues --repo astroautomata/PySR 'gamma'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'gamma'",
+      "gh search issues --repo astroautomata/PySR 'gamma'",
+    ]
 lean:
   property: "SymReg.Operators.gammaTotal"
   theorem: "SymReg.Operators.gammaTotal_refuted"

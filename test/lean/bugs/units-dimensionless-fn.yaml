@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Units"
 files: ["src/DimensionalAnalysis.jl"]
-functions: ["degn_eval","@maybe_return_call"]
+functions: ["degn_eval", "@maybe_return_call"]
 summary: |-
   Trig, exp and log on explicitly dimensionless columns can be marked dimensionally invalid.
 likelihood: |-
@@ -49,7 +49,12 @@ cause: |-
 possible_fix: "Add a scalar fallback for operands whose dimension is zero."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'","gh search issues --repo astroautomata/PySR 'dimensionless'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
 lean:
   property: "SymReg.Units.units_dimensionless_fn"
   theorem: "SymReg.Units.units_dimensionless_fn_refuted"

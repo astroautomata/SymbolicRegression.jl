@@ -809,7 +809,7 @@ mutual
       | symbol s => simp [getSymbArgs, syntaxLeaves, firstSyntaxLeaf, bind, Except.bind, pure, Except.pure]
       | other => simp [getSymbArgs, getSymb, syntaxLeaves, firstSyntaxLeaf, bind, Except.bind]
       | expr inner =>
-        simp only [syntaxLeaves] 
+        simp only [syntaxLeaves]
         rw [← syntaxArgsModel inner, ← syntaxArgsModel xs]
         simp [getSymbArgs, getSymb]
 end

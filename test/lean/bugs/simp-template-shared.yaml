@@ -48,7 +48,12 @@ cause: |-
 possible_fix: "Separate storage before applying a mutating rewrite to an aliased tree."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
 lean:
   property: "SymReg.SimpCons.templateDenotation"
   theorem: "SymReg.SimpCons.templateDenotation_refuted"

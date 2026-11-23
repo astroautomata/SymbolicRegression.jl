@@ -3,8 +3,8 @@ title: "Unit exponent rounding rejects equivalent expressions"
 priority: "P2"
 kind: "wrong-result"
 area: "Units"
-files: ["src/DimensionalAnalysis.jl","src/Dataset.jl"]
-functions: ["sqrt","cbrt","safe_sqrt","violates_dimensional_constraints"]
+files: ["src/DimensionalAnalysis.jl", "src/Dataset.jl"]
+functions: ["sqrt", "cbrt", "safe_sqrt", "violates_dimensional_constraints"]
 summary: |-
   Fixed-denominator unit exponents round independently, so algebraically equivalent root products can compare unequal.
 likelihood: |-
@@ -50,7 +50,12 @@ cause: |-
 possible_fix: "Use exact or suitably checked unit exponents in the dimensional analysis path."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'","gh search issues --repo astroautomata/PySR 'dimensionless'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
 lean:
   property: "SymReg.Units.units_root_rounding"
   theorem: "SymReg.Units.units_root_rounding_refuted"

@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-exception"
 area: "MLJ"
 files: ["src/MLJInterface.jl"]
-functions: ["_predict","predict"]
+functions: ["_predict", "predict"]
 summary: |-
   A fitted feature table with an ordinary `data` or `idx` column can be rejected as a malformed selector.
 likelihood: |-
@@ -57,7 +57,12 @@ cause: |-
 possible_fix: "Separate array selection requests from arbitrary feature-table column names."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'","gh search issues --repo astroautomata/PySR 'warm_start'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
 lean:
   property: "SymReg.MLJ.pred_feature_table"
   theorem: "SymReg.MLJ.pred_feature_table_refuted"

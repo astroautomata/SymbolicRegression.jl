@@ -67,7 +67,12 @@ cause: |-
 possible_fix: "Compare penalized costs in a representation that avoids overflow, including zero-cost members."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'adaptive_parsimony_scaling'","gh search issues --repo astroautomata/PySR 'adaptive_parsimony_scaling'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'adaptive_parsimony_scaling'",
+      "gh search issues --repo astroautomata/PySR 'adaptive_parsimony_scaling'",
+    ]
 lean:
   property: "SymReg.Plugins.tournament_finite"
   theorem: "SymReg.Plugins.tournament_finite_refuted"

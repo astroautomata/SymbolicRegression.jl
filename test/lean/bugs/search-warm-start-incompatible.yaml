@@ -4,7 +4,8 @@ priority: P1
 kind: wrong-result
 area: Search
 files: [src/SymbolicRegression.jl, src/OptionsStruct.jl]
-functions: [equation_search, _initialize_search!, check_warm_start_compatibility]
+functions:
+  [equation_search, _initialize_search!, check_warm_start_compatibility]
 summary: |
   Reusing a returned state after reducing maxsize can silently return an equation
   beyond the new limit. A saved perfect equation of complexity 5 still appears on

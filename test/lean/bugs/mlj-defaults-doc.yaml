@@ -4,7 +4,7 @@ priority: "P3"
 kind: "documentation"
 area: "MLJ"
 files: ["src/MLJInterface.jl"]
-functions: ["modelexpr","tag_with_docstring"]
+functions: ["modelexpr", "tag_with_docstring"]
 summary: |-
   The documentation lists ten iterations while the constructors default to 100.
 likelihood: |-
@@ -45,7 +45,12 @@ cause: |-
 possible_fix: "Update the documented default."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'","gh search issues --repo astroautomata/PySR 'warm_start'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
 lean:
   property: "SymReg.MLJ.defaults_doc"
   theorem: "SymReg.MLJ.defaults_doc_refuted"

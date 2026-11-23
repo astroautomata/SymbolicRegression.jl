@@ -3,8 +3,8 @@ title: "Unit checks reject negation and ReLU of dimensioned values"
 priority: "P1"
 kind: "wrong-result"
 area: "Units"
-files: ["src/DimensionalAnalysis.jl","src/Operators.jl"]
-functions: ["degn_eval","@maybe_return_call"]
+files: ["src/DimensionalAnalysis.jl", "src/Operators.jl"]
+functions: ["degn_eval", "@maybe_return_call"]
 summary: |-
   The quantity wrapper lacks unary minus and zero, so valid negation and rectification receive a penalty.
 likelihood: |-
@@ -53,7 +53,12 @@ cause: |-
 possible_fix: "Implement unary minus and a dimension-preserving zero for WildcardQuantity."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'","gh search issues --repo astroautomata/PySR 'dimensionless'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
 lean:
   property: "SymReg.Units.units_neg_preserve"
   theorem: "SymReg.Units.units_neg_preserve_refuted"

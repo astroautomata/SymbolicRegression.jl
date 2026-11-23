@@ -58,7 +58,10 @@ cause: |
 possible_fix: "Retain the last positive entry as the fallback when the total is finite."
 duplicates:
   issues: []
-  queries: ['site:github.com/MilesCranmer/SymbolicRegression.jl "_sample_mutation" "subnormal" OR "zero weight"']
+  queries:
+    [
+      'site:github.com/MilesCranmer/SymbolicRegression.jl "_sample_mutation" "subnormal" OR "zero weight"',
+    ]
 lean:
   property: SymReg.MutateGen.ng_positive
   theorem: SymReg.MutateGen.ng_positive_refuted

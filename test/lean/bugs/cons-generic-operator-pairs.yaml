@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-exception"
 area: "Constraints and simplification"
 files: ["src/Options.jl"]
-functions: ["build_constraints","_build_constraints"]
+functions: ["build_constraints", "_build_constraints"]
 summary: |-
   `Options` forwards operator-keyed constraints to a builder that indexes its input by arity.
 likelihood: |-
@@ -44,7 +44,12 @@ cause: |-
 possible_fix: "Normalize keyed options before indexing by degree."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
 lean:
   property: "SymReg.SimpCons.genericOperatorPairs"
   theorem: "SymReg.SimpCons.genericOperatorPairs_refuted"

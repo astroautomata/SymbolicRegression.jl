@@ -3,8 +3,8 @@ title: "Ranked tournament can return the same candidate twice"
 priority: "P1"
 kind: "wrong-result"
 area: "Population"
-files: ["src/Population.jl","src/Utils.jl"]
-functions: ["_best_of_sample","bottomk_fast","_bottomk_dispatch","_bottomk!"]
+files: ["src/Population.jl", "src/Utils.jl"]
+functions: ["_best_of_sample", "bottomk_fast", "_bottomk_dispatch", "_bottomk!"]
 summary: |-
   An invalid member's `Inf` cost never displaces a sentinel, so a repeated index can win the wrong rank. An `Inf` entry leaves a fabricated duplicate index in the result.
 likelihood: |-
@@ -62,7 +62,12 @@ cause: |-
 possible_fix: "Track occupied slots explicitly and use a defined order for nonfinite costs."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Population.tournament_rank"
   theorem: "SymReg.Population.tournament_rank_refuted"

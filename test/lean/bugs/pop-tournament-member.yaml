@@ -28,7 +28,10 @@ cause: |-
 possible_fix: "Give each active tournament its own scratch buffer while a multiplier can reenter tournament selection."
 duplicates:
   issues: []
-  queries: ["gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament scratch reentrant'"]
+  queries:
+    [
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament scratch reentrant'",
+    ]
 lean:
   property: "SymReg.Population.tournament_member_live"
   theorem: "SymReg.Population.tournament_member_live_refuted"

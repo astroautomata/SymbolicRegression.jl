@@ -60,7 +60,12 @@ cause: |-
 possible_fix: "Call set_optimizable_parameters! in the Enzyme evaluator."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'num_parameters'","gh search issues --repo astroautomata/PySR 'num_parameters'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'num_parameters'",
+      "gh search issues --repo astroautomata/PySR 'num_parameters'",
+    ]
 lean:
   property: "SymReg.Ext.enzymeOptimizableHooks"
   theorem: "SymReg.Ext.enzymeOptimizableHooks_refuted"

@@ -4,7 +4,8 @@ priority: P3
 kind: wrong-result
 area: Backsolve
 files: [src/Backsolve.jl, src/Mutate.jl]
-functions: [fit_sparse_expression, weighted_sum_costs, combine_trees_weighted_sum]
+functions:
+  [fit_sparse_expression, weighted_sum_costs, combine_trees_weighted_sum]
 summary: |
   Fitting a target equal to a feature returns nothing with max_complexity=1,
   although the feature itself is a library term of complexity 1 and fits all
@@ -60,7 +61,10 @@ cause: |
 possible_fix: "Try exact unweighted basis terms at their actual complexity before the greedy weighted fit."
 duplicates:
   issues: []
-  queries: ["SymbolicRegression.jl backsolve max_complexity weighted_sum_costs unit coefficient"]
+  queries:
+    [
+      "SymbolicRegression.jl backsolve max_complexity weighted_sum_costs unit coefficient",
+    ]
 lean:
   property: SymReg.Backsolve.unit_fit_within_budget
   theorem: SymReg.Backsolve.unit_fit_within_budget_refuted

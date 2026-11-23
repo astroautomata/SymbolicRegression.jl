@@ -46,8 +46,13 @@ cause: |-
   src/SingleIteration.jl:94-109: Simplifying an unbatched member invalidates complexity without updating its parsimony-adjusted cost.
 possible_fix: "Refresh cost after simplification using the updated size and validated loss."
 duplicates:
-  issues: [{"number":673,"relation":"related","state":"closed"}]
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+  issues: [{ "number": 673, "relation": "related", "state": "closed" }]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
 lean:
   property: "SymReg.SimpCons.populationCostFresh"
   theorem: "SymReg.SimpCons.populationCostFresh_refuted"

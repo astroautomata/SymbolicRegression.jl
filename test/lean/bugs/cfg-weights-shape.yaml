@@ -41,7 +41,12 @@ cause: |-
 possible_fix: "Compare weight length with sample count during dataset validation."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'","gh search issues --repo astroautomata/PySR 'batching'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'",
+      "gh search issues --repo astroautomata/PySR 'batching'",
+    ]
 lean:
   property: "SymReg.Infra.datasetWeightsShape"
   theorem: "SymReg.Infra.datasetWeightsShape_refuted"

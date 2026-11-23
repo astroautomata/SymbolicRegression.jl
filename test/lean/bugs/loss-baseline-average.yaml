@@ -72,7 +72,12 @@ cause: |-
 possible_fix: "Construct the baseline using the numeric target mean when the expression type supports it."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'","gh search issues --repo astroautomata/PySR 'baseline loss'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'",
+      "gh search issues --repo astroautomata/PySR 'baseline loss'",
+    ]
 lean:
   property: "SymReg.Loss.baseline_average"
   theorem: "SymReg.Loss.baseline_average_refuted"

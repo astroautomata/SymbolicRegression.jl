@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Search"
 files: ["src/SymbolicRegression.jl"]
-functions: ["_initialize_search!","_warmup_search!","_preserve_loaded_state!"]
+functions: ["_initialize_search!", "_warmup_search!", "_preserve_loaded_state!"]
 summary: |-
   Initialization reports evaluations which warmup discards, understating work before budget checks.
 likelihood: |-
@@ -55,8 +55,13 @@ cause: |-
   src/SymbolicRegression.jl:970,998-1005,1033-1039: Initialization reports evaluations which warmup discards, understating work before budget checks.
 possible_fix: "Accumulate reports from initialization before the first budget check."
 duplicates:
-  issues: [{"number":74,"relation":"related","state":"closed"}]
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'","gh search issues --repo astroautomata/PySR 'max_evals'"]
+  issues: [{ "number": 74, "relation": "related", "state": "closed" }]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
 lean:
   property: "SymReg.Search.initialization_evaluations_counted"
   theorem: "SymReg.Search.initialization_evaluations_counted_refuted"

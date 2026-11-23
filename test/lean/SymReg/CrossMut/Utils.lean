@@ -939,4 +939,3 @@ theorem ignoredSyntax_holds : ignoredSyntax := by
   rfl
 
 end SymReg.CrossMut
-

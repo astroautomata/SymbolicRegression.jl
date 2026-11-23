@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-exception"
 area: "Infrastructure"
 files: ["src/ProgressBars.jl"]
-functions: ["format_for_meter","newlines_to_spaces"]
+functions: ["format_for_meter", "newlines_to_spaces"]
 summary: |-
   A positive width smaller than the label margin becomes a negative chunk width.
 likelihood: |-
@@ -41,7 +41,12 @@ cause: |-
 possible_fix: "Clamp the content width or move the label to its own line."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'","gh search issues --repo astroautomata/PySR 'batching'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'",
+      "gh search issues --repo astroautomata/PySR 'batching'",
+    ]
 lean:
   property: "SymReg.Infra.progressNarrowMultiline"
   theorem: "SymReg.Infra.progressNarrowMultiline_refuted"

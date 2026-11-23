@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Mutations"
 files: ["src/MutationFunctions.jl"]
-functions: ["randomly_rotate_tree!","_valid_rotation_root"]
+functions: ["randomly_rotate_tree!", "_valid_rotation_root"]
 summary: |-
   Rotating a shared pivot can introduce a back edge, breaking the acyclic graph invariant used by tree traversals.
 likelihood: |-
@@ -60,7 +60,12 @@ cause: |-
 possible_fix: "Reject rewrites that leave a second route to the pivot before adding a back edge."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Mutations.rotate_graph_acyclic"
   theorem: "SymReg.Mutations.rotate_graph_acyclic_refuted"

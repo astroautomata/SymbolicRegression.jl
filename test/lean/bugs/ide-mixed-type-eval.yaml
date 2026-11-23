@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-exception"
 area: "DynamicExpressions interface"
 files: ["src/InterfaceDynamicExpressions.jl"]
-functions: ["eval_tree_array","expected_array_type"]
+functions: ["eval_tree_array", "expected_array_type"]
 summary: |-
   DE promotes mixed data/tree inputs, then SR asserts an incompatible result vector type.
 likelihood: |-
@@ -50,7 +50,12 @@ cause: |-
 possible_fix: "Assert the promoted result type instead of the input matrix element type."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
 lean:
   property: "SymReg.Interface.mixedTypeForwarding"
   theorem: "SymReg.Interface.mixedTypeForwarding_refuted"

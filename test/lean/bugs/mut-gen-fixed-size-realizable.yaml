@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-result"
 area: "Mutations"
 files: ["src/MutationFunctions.jl"]
-functions: ["gen_random_tree_fixed_size","_arity_picker"]
+functions: ["gen_random_tree_fixed_size", "_arity_picker"]
 summary: |-
   Greedy growth can leave an unreachable remainder even when the requested size was achievable.
 likelihood: |-
@@ -45,7 +45,12 @@ cause: |-
 possible_fix: "Pick only arities that leave a feasible remainder, or retry a dead end."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.Mutations.gen_fixed_size_realizable"
   theorem: "SymReg.Mutations.gen_fixed_size_realizable_refuted"

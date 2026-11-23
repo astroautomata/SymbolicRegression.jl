@@ -4,7 +4,7 @@ priority: "P3"
 kind: "documentation"
 area: "MLJ"
 files: ["src/MLJInterface.jl"]
-functions: ["modelexpr","SRRegressor"]
+functions: ["modelexpr", "SRRegressor"]
 summary: |-
   The MLJ field is Symbol-only but its documentation also accepts strings; PySR has its own conversion.
 likelihood: |-
@@ -47,7 +47,12 @@ cause: |-
 possible_fix: "Match the docstring to the accepted type if strings are intentionally unsupported."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'","gh search issues --repo astroautomata/PySR 'warm_start'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
 lean:
   property: "SymReg.MLJ.parallelism_string"
   theorem: "SymReg.MLJ.parallelism_string_refuted"

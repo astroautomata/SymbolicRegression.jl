@@ -37,7 +37,12 @@ cause: |-
 possible_fix: "Use a subtype check for the numeric element type."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'","gh search issues --repo astroautomata/PySR 'baseline loss'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'",
+      "gh search issues --repo astroautomata/PySR 'baseline loss'",
+    ]
 lean:
   property: "SymReg.Loss.dataset_average"
   theorem: "SymReg.Loss.dataset_average_refuted"

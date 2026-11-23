@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Constant optimization"
 files: ["src/ConstantOptimization.jl"]
-functions: ["_optimize_constants_inner","optimize_constants"]
+functions: ["_optimize_constants_inner", "optimize_constants"]
 summary: |-
   Every optimizer invocation runs an uncounted baseline objective; the missing charge should include the batch fraction.
 likelihood: |-
@@ -65,7 +65,12 @@ cause: |-
 possible_fix: "Include the initial objective call in num_evals."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'","gh search issues --repo astroautomata/PySR 'max_evals'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
 lean:
   property: "SymReg.ConstOpt.evalAccounting"
   theorem: "SymReg.ConstOpt.evalAccounting_refuted"

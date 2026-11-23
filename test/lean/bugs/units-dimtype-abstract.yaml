@@ -41,7 +41,12 @@ cause: |-
 possible_fix: "Inspect an element when the typed path cannot recover a concrete dimension type."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'","gh search issues --repo astroautomata/PySR 'dimensionless'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'dimensionless'",
+      "gh search issues --repo astroautomata/PySR 'dimensionless'",
+    ]
 lean:
   property: "SymReg.Units.units_dimtype_abstract"
   theorem: "SymReg.Units.units_dimtype_abstract_refuted"

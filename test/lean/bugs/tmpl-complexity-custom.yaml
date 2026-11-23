@@ -51,7 +51,12 @@ cause: |-
 possible_fix: "Call the callback for the whole template before falling back to sum of inner sizes."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
 lean:
   property: "SymReg.Templates.complexityCustom"
   theorem: "SymReg.Templates.complexityCustom_refuted"

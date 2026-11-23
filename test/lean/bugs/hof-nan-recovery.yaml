@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Hall of fame"
 files: ["src/HallOfFame.jl"]
-functions: ["update_hall_of_fame!","_update_hall_of_fame_unchecked!"]
+functions: ["update_hall_of_fame!", "_update_hall_of_fame_unchecked!"]
 summary: |-
   A NaN cost admitted to an empty slot cannot be displaced by a finite cost.
 likelihood: |-
@@ -43,7 +43,12 @@ cause: |-
 possible_fix: "Reject NaN costs or let finite challengers replace them."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
 lean:
   property: "SymReg.HofMig.nan_recovery"
   theorem: "SymReg.HofMig.nan_recovery_refuted"

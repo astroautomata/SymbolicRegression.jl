@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-result"
 area: "Constraints and simplification"
 files: ["src/Mutate.jl"]
-functions: ["mutate!","_next_generation"]
+functions: ["mutate!", "_next_generation"]
 summary: |-
   Simplification can increase a valid custom price and bypasses the normal constraint check.
 likelihood: |-
@@ -47,7 +47,12 @@ cause: |-
 possible_fix: "Check the simplified candidate before returning it as an accepted child."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
 lean:
   property: "SymReg.SimpCons.customSimplificationBound"
   theorem: "SymReg.SimpCons.customSimplificationBound_refuted"

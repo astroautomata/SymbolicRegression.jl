@@ -39,7 +39,10 @@ cause: |-
 possible_fix: ""
 duplicates:
   issues: []
-  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+  queries:
+    [
+      "Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches",
+    ]
 lean:
   property: "SymReg.HofMig.zero_ratio_no_improvement"
   theorem: "SymReg.HofMig.zero_ratio_no_improvement_refuted"

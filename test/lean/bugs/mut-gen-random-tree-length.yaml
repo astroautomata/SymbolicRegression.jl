@@ -55,7 +55,10 @@ cause: |-
 possible_fix: ""
 duplicates:
   issues: []
-  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+  queries:
+    [
+      "Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches",
+    ]
 lean:
   property: "SymReg.Mutations.gen_random_tree_length"
   theorem: "SymReg.Mutations.gen_random_tree_length_refuted"

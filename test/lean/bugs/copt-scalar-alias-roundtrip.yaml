@@ -4,7 +4,7 @@ priority: "P2"
 kind: "wrong-result"
 area: "Constant optimization"
 files: ["src/ConstantOptimization.jl"]
-functions: ["get_optimizable_parameters","set_optimizable_parameters!"]
+functions: ["get_optimizable_parameters", "set_optimizable_parameters!"]
 summary: |-
   Two references to the same mutable Node become separate optimizer coordinates; the last input overwrites the first.
 likelihood: |-
@@ -47,7 +47,12 @@ cause: |-
 possible_fix: "Deduplicate reference identities when flattening parameters."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'","gh search issues --repo astroautomata/PySR 'max_evals'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
 lean:
   property: "SymReg.ConstOpt.scalarAliasRoundtrip"
   theorem: "SymReg.ConstOpt.scalarAliasRoundtrip_refuted"

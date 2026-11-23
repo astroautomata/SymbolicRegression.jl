@@ -55,7 +55,10 @@ cause: |
 possible_fix: "Recompute or invalidate cached complexity after accepted parameter changes when the mapping is a function."
 duplicates:
   issues: []
-  queries: ['site:github.com/astroautomata/SymbolicRegression.jl/issues "complexity_mapping" "cache" "constant optimization"']
+  queries:
+    [
+      'site:github.com/astroautomata/SymbolicRegression.jl/issues "complexity_mapping" "cache" "constant optimization"',
+    ]
 lean:
   property: SymReg.ConstOpt.acceptedScoresFresh
   theorem: SymReg.ConstOpt.acceptedScoresFresh_refuted

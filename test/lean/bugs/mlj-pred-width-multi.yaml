@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "MLJ"
 files: ["src/MLJInterface.jl"]
-functions: ["_predict","eval_tree_mlj","prediction_fallback"]
+functions: ["_predict", "eval_tree_mlj", "prediction_fallback"]
 summary: |-
   Each failed target can append a full model-width fallback rather than one column.
 likelihood: |-
@@ -75,7 +75,12 @@ cause: |-
 possible_fix: "Construct one fallback column per failed target, or return the full fallback once."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'","gh search issues --repo astroautomata/PySR 'warm_start'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
 lean:
   property: "SymReg.MLJ.predK_width"
   theorem: "SymReg.MLJ.predK_width_refuted"

@@ -4,7 +4,8 @@ priority: "P2"
 kind: "wrong-exception"
 area: "Infrastructure"
 files: ["src/precompile.jl"]
-functions: ["@maybe_setup_workload","@maybe_compile_workload","do_precompilation"]
+functions:
+  ["@maybe_setup_workload", "@maybe_compile_workload", "do_precompilation"]
 summary: |-
   Concatenating `show(mode)` loses the intended invalid-mode diagnostic and throws MethodError.
 likelihood: |-
@@ -42,7 +43,12 @@ cause: |-
 possible_fix: "Use repr or sprint(show, mode) when building the message."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'","gh search issues --repo astroautomata/PySR 'batching'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'",
+      "gh search issues --repo astroautomata/PySR 'batching'",
+    ]
 lean:
   property: "SymReg.Infra.precompileInvalidDiagnostic"
   theorem: "SymReg.Infra.precompileInvalidDiagnostic_refuted"

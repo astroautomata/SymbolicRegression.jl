@@ -4,7 +4,7 @@ priority: "P1"
 kind: "wrong-result"
 area: "Templates"
 files: ["src/ExpressionBuilder.jl"]
-functions: ["create_expression","extra_init_params"]
+functions: ["create_expression", "extra_init_params"]
 summary: |-
   Two generic ParametricExpression builds share the caller's parameter matrix and edits leak between them.
 likelihood: |-
@@ -50,7 +50,12 @@ cause: |-
 possible_fix: "Copy parameters that candidate optimization can mutate."
 duplicates:
   issues: []
-  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
 lean:
   property: "SymReg.Templates.createIndependent"
   theorem: "SymReg.Templates.createIndependent_refuted"
