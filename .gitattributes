@@ -1,4 +1,5 @@
 benchmark/* linguist-documentation
 docs/* linguist-documentation
 test/* linguist-documentation
+test/lean/** linguist-documentation
 .github/workflows/* linguist-documentation

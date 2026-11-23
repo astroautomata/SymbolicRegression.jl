@@ -1,0 +1,31 @@
+name: Lean
+
+on:
+  pull_request:
+    paths: ["test/lean/**", ".github/workflows/lean.yml"]
+  push:
+    branches: [master]
+    paths: ["test/lean/**", ".github/workflows/lean.yml"]
+
+permissions:
+  contents: read
+
+jobs:
+  lean:
+    runs-on: ubuntu-latest
+    env:
+      LEAN_NUM_THREADS: 2
+    steps:
+      - uses: actions/checkout@v6
+      - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee # v1
+        with:
+          lake-package-directory: test/lean
+          use-github-cache: 'true'
+          build: 'true'
+          test: 'false'
+          lint: 'false'
+      - name: Audit the registry and run source checks
+        working-directory: test/lean
+        run: |
+          ./scripts/audit.sh
+          diff -u registry.tsv .lake/registry.tsv

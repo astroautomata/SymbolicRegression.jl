@@ -1,0 +1,3 @@
+.lake/
+!/repro/tmpl-*.jl
+!/bugs/tmpl-*.yaml
