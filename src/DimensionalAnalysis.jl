@@ -53,11 +53,34 @@ ustrip(w::WildcardQuantity) = ustrip(w.val)
 dimension(w::WildcardQuantity) = dimension(w.val)
 valid(x::WildcardQuantity) = !x.violates
 
-Base.one(::Type{W}) where {Q,W<:WildcardQuantity{Q}} = return W(one(Q), false, false)
+Base.one(::Type{W}) where {Q,W<:WildcardQuantity{Q}} = W(one(Q), false, false)
+Base.one(w::W) where {W<:WildcardQuantity} = w.violates ? w : one(W)
+Base.zero(::Type{W}) where {Q,W<:WildcardQuantity{Q}} = W(zero(Q), false, false)
+function Base.zero(w::W) where {W<:WildcardQuantity}
+    w.violates ? w : W(zero(w.val), w.wildcard, false)
+end
 Base.isfinite(w::WildcardQuantity) = isfinite(w.val)
 
 same_dimensions(x::WildcardQuantity, y::WildcardQuantity) = dimension(x) == dimension(y)
-has_no_dims(x::Quantity) = iszero(dimension(x))
+has_no_dims(x::AbstractQuantity) = iszero(dimension(x))
+
+Base.:-(l::W) where {W<:WildcardQuantity} = l.violates ? l : W(-l.val, l.wildcard, false)
+function Base.:*(b::Bool, w::W) where {W<:WildcardQuantity}
+    return w.violates ? w : W(b * w.val, w.wildcard, false)
+end
+Base.:*(w::W, b::Bool) where {W<:WildcardQuantity} = b * w
+for op in (:(Base.:<), :(Base.:>), :(Base.:<=), :(Base.:>=))
+    @eval function $(op)(l::W, r::W) where {W<:WildcardQuantity}
+        (l.violates || r.violates) && throw(DimensionError(l.val, r.val))
+        if same_dimensions(l, r)
+            return $(op)(l.val, r.val)
+        elseif l.wildcard || r.wildcard
+            return $(op)(ustrip(l), ustrip(r))
+        else
+            throw(DimensionError(l.val, r.val))
+        end
+    end
+end
 
 # Overload *, /, +, -, ^ for WildcardQuantity, as
 # we want wildcards to propagate through these operations.
@@ -160,7 +183,7 @@ end
                 # (e.g., for N = 3, this would be (0, 0, 0), (0, 0, 1), ..., (1, 1, 1))
                 #! format: off
                 if hasmethod(op, Tuple{Base.Cartesian.@ntuple($N, j -> lattice_j == 0 ? W : T)...}) &&
-                        Base.Cartesian.@nall($N, j -> lattice_j == 0 ? true : arg_j.wildcard)
+                        Base.Cartesian.@nall($N, j -> lattice_j == 0 ? true : (arg_j.wildcard || has_no_dims(arg_j.val)))
 
                     # if on last one, we always evaluate (assuming wildcards are on):
                     if i == $(2^N)
