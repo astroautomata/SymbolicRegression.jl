@@ -1,0 +1,1 @@
+# Known hoists: relative path, a tab, then the stripped line containing the operator.
