@@ -1383,40 +1383,45 @@ parse_expression((; f="#1", p=[2.0, 3.0]); expression_spec=spec, operators)
             end,
         )
     end
-    inner_expressions = NamedTuple{function_keys}(
-        map(function_keys) do key
-            expr_str = getproperty(ex, key)
-            expr_str isa AbstractString || throw(
-                ArgumentError(
-                    "Expected template expression `$key` to be a string, got $(typeof(expr_str))",
-                ),
-            )
-            max_var_index = 0
-            for m in eachmatch(r"#(\d+)", expr_str)
-                capture = m.captures[1]
-                if capture !== nothing
-                    var_idx = parse(Int, capture)
-                    max_var_index = max(max_var_index, var_idx)
-                end
+    parsed_trees = map(function_keys) do key
+        expr_str = getproperty(ex, key)
+        expr_str isa AbstractString || throw(
+            ArgumentError(
+                "Expected template expression `$key` to be a string, got $(typeof(expr_str))",
+            ),
+        )
+        max_var_index = 0
+        for m in eachmatch(r"#(\d+)", expr_str)
+            capture = m.captures[1]
+            if capture !== nothing
+                var_idx = parse(Int, capture)
+                max_var_index = max(max_var_index, var_idx)
             end
+        end
 
-            placeholder_variable_names = ["__arg_$i" for i in 1:max_var_index]
-            expr_str = replace(expr_str, r"#(\d+)" => s"__arg_\1")
+        placeholder_variable_names = ["__arg_$i" for i in 1:max_var_index]
+        expr_str = replace(expr_str, r"#(\d+)" => s"__arg_\1")
 
-            parsed_expr = DE.parse_expression(
-                expr_str;
-                operators,
-                binary_operators,
-                unary_operators,
-                variable_names=placeholder_variable_names,
-                expression_type=DE.Expression,
-                node_type=resolved_node_type,
-                eval_module,
-                kws...,
+        DE.parse_expression(
+            expr_str;
+            operators,
+            binary_operators,
+            unary_operators,
+            variable_names=placeholder_variable_names,
+            expression_type=DE.Expression,
+            node_type=resolved_node_type,
+            eval_module,
+            kws...,
+        ).tree
+    end
+    common_type = promote_type(map(eltype, parsed_trees)...)
+    inner_expressions = NamedTuple{function_keys}(
+        map(parsed_trees) do tree
+            converted_tree = convert(
+                DE.with_type_parameters(typeof(tree), common_type), tree
             )
-
             DE.constructorof(inner_expression_type)(
-                parsed_expr.tree;
+                converted_tree;
                 operators,
                 variable_names=nothing,
                 eval_context_kws...,
