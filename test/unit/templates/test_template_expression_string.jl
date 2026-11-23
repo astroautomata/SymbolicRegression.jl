@@ -20,6 +20,36 @@
     @test colors_8[7:8] == (:magenta, :green)  # Should cycle colors properly
 end
 
+@testitem "TemplateExpression get_tree with more inputs than template keys" begin
+    using SymbolicRegression
+    using DynamicExpressions:
+        Node, GraphNode, OperatorEnum, get_tree, count_nodes, string_tree
+
+    operators = OperatorEnum(; binary_operators=(+, *), unary_operators=(sin,))
+    x1 = ComposableExpression(Node{Float64}(; feature=1); operators)
+    x2 = ComposableExpression(Node{Float64}(; feature=2); operators)
+
+    st_single = TemplateStructure{(:f,)}(((; f), (a, b)) -> f(a, b))
+    ex_single = TemplateExpression((; f=x1 + x2); structure=st_single, operators)
+    @test string_tree(get_tree(ex_single), operators) == "x1 + x2"
+    @test count_nodes(ex_single) == 3
+
+    st_three = TemplateStructure{(:f, :g)}(((; f, g), (a, b, c)) -> f(a, b) + g(c))
+    ex_three = TemplateExpression((; f=x1 * x2, g=sin(x1)); structure=st_three, operators)
+    @test string_tree(get_tree(ex_three), operators) == "(x1 * x2) + sin(x3)"
+    @test count_nodes(ex_three) == 6
+
+    c1 = ComposableExpression(Node{Float64}(; val=2.0); operators)
+    st_zero = TemplateStructure{(:f, :g)}(((; f, g), (a, b)) -> f() + g(a, b))
+    ex_zero = TemplateExpression((; f=c1, g=x1 * x2); structure=st_zero, operators)
+    @test string_tree(get_tree(ex_zero), operators) == "2.0 + (x1 * x2)"
+    @test count_nodes(ex_zero) == 5
+
+    gx1 = ComposableExpression(GraphNode{Float64}(; feature=1); operators)
+    ex_graph = TemplateExpression((; f=gx1); structure=st_single, operators)
+    @test count_nodes(ex_graph) == 1
+end
+
 @testitem "template expression string representation" begin
     using SymbolicRegression
     using StyledStrings: @styled_str, annotatedstring, AnnotatedString
