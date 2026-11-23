@@ -20,10 +20,10 @@ jobs:
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee # v1
         with:
           lake-package-directory: test/lean
-          use-github-cache: 'true'
-          build: 'true'
-          test: 'false'
-          lint: 'false'
+          use-github-cache: "true"
+          build: "true"
+          test: "false"
+          lint: "false"
       - name: Audit the registry and run source checks
         working-directory: test/lean
         run: |
