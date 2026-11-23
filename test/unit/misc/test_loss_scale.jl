@@ -82,6 +82,34 @@ end
     end
 end
 
+@testitem "HallOfFame ignores NaN costs and replaces NaN incumbents" begin
+    using SymbolicRegression
+
+    options = Options(; binary_operators=[+], maxsize=5, deterministic=true)
+    dataset = Dataset(zeros(1, 2), zeros(2))
+    hof = HallOfFame(options, dataset)
+
+    bad = copy(hof.members[1])
+    bad.cost = NaN
+    bad.loss = 1.0
+    good = copy(hof.members[1])
+    good.cost = 1.0
+    good.loss = 1.0
+
+    SymbolicRegression.update_hall_of_fame!(hof, bad, options)
+    @test !hof.exists[1]
+
+    SymbolicRegression.update_hall_of_fame!(hof, good, options)
+    @test hof.exists[1]
+    @test hof.members[1].cost == 1.0
+
+    hof_incumbent = HallOfFame(options, dataset)
+    hof_incumbent.members[1] = copy(bad)
+    hof_incumbent.exists[1] = true
+    SymbolicRegression.update_hall_of_fame!(hof_incumbent, good, options)
+    @test hof_incumbent.members[1].cost == 1.0
+end
+
 @testitem "loss_scale in pareto_volume" begin
     using SymbolicRegression.LoggingModule: pareto_volume
 
