@@ -1,14 +1,8 @@
 module SymbolicRegressionEnzymeExt
 
 using SymbolicRegression.LossFunctionsModule: eval_loss
-using DynamicExpressions:
-    AbstractExpression,
-    AbstractExpressionNode,
-    get_scalar_constants,
-    set_scalar_constants!,
-    extract_gradient,
-    with_contents,
-    get_contents
+using SymbolicRegression.ConstantOptimizationModule:
+    get_optimizable_parameters, set_optimizable_parameters!
 using ADTypes: AutoEnzyme
 using Enzyme: autodiff, Reverse, Active, Const, Duplicated, make_zero, remake_zero!
 
@@ -17,7 +11,7 @@ import SymbolicRegression.ConstantOptimizationModule: Evaluator, GradEvaluator
 # We prepare a copy of the tree and all arrays
 function GradEvaluator(f::F, backend::AE) where {F<:Evaluator,AE<:AutoEnzyme}
     storage_tree = make_zero(f.tree)
-    _, storage_refs = get_scalar_constants(storage_tree)
+    _, storage_refs = get_optimizable_parameters(storage_tree, f.ctx.options)
     storage_dataset = make_zero(f.ctx.dataset)
     storage_options = make_zero(f.ctx.options)
     # TODO: It is super inefficient to deepcopy; how can we skip this
@@ -37,7 +31,7 @@ end
 with_stacksize(f::F, n) where {F} = fetch(schedule(Task(f, n)))
 
 function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) where {T}
-    set_scalar_constants!(g.e.tree, x, g.e.refs)
+    set_optimizable_parameters!(g.e.tree, x, g.e.refs)
     remake_zero!(g.extra.storage_tree)
     remake_zero!(g.extra.storage_dataset)
     remake_zero!(g.extra.storage_options)
@@ -57,9 +51,18 @@ function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) wher
     end
 
     if G !== nothing
-        # TODO: This is redundant since we already have the references.
-        # Should just be able to extract from the references directly.
-        G .= first(get_scalar_constants(g.extra.storage_tree))
+        extracted_gradient = first(
+            get_optimizable_parameters(g.extra.storage_tree, g.e.ctx.options)
+        )
+        if length(extracted_gradient) != length(G)
+            throw(
+                DimensionMismatch(
+                    "extracted $(length(extracted_gradient)) parameter gradients for " *
+                    "an optimization vector of length $(length(G))",
+                ),
+            )
+        end
+        G .= extracted_gradient
     end
     return output[]
 end
