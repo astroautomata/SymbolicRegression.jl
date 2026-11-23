@@ -1,0 +1,65 @@
+id: "einv-no-throw"
+title: "Backsolve can throw while processing an already invalid row"
+priority: "P2"
+kind: "wrong-exception"
+area: "Backsolve"
+files: ["src/EvaluateInverse.jl"]
+functions: ["eval_inverse_tree_array_masked", "degn_invert!"]
+summary: |-
+  A later inverse can throw on a nonfinite row that an earlier step already marked invalid.
+likelihood: |-
+  PySR default-path likelihood: conditional, optional backsolve and incompatible composed domains |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions
+  const SR = SymbolicRegression
+  const EI = SR.EvaluateInverseModule
+
+  # Tree 1 / atan(x1), targets [0, 1], inverting at x1. The first inverse step gives 1 / 0 = Inf
+  # on row 1 (masked invalid) and 1 on row 2 (valid), so the recursion continues and applies
+  # tan to every row, including Inf: tan(Inf) throws DomainError instead of masking the row
+  # (src/EvaluateInverse.jl:102-120,297-310).
+  opts = Options(; binary_operators=[+, *, /], unary_operators=[atan], mutations=[BacksolveMutation() => 1.0])
+  ops = opts.operators
+  x1 = Node{Float64}(; feature=1)
+  c1 = Node{Float64}(; val=1.0)
+  tree = Node(; op=findfirst(==(/), ops.binops),
+      children=(c1, Node(; op=findfirst(==(atan), ops.unaops), children=(x1,))))
+  X = [2.0 3.0]
+  r = try
+      EI.eval_inverse_tree_array_masked(tree, X, ops, x1, [0.0, 1.0])
+  catch e
+      e
+  end
+  println("eval_inverse_tree_array_masked -> ", r)
+  if r isa DomainError
+      println("REPRODUCED einv-no-throw")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    eval_inverse_tree_array_masked -> DomainError(Inf, "tan(x) is only defined for finite x.")
+    REPRODUCED einv-no-throw
+expected: |-
+  Ignore already masked rows in later inverse steps and return validity flags.
+promised_by: |-
+  The masked inversion path exists to remove rows outside the inverse domain.
+cause: |-
+  src/EvaluateInverse.jl:102-120: A later inverse can throw on a nonfinite row that an earlier step already marked invalid.
+possible_fix: "Skip inverse application on rows with a false mask."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Backsolve.maskedNoThrow"
+  theorem: "SymReg.Backsolve.maskedNoThrow_refuted"
+covers: []

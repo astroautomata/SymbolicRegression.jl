@@ -1,0 +1,68 @@
+id: "bs-greedy-scale"
+title: "Greedy-fit scale invariance needs a narrower description"
+priority: "P3"
+kind: "documentation"
+area: "Backsolve"
+files: ["src/Backsolve.jl"]
+functions: ["greedy_forward_selection_gram"]
+summary: |-
+  Column choice can be scale invariant but absolute coefficient acceptance thresholds are not.
+likelihood: |-
+  PySR default-path likelihood: conditional, optional greedy backsolve |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions
+  const SR = SymbolicRegression
+  const BS = SR.BacksolveModule
+
+  # greedy_forward_selection_gram claims invariance to the scale of y (src/Backsolve.jl:184-187),
+  # but success is the absolute test any(abs.(coefficients) .> 100 eps) (src/Backsolve.jl:264).
+  # The one-column fit y = x scaled by eps() keeps the coefficient eps() yet reports failure.
+  kw = (; term_costs=[1], join_cost=1, budget=nothing, max_terms=1, min_improvement=1e-3)
+  G = reshape([1.0], 1, 1)
+  c1, ok1 = BS.greedy_forward_selection_gram(G, [1.0], 1.0; kw...)
+  s = eps()
+  c2, ok2 = BS.greedy_forward_selection_gram(G, [s], s^2; kw...)
+  println("y = x: ", (c1, ok1), "; y = eps() * x: ", (c2, ok2))
+
+  # End to end: fit_sparse_expression fits y = 2 x1 but returns nothing for y = 2e-15 x1.
+  opts = Options(; binary_operators=[+, *], mutations=[BacksolveMutation() => 1.0])
+  x1 = Node{Float64}(; feature=1)
+  xs = collect(1.0:20.0)
+  ds = SR.Dataset(reshape(xs, 1, :), 2 .* xs)
+  big = BS.fit_sparse_expression(x1, 2 .* xs, ds, opts, 1)
+  small = BS.fit_sparse_expression(x1, 2e-15 .* xs, SR.Dataset(reshape(xs, 1, :), 2e-15 .* xs), opts, 1)
+  println("fit of 2 x1: ", big === nothing ? "nothing" : string_tree(big, opts),
+      "; fit of 2e-15 x1: ", small === nothing ? "nothing" : string_tree(small, opts))
+  if ok1 && !ok2 && c2[1] == s && big !== nothing && small === nothing
+      println("REPRODUCED bs-greedy-scale")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    y = x: ([1.0], true); y = eps() * x: ([2.220446049250313e-16], false)
+    fit of 2 x1: (-2.742808260261412e-14 * 1.0) + (2.000000000000003 * x1); fit of 2e-15 x1: nothing
+    REPRODUCED bs-greedy-scale
+expected: |-
+  Clarify that absolute tolerances can change fit success when y is rescaled.
+promised_by: |-
+  Backsolve.jl describes scale invariance without explaining the absolute success threshold.
+cause: |-
+  src/Backsolve.jl:184-187,264: Column choice can be scale invariant but absolute coefficient acceptance thresholds are not.
+possible_fix: "Document the selection rule and acceptance tolerances separately."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Backsolve.greedyScaleInvariant"
+  theorem: "SymReg.Backsolve.greedyScaleInvariant_refuted"
+covers: []

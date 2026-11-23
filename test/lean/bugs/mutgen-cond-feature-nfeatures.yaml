@@ -1,0 +1,70 @@
+id: "mutgen-cond-feature-nfeatures"
+title: "Leaf mutation conditioning skips applicable checks"
+priority: "P2"
+kind: "wrong-result"
+area: "Mutation sampling"
+files: ["src/Mutate.jl"]
+functions: ["condition_mutation_weights!"]
+summary: |-
+  One-feature leaves retain a feature-change weight that can only buy a no-op. An already oversized leaf retains growth weights and spends search attempts on otherwise rejected changes.
+likelihood: |-
+  PySR default-path likelihood: default, one-feature fit |; conditional, custom leaf cost |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mutgen-cond-feature-nfeatures` (SymReg/MutateGen/ConditionProps.lean).
+  # condition_mutation_weights! returns early for a leaf (src/Mutate.jl:179-191), before the
+  # `nfeatures <= 1` check that zeroes FeatureMutation (src/Mutate.jl:199-201). On a variable
+  # leaf with one feature, FeatureMutation keeps its weight although mutate_feature returns
+  # the tree unchanged (src/MutationFunctions.jl:200).
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.MutateModule: condition_mutation_weights!
+  using SymbolicRegression.MutationFunctionsModule: mutate_feature
+  using DynamicExpressions: Node
+
+  X = randn(1, 20)
+  dataset = Dataset(X, X[1, :] .+ 1)
+  options = Options(; binary_operators=[+, *])
+  member = PopMember(dataset, Node(Float64; feature=1), options; deterministic=false)
+
+  weights = copy(options.mutations)
+  condition_mutation_weights!(weights, member, options, 10, 1)
+  w = only(p.second for p in weights if p.first isa FeatureMutation)
+  mutated = mutate_feature(copy(member.tree), 1)
+  println("leaf ", member.tree, ", nfeatures = 1: conditioned FeatureMutation weight = ", w,
+      "; mutate_feature gives ", mutated)
+  if w > 0 && string(mutated) == string(member.tree)
+      println("REPRODUCED mutgen-cond-feature-nfeatures")
+  end
+
+  include("mutgen-cond-add-maxsize.jl")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    leaf x1, nfeatures = 1: conditioned FeatureMutation weight = 0.1; mutate_feature gives x1
+    REPRODUCED mutgen-cond-feature-nfeatures
+    leaf complexity = 3, curmaxsize = 3: conditioned AddNode weight = 2.47, InsertNode weight = 0.0112
+    REPRODUCED mutgen-cond-add-maxsize
+expected: |-
+  A one-feature variable leaf cannot draw a feature change; an oversized leaf cannot draw inapplicable growth changes.
+promised_by: |-
+  Conditioning should disable these impossible or ineffective actions for leaves as it does for branches.
+cause: |-
+  src/Mutate.jl:179-207: One-feature leaves retain a feature-change weight that can only buy a no-op.
+  src/Mutate.jl:179-207: An already oversized leaf retains growth weights and spends search attempts on otherwise rejected changes.
+possible_fix: "Run the feature-count and size checks before returning on leaves."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.MutateGen.feature_nfeatures"
+  theorem: "SymReg.MutateGen.feature_nfeatures_refuted"
+covers: ["mutgen-cond-add-maxsize"]

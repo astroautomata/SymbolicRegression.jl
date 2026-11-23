@@ -1,0 +1,59 @@
+id: "mlj-parallelism-string"
+title: "MLJ documents parallelism strings that its constructors reject"
+priority: "P3"
+kind: "documentation"
+area: "MLJ"
+files: ["src/MLJInterface.jl"]
+functions: ["modelexpr", "SRRegressor"]
+summary: |-
+  The MLJ field is Symbol-only but its documentation also accepts strings; PySR has its own conversion.
+likelihood: |-
+  PySR default-path likelihood: off |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mlj-parallelism-string` (SymReg/MLJ/FitProps.lean).
+  # The docstring (src/MLJInterface.jl:810-818) says "You may also pass a string instead of a
+  # symbol, like \"multithreading\"", but the struct field is `parallelism::Symbol`
+  # (src/MLJInterface.jl:74), so the keyword constructor rejects a string.
+  using SymbolicRegression
+  using SymbolicRegression.MLJInterfaceModule: SRRegressor
+
+  result = try
+      SRRegressor(; parallelism="serial")
+  catch e
+      e
+  end
+  println("SRRegressor(; parallelism=\"serial\") returned: ",
+      result isa Exception ? first(sprint(showerror, result), 160) : result.parallelism)
+  println("expected: a model with parallelism = :serial")
+  if result isa MethodError
+      println("REPRODUCED mlj-parallelism-string")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    SRRegressor(; parallelism="serial") returned: MethodError: no method matching SRRegressor(::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Nothing, ::Noth
+    expected: a model with parallelism = :serial
+    REPRODUCED mlj-parallelism-string
+expected: |-
+  Document Symbol spellings such as :serial, or normalize strings before construction.
+promised_by: |-
+  MLJInterface.jl:818 documents string arguments as well as symbols.
+cause: |-
+  src/MLJInterface.jl:74,818: The MLJ field is Symbol-only but its documentation also accepts strings; PySR has its own conversion.
+possible_fix: "Match the docstring to the accepted type if strings are intentionally unsupported."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'",
+      "gh search issues --repo astroautomata/PySR 'warm_start'",
+    ]
+lean:
+  property: "SymReg.MLJ.parallelism_string"
+  theorem: "SymReg.MLJ.parallelism_string_refuted"
+covers: []

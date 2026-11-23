@@ -1,0 +1,51 @@
+id: loss-finite-cost
+title: "Loss normalization can overflow on a finite loss"
+priority: P3
+kind: wrong-result
+area: Loss
+files: [src/LossFunctions.jl]
+functions: [loss_to_cost]
+summary: |
+  Dividing a finite loss by the baseline floor can return infinite cost even
+  when parsimony is zero.
+likelihood: |
+  With the baseline disabled and Float64 loss, the positive loss must be near
+  floatmax, above about 1.8e306, for this division alone to overflow. This is
+  unlikely in a normally scaled search.
+maybe_intended: |
+  The configured normalization can yield a value outside the requested loss
+  type's range. The infinity is the IEEE result of that division.
+reproducer: |
+  using SymbolicRegression: Options
+  using SymbolicRegression.LossFunctionsModule: loss_to_cost
+
+  loss = floatmax(Float64)
+  options = Options(; parsimony=0.0)
+  cost = loss_to_cost(loss, false, 1.0, nothing, options, 1)
+  @assert isfinite(loss) && cost == Inf
+  println("loss = ", loss, "; cost = ", cost)
+  println("REPRODUCED loss-finite-cost")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    loss = 1.7976931348623157e308; cost = Inf
+    REPRODUCED loss-finite-cost
+expected: |
+  The score for a finite loss and zero parsimony remains finite, or the search
+  reports that normalization exceeded the representable range.
+promised_by: |
+  Numerical invariant: scoring a valid finite loss should preserve finiteness.
+cause: |
+  src/LossFunctions.jl:212-217 chooses Float64(0.01) when baseline normalization
+  is disabled and divides by it. The mathematical quotient exceeds floatmax.
+possible_fix: ""
+duplicates:
+  issues: []
+  queries:
+    - 'repo:astroautomata/SymbolicRegression.jl "loss_to_cost" overflow'
+    - 'repo:astroautomata/PySR "loss_to_cost" overflow'
+lean:
+  property: SymReg.Loss.finite_cost
+  theorem: SymReg.Loss.finite_cost_refuted

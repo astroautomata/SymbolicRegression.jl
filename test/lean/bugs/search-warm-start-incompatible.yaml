@@ -1,0 +1,83 @@
+id: search-warm-start-incompatible
+title: "Direct warm start retains equations above a reduced maxsize"
+priority: P1
+kind: wrong-result
+area: Search
+files: [src/SymbolicRegression.jl, src/OptionsStruct.jl]
+functions:
+  [equation_search, _initialize_search!, check_warm_start_compatibility]
+summary: |
+  Reusing a returned state after reducing maxsize can silently return an equation
+  beyond the new limit. A saved perfect equation of complexity 5 still appears on
+  the resumed Pareto frontier with maxsize=4.
+likelihood: |
+  Julia callers may lower maxsize in a second run to restrict the complexity of
+  their result. MLJ checks compatibility before calling the search, so this
+  affects callers passing saved_state directly to equation_search.
+maybe_intended: "The direct API may be intended as a low-level entry point whose caller checks compatibility. Keeping an out-of-budget equation still defeats the new search limit."
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.CoreModule: WarmStartIncompatibleError, check_warm_start_compatibility
+
+  function search_options(maxsize)
+      return Options(;
+          binary_operators=[+, *], maxsize, populations=1, population_size=4,
+          maxdepth=3,
+          tournament_selection_n=2,
+          should_optimize_constants=false, deterministic=true, seed=12,
+          input_stream=devnull, save_to_file=false,
+      )
+  end
+
+  x = collect(1.0:8.0)
+  X = reshape(x, 1, :)
+  y = x .+ x .^ 2
+  old, new = search_options(7), search_options(4)
+  params = (; niterations=0, parallelism=:serial, verbosity=0, progress=false)
+  saved = equation_search(X, y; params..., options=old, return_state=true,
+      guesses=["x1 + x1 * x1"])
+
+  compatibility_error = try
+      check_warm_start_compatibility(old, new)
+      nothing
+  catch err
+      err isa WarmStartIncompatibleError || rethrow()
+      err
+  end
+  @assert compatibility_error isa WarmStartIncompatibleError
+  @assert compatibility_error.fields == [:maxsize]
+  @assert saved[2].exists[5] && saved[2].members[5].loss == 0.0
+
+  resumed = equation_search(X, y; params..., options=new, saved_state=saved)
+  frontier = calculate_pareto_frontier(resumed)
+  if resumed.exists[5] && any(m -> m.loss == 0.0 && compute_complexity(m, new) == 5, frontier)
+      println("maxsize=4; resumed frontier still contains complexity=5, loss=0.0")
+      println("REPRODUCED search-warm-start-incompatible")
+  else
+      error("No out-of-budget perfect equation survived the warm start")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    maxsize=4; resumed frontier still contains complexity=5, loss=0.0
+    REPRODUCED search-warm-start-incompatible
+expected: |
+  Reject the incompatible warm start with WarmStartIncompatibleError, or ensure
+  the returned hall and frontier obey the new maximum complexity.
+promised_by: |
+  Options.jl documents maxsize as the maximum complexity. OptionsStruct.jl:341-362
+  identifies maxsize among the fields that invalidate a warm start.
+cause: |
+  The direct search path at src/SymbolicRegression.jl:698-713 has no prior options
+  to compare. The restored hall is rescored in place at lines 894-910 and no slot
+  is dropped. The zero-iteration path returns that hall without a search cycle.
+possible_fix: "Carry the compatibility fields with returned state and validate them on resume."
+duplicates:
+  issues: []
+  queries: ["SymbolicRegression.jl warm start saved_state maxsize incompatible"]
+lean:
+  property: SymReg.Search.warm_start_incompatible
+  theorem: SymReg.Search.warm_start_incompatible_refuted
+covers: []

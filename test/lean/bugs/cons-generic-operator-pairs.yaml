@@ -1,0 +1,56 @@
+id: "cons-generic-operator-pairs"
+title: "Explicit operator enum rejects operator-keyed constraints"
+priority: "P1"
+kind: "wrong-exception"
+area: "Constraints and simplification"
+files: ["src/Options.jl"]
+functions: ["build_constraints", "_build_constraints"]
+summary: |-
+  `Options` forwards operator-keyed constraints to a builder that indexes its input by arity.
+likelihood: |-
+  Requires explicitly passing `operators=...` with operator-keyed `constraints`. The default unary/binary operator path does not trigger this error.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+
+  operators = SymbolicRegression.OperatorEnum(; binary_operators=[+])
+  try
+      options = SymbolicRegression.Options(;
+          operators, constraints=Dict((+) => (-1, 3)))
+      println("generic operator constraints built successfully: ", options.op_constraints)
+  catch err
+      if err isa KeyError && err.key == 1
+          println("known + operator constraint with explicit enum raises: ", sprint(showerror, err))
+          println("REPRODUCED cons-generic-operator-pairs")
+          println("REPRODUCED cons-builder-pair-layout")
+      else
+          println("unexpected builder exception: ", sprint(showerror, err))
+      end
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    known + operator constraint with explicit enum raises: KeyError: key 1 not found
+    REPRODUCED cons-generic-operator-pairs
+    REPRODUCED cons-builder-pair-layout
+expected: |-
+  A keyed binary constraint for + is converted to the arity-2 constraint table.
+promised_by: |-
+  The supported keyed form should resolve known operators regardless of enum construction route.
+cause: |-
+  src/Options.jl:731-800: `Options` forwards operator-keyed constraints to a builder that indexes its input by arity.
+possible_fix: "Normalize keyed options before indexing by degree."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
+lean:
+  property: "SymReg.SimpCons.genericOperatorPairs"
+  theorem: "SymReg.SimpCons.genericOperatorPairs_refuted"
+covers: ["cons-builder-pair-layout"]

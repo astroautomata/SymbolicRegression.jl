@@ -1,0 +1,74 @@
+id: "pop-tournament-rank"
+title: "Ranked tournament can return the same candidate twice"
+priority: "P1"
+kind: "wrong-result"
+area: "Population"
+files: ["src/Population.jl", "src/Utils.jl"]
+functions: ["_best_of_sample", "bottomk_fast", "_bottomk_dispatch", "_bottomk!"]
+summary: |-
+  An invalid member's `Inf` cost never displaces a sentinel, so a repeated index can win the wrong rank. An `Inf` entry leaves a fabricated duplicate index in the result.
+likelihood: |-
+  PySR default-path likelihood: default, invalid expressions |; default through ranked tournament |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `pop-tournament-rank` (SymReg/Population/Tournament.lean).
+  # bottomk_fast (src/Utils.jl:97-131) never inserts costs equal to Inf (or NaN), so place 2 of the
+  # sample [5.0, Inf] goes to the place-1 member. With p = 0.5 and n = 2 place 2 is drawn with
+  # probability 1/3, yet the Inf-cost member is never selected.
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.PopulationModule: _best_of_sample
+  using SymbolicRegression.UtilsModule: bottomk_fast
+  using Random
+
+  Random.seed!(0)
+  options = Options(; binary_operators=[+, *], default_plugins=(), tournament_selection_p=0.5,
+      tournament_selection_n=2, population_size=10)
+  X = randn(1, 20)
+  dataset = Dataset(X, X[1, :])
+  function member_with_cost(c)
+      m = PopMember(dataset, Node{Float64}(; feature=1), options; deterministic=false)
+      m.cost = c
+      return m
+  end
+  println("bottomk_fast([5.0, Inf], 2) = ", bottomk_fast([5.0, Inf], 2))
+  members = [member_with_cost(5.0), member_with_cost(Inf)]
+  trials = 3000
+  second = count(_ -> _best_of_sample(members, [1, 2], options; plugin_states=()) === members[2], 1:trials)
+  println("Inf-cost member chosen in ", second, " of ", trials, " tournaments (expected about ", trials ÷ 3, ")")
+  if bottomk_fast([5.0, Inf], 2)[2][end] == 1 && second == 0
+      println("REPRODUCED pop-tournament-rank")
+  end
+
+  include("util-bottomk-sentinel.jl")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    bottomk_fast([5.0, Inf], 2) = ([5.0, Inf], [1, 1])
+    Inf-cost member chosen in 0 of 3000 tournaments (expected about 1000)
+    REPRODUCED pop-tournament-rank
+    input=[0.0, Inf] values=[0.0, Inf] indices=[1, 1] indexed values=[0.0, 0.0]
+    REPRODUCED util-bottomk-sentinel
+expected: |-
+  For [5, Inf] the first and second ranked indices are distinct, and the Inf member can be drawn second.
+promised_by: |-
+  Valid k means there are at least k input positions to return; tournament ranks must refer to real distinct positions.
+cause: |-
+  src/Population.jl:210-212; src/Utils.jl:97-131: An invalid member's `Inf` cost never displaces a sentinel, so a repeated index can win the wrong rank.
+  src/Utils.jl:97-131: An `Inf` entry leaves a fabricated duplicate index in the result.
+possible_fix: "Track occupied slots explicitly and use a defined order for nonfinite costs."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Population.tournament_rank"
+  theorem: "SymReg.Population.tournament_rank_refuted"
+covers: ["util-bottomk-sentinel"]

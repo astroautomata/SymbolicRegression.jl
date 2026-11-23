@@ -1,0 +1,59 @@
+id: "simp-population-cost"
+title: "Unbatched simplification leaves an old parsimony cost"
+priority: "P1"
+kind: "wrong-result"
+area: "Constraints and simplification"
+files: ["src/SingleIteration.jl"]
+functions: ["optimize_and_simplify_population"]
+summary: |-
+  Simplifying an unbatched member invalidates complexity without updating its parsimony-adjusted cost.
+likelihood: |-
+  PySR default-path likelihood: conditional, simplification and nonzero parsimony.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: Node
+
+  options = SymbolicRegression.Options(;
+      binary_operators=[+], should_simplify=true,
+      should_optimize_constants=false, batching=false, parsimony=1.0)
+  dataset = SymbolicRegression.Dataset(reshape([0.0], 1, :), [3.0])
+  tree = Node(1, Node(Float64; val=1.0), Node(Float64; val=2.0))
+  member = SymbolicRegression.PopMember(dataset, tree, options; deterministic=false)
+  pop = SymbolicRegression.Population([member])
+  before = member.cost
+  SymbolicRegression.SingleIterationModule.optimize_and_simplify_population(
+      dataset, pop, options, options.maxsize, nothing)
+  stored = member.cost
+  expected, _ = SymbolicRegression.LossFunctionsModule.eval_cost(dataset, member, options)
+  println("1+2 -> 3 with parsimony=1: previous cost=", before,
+          ", stored cost=", stored, ", recomputed cost=", expected)
+  if before == 3.0 && stored == 3.0 && expected == 1.0
+      println("REPRODUCED simp-population-cost")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    1+2 -> 3 with parsimony=1: previous cost=3.0, stored cost=3.0, recomputed cost=1.0
+    REPRODUCED simp-population-cost
+expected: |-
+  Folding 1+2 into 3 at parsimony 1 yields stored cost 1 when raw loss is zero.
+promised_by: |-
+  Stored cost should describe the stored expression and its current complexity.
+cause: |-
+  src/SingleIteration.jl:94-109: Simplifying an unbatched member invalidates complexity without updating its parsimony-adjusted cost.
+possible_fix: "Refresh cost after simplification using the updated size and validated loss."
+duplicates:
+  issues: [{ "number": 673, "relation": "related", "state": "closed" }]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'",
+      "gh search issues --repo astroautomata/PySR 'complexity_mapping'",
+    ]
+lean:
+  property: "SymReg.SimpCons.populationCostFresh"
+  theorem: "SymReg.SimpCons.populationCostFresh_refuted"
+covers: []

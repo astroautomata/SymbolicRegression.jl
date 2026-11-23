@@ -1,0 +1,68 @@
+id: "search-initial-evaluations"
+title: "Fresh population evaluations do not count toward max_evals"
+priority: "P1"
+kind: "wrong-result"
+area: "Search"
+files: ["src/SymbolicRegression.jl"]
+functions: ["_initialize_search!", "_warmup_search!", "_preserve_loaded_state!"]
+summary: |-
+  Initialization reports evaluations which warmup discards, understating work before budget checks.
+likelihood: |-
+  PySR default-path likelihood: default accounting; budget impact with `max_evals`.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  const SR = SymbolicRegression
+
+  options = Options(;
+      binary_operators=[+], populations=2, population_size=4,
+      tournament_selection_n=1, ncycles_per_iteration=1,
+      should_optimize_constants=false, should_simplify=false,
+      save_to_file=false, input_stream=devnull, verbosity=0, progress=false,
+  )
+  X = reshape(Float64[1, 2, 3, 4], 1, :)
+  datasets = [Dataset(X, Float64[2, 4, 6, 8])]
+  ropt = SR.SearchUtilsModule.RuntimeOptions(;
+      niterations=0, nout=1, parallelism=:serial, runtests=false,
+      verbosity=0, progress=false, return_state=true,
+  )
+  SR._validate_options(datasets, ropt, options)
+  state = SR._create_workers(datasets, ropt, options)
+  SR._initialize_search!(state, datasets, ropt, options, nothing, nothing)
+  initial_reports = sum(reply[4] for row in state.worker_output for reply in row)
+  SR._warmup_search!(state, datasets, ropt, options)
+  SR._main_search_loop!(state, datasets, ropt, options)
+  SR._tear_down!(state, datasets, ropt, options)
+  actual = sum(sum, state.num_evals)
+  expected = initial_reports
+  println("recorded initialization evaluations actual=$actual expected=$expected (worker reports)")
+  @assert initial_reports == options.population_size * options.populations == 8
+  @assert actual == 0
+  println("REPRODUCED search-initial-evaluations")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    recorded initialization evaluations actual=0.0 expected=8.0 (worker reports)
+    REPRODUCED search-initial-evaluations
+expected: |-
+  Include all eight initialization loss evaluations for two four-member populations.
+promised_by: |-
+  The evaluation budget is used to compare runs by work done.
+cause: |-
+  src/SymbolicRegression.jl:970,998-1005,1033-1039: Initialization reports evaluations which warmup discards, understating work before budget checks.
+possible_fix: "Accumulate reports from initialization before the first budget check."
+duplicates:
+  issues: [{ "number": 74, "relation": "related", "state": "closed" }]
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'",
+      "gh search issues --repo astroautomata/PySR 'max_evals'",
+    ]
+lean:
+  property: "SymReg.Search.initialization_evaluations_counted"
+  theorem: "SymReg.Search.initialization_evaluations_counted_refuted"
+covers: []

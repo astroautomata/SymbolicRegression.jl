@@ -1,0 +1,61 @@
+id: "ops-atanh-comment"
+title: "atanh_clip comment describes remainder instead of modulo"
+priority: "P3"
+kind: "documentation"
+area: "Operators"
+files: ["src/Operators.jl"]
+functions: ["atanh_clip"]
+summary: |-
+  The comment's `rem` formula disagrees with periodic `mod` wrapping on negative values.
+likelihood: |-
+  PySR default-path likelihood: conditional, code comment only |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  const O = SymbolicRegression.CoreModule.OperatorsModule
+
+  function reproduces()
+      x = -2.0
+      actual = O.atanh_clip(x)
+      @assert mod(x + 1, 2) == 1.0
+      @assert (x + 1) % 2 == -1.0
+      comment_throws = try
+          atanh((x + 1) % 2 - 1)
+          false
+      catch error
+          error isa DomainError
+      end
+      @assert actual == 0.0
+      @assert comment_throws
+      println("atanh_clip(-2.0) = ", actual, "; comment's percent/rem formula throws DomainError")
+      return true
+  end
+
+  reproduces() && println("REPRODUCED ops-atanh-comment")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    atanh_clip(-2.0) = 0.0; comment's percent/rem formula throws DomainError
+    REPRODUCED ops-atanh-comment
+expected: |-
+  Document the periodic shift using mod.
+promised_by: |-
+  The adjacent comment describes a mathematical formula expected to agree with the implementation.
+cause: |-
+  src/Operators.jl:19-20: The comment's `rem` formula disagrees with periodic `mod` wrapping on negative values.
+possible_fix: "Replace the percent-form calculation with an explicit mod call in the comment."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'gamma'",
+      "gh search issues --repo astroautomata/PySR 'gamma'",
+    ]
+lean:
+  property: "SymReg.Operators.clippingComment"
+  theorem: "SymReg.Operators.clippingComment_refuted"
+covers: []

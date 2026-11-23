@@ -1,0 +1,88 @@
+id: "regevol-crossover-prob"
+title: "A zero crossover probability can still select crossover"
+priority: "P2"
+kind: "wrong-result"
+area: "Population"
+files: ["src/RegularizedEvolution.jl"]
+functions: ["reg_evol_cycle"]
+summary: |-
+  Equality enters crossover, including the possible exact-zero draw when the option is zero.
+likelihood: |-
+  PySR default-path likelihood: default, exceptionally rare boundary |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `regevol-crossover-prob` (SymReg/Population/RegEvol.lean).
+  # The branch test is rand() > crossover_probability (src/RegularizedEvolution.jl:130). rand()
+  # can return exactly 0.0, so crossover_probability = 0.0 still runs a crossover. The default
+  # RNG is put in a state whose next Float64 is 0.0 (Xoshiro256++ output rotl(s0 + s3, 23) + s0
+  # is 0 when s0 = s3 = 0); every mutation fails and is skipped, so any change of the population
+  # comes from a crossover.
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, HallOfFame, MutationResult
+  using SymbolicRegression.RegularizedEvolutionModule: reg_evol_cycle
+  using Random
+
+  struct FailingMutation <: SymbolicRegression.AbstractMutation end
+  function SymbolicRegression.mutate!(
+      tree::N, ::P, ::FailingMutation, options; kws...
+  ) where {N,P}
+      return MutationResult{N,P}(; tree, success=false)
+  end
+
+  Random.seed!(0)
+  X = randn(2, 50)
+  y = X[1, :] .+ 1
+  dataset = Dataset(X, y)
+  options = Options(; binary_operators=[+, *], default_mutations=(),
+      mutations=(FailingMutation() => 1.0,), crossover_probability=0.0,
+      skip_mutation_failures=true, population_size=2, tournament_selection_n=1)
+  plugin_states = SymbolicRegression.init_plugin_states(options, dataset)
+
+  function replaced_after_cycle(rng_state)
+      pop = Population(dataset; population_size=2, nlength=3, options, nfeatures=2, plugin_states)
+      before = copy(pop.members)  # the member objects
+      best_seen = HallOfFame(options, dataset)
+      # No RNG draw happens between this point and the `rand()` at src/RegularizedEvolution.jl:130.
+      copy!(Random.default_rng(), rng_state)
+      reg_evol_cycle(dataset, pop, options.maxsize, options, nothing; plugin_states, best_seen)
+      return count(i -> pop.members[i] !== before[i], 1:pop.n)
+  end
+
+  probe = Xoshiro(0x0000000000000000, 0x0123456789abcdef, 0x0fedcba987654321, 0x0000000000000000)
+  println("first rand() from the crafted state: ", rand(copy(probe)))
+  control = sum(s -> replaced_after_cycle(Xoshiro(s)), 1:20)
+  println("control (20 ordinary seeds): members replaced = ", control, " (mutations always fail)")
+  replaced = replaced_after_cycle(probe)
+  println("crossover_probability = 0.0, first rand() = 0.0: members replaced = ", replaced, " (expected 0)")
+  if control == 0 && replaced > 0
+      println("REPRODUCED regevol-crossover-prob")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    first rand() from the crafted state: 0.0
+    control (20 ordinary seeds): members replaced = 0 (mutations always fail)
+    crossover_probability = 0.0, first rand() = 0.0: members replaced = 2 (expected 0)
+    REPRODUCED regevol-crossover-prob
+expected: |-
+  A probability of zero disables crossover even when the random draw is exactly zero.
+promised_by: |-
+  A disabled probabilistic operation must be unselectable.
+cause: |-
+  src/RegularizedEvolution.jl:130: Equality enters crossover, including the possible exact-zero draw when the option is zero.
+possible_fix: "Use rand() < crossover_probability for the crossover branch."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.Population.crossover_prob"
+  theorem: "SymReg.Population.crossover_prob_refuted"
+covers: []

@@ -1,0 +1,52 @@
+id: "loss-explicit-index"
+title: "Built-in eval_loss silently ignores idx"
+priority: "P2"
+kind: "wrong-result"
+area: "Loss"
+files: ["src/LossFunctions.jl"]
+functions: ["eval_loss", "_eval_loss"]
+summary: |-
+  The accepted `idx` keyword silently gives full-data loss for the built-in objective; a batch view honors the same selection.
+likelihood: |-
+  PySR default-path likelihood: off |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, eval_loss, create_expression
+  using SymbolicRegression.CoreModule: batch
+
+  options = Options(; binary_operators=[+], parsimony=0.0)
+  dataset = Dataset(reshape([1.0, 3.0], 1, :), [0.0, 0.0]; weights=[1.0, 3.0])
+  tree = create_expression(Node(Float64; feature=1), options, dataset)
+  with_idx = eval_loss(tree, dataset, options; idx=[1])
+  with_view = eval_loss(tree, batch(dataset, [1]), options)
+  println("eval_loss(idx=[1])=", with_idx, " eval_loss(batch([1]))=", with_view)
+  if with_idx == 7.0 && with_view == 1.0
+      println("REPRODUCED loss-explicit-index")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    eval_loss(idx=[1])=7.0 eval_loss(batch([1]))=1.0
+    REPRODUCED loss-explicit-index
+expected: |-
+  Apply the same sample selection as batch(dataset, idx), or reject idx explicitly for built-in losses.
+promised_by: |-
+  An accepted sample selector must control which samples are evaluated. Existing internal callers already use batch views.
+cause: |-
+  src/LossFunctions.jl:167-188: The accepted `idx` keyword silently gives full-data loss for the built-in objective; a batch view honors the same selection.
+possible_fix: "Route built-in loss through a batch view when idx is supplied."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'baseline loss'",
+      "gh search issues --repo astroautomata/PySR 'baseline loss'",
+    ]
+lean:
+  property: "SymReg.Loss.explicit_index"
+  theorem: "SymReg.Loss.explicit_index_refuted"
+covers: []

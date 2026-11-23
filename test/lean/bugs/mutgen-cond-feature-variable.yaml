@@ -1,0 +1,65 @@
+id: "mutgen-cond-feature-variable"
+title: "A constant-only branch can draw a feature mutation"
+priority: "P2"
+kind: "wrong-result"
+area: "Mutation sampling"
+files: ["src/Mutate.jl"]
+functions: ["condition_mutation_weights!"]
+summary: |-
+  Constant-only branches retain the weight of a mutation that has no variable to change.
+likelihood: |-
+  PySR default-path likelihood: default, constant-only branch |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mutgen-cond-feature-variable` (SymReg/MutateGen/ConditionProps.lean).
+  # condition_mutation_weights! zeroes FeatureMutation on a constant leaf (src/Mutate.jl:187-189)
+  # but never on an operator tree without variables, where mutate_feature also returns the tree
+  # unchanged (src/MutationFunctions.jl:201).
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.MutateModule: condition_mutation_weights!
+  using SymbolicRegression.MutationFunctionsModule: mutate_feature
+  using DynamicExpressions: Node
+
+  X = randn(2, 20)
+  dataset = Dataset(X, X[1, :] .+ 1)
+  options = Options(; binary_operators=[+, *])
+  tree = Node{Float64,2}(; op=1, children=(Node{Float64,2}(; val=1.0), Node{Float64,2}(; val=2.0)))
+  member = PopMember(dataset, tree, options; deterministic=false)
+
+  weights = copy(options.mutations)
+  condition_mutation_weights!(weights, member, options, 10, 2)
+  w = only(p.second for p in weights if p.first isa FeatureMutation)
+  mutated = mutate_feature(copy(member.tree), 2)
+  println("tree ", member.tree, ", nfeatures = 2: conditioned FeatureMutation weight = ", w,
+      "; mutate_feature gives ", mutated)
+  if w > 0 && string(mutated) == string(member.tree)
+      println("REPRODUCED mutgen-cond-feature-variable")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    tree binary_operator[1](1.0, 2.0), nfeatures = 2: conditioned FeatureMutation weight = 0.1; mutate_feature gives binary_operator[1](1.0, 2.0)
+    REPRODUCED mutgen-cond-feature-variable
+expected: |-
+  Zero the feature mutation weight when the expression has no variable leaf.
+promised_by: |-
+  There is no feature to change, and the current search still scores the result as a mutation.
+cause: |-
+  src/Mutate.jl:187-201: Constant-only branches retain the weight of a mutation that has no variable to change.
+possible_fix: "Use the presence of variable leaves when setting the feature weight."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.MutateGen.feature_needs_variable"
+  theorem: "SymReg.MutateGen.feature_needs_variable_refuted"
+covers: []

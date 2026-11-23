@@ -1,0 +1,65 @@
+id: mut-mutate-factor-negate
+title: "ConstantMutation flips a constant's sign with probability 1 - probability_negate"
+priority: P0
+kind: wrong-result
+area: Mutations
+files: [src/MutationFunctions.jl, src/Mutations.jl, src/Options.jl]
+functions: [mutate_factor, mutate_value, ConstantMutation]
+summary: |
+  `ConstantMutation`'s `probability_negate` is documented as the chance of
+  flipping the constant's sign, but `mutate_factor` negates the factor when
+  `rand(rng) > m.probability_negate`. With the default of 0.01, about 99% of
+  constant mutations flip the sign instead of 1%. The same applies to
+  `Options(probability_negate_constant=...)`, which sets that field.
+likelihood: |
+  Every default search that mutates a constant hits this path.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression, Random
+  using SymbolicRegression.MutationFunctionsModule: mutate_factor, mutate_value
+  using SymbolicRegression.CoreModule: ConstantMutation
+
+  m = ConstantMutation()  # probability_negate = 0.01
+  rng = Xoshiro(0)
+  n = 10_000
+  negated = count(_ -> mutate_factor(Float64, 1.0, m, rng) < 0, 1:n)
+  flipped = count(_ -> mutate_value(rng, 2.5, 1.0, m) < 0, 1:n)
+  println("probability_negate = ", m.probability_negate)
+  println("fraction of negative factors: ", negated / n)
+  println("fraction of sign flips of 2.5 by mutate_value: ", flipped / n)
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    probability_negate = 0.01
+    fraction of negative factors: 0.99
+    fraction of sign flips of 2.5 by mutate_value: 0.9882
+    REPRODUCED mut-mutate-factor-negate
+expected: |
+  About 1% of mutated factors are negative with the default
+  `probability_negate = 0.01`.
+promised_by: |
+  `src/Mutations.jl:38`: "`probability_negate` is the chance of flipping the
+  constant's sign."
+cause: |
+  `src/MutationFunctions.jl:181` negates when `rand(rng) > m.probability_negate`,
+  which happens with probability `1 - probability_negate`.
+possible_fix: |
+  Rename the setting after what it does and keep the search behavior unchanged:
+  SymbolicRegression.jl PR #788 renames it to `probability_flip_sign` with
+  converted defaults and deprecates the old names.
+duplicates:
+  issues:
+    - number: 783
+      relation: duplicate
+      state: open
+    - number: 788
+      relation: related
+      state: open
+  queries: ["probability_negate", "negate constant sign probability"]
+lean:
+  property: "SymReg.Mutations.mutate_factor_negate"
+  theorem: "SymReg.Mutations.mutate_factor_negate_refuted"
+covers: []

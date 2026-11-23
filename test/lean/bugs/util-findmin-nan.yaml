@@ -1,0 +1,48 @@
+id: "util-findmin-nan"
+title: "findmin_fast documentation omits different NaN semantics"
+priority: "P3"
+kind: "documentation"
+area: "Utilities"
+files: ["src/Utils.jl"]
+functions: ["findmin_fast"]
+summary: |-
+  The fast minimum uses strict comparison, with different NaN semantics from Base (Q73); call sites may prefer ignoring later NaNs.
+likelihood: |-
+  PySR default-path likelihood: off for direct helper calls |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.CoreModule.UtilsModule: findmin_fast
+  x = [1.0, NaN, 0.0]
+  actual, expected = findmin_fast(x), findmin(x)
+  println("input=", x, " actual=", actual, " expected=", expected)
+  @assert isequal(actual, (0.0, 3))
+  @assert isequal(expected, (NaN, 2))
+  println("REPRODUCED util-findmin-nan")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    input=[1.0, NaN, 0.0] actual=(0.0, 3) expected=(NaN, 2)
+    REPRODUCED util-findmin-nan
+expected: |-
+  Describe the strict comparison, its NaN behavior and first-tie selection.
+promised_by: |-
+  The helper is presented as a fast version of findmin, whose NaN behavior differs.
+cause: |-
+  src/Utils.jl:133-144: The fast minimum uses strict comparison, with different NaN semantics from Base (Q73); call sites may prefer ignoring later NaNs.
+possible_fix: "Document the ordering for the helper instead of changing its current callers’ semantics."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'",
+      "gh search issues --repo astroautomata/PySR 'tournament'",
+    ]
+lean:
+  property: "SymReg.CrossMut.findminAgreement"
+  theorem: "SymReg.CrossMut.findminAgreement_refuted"
+covers: []

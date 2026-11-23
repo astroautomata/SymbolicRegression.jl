@@ -1,0 +1,62 @@
+id: "ide-mixed-type-eval"
+title: "SR evaluation wrapper rejects mixed tree and data precision"
+priority: "P1"
+kind: "wrong-exception"
+area: "DynamicExpressions interface"
+files: ["src/InterfaceDynamicExpressions.jl"]
+functions: ["eval_tree_array", "expected_array_type"]
+summary: |-
+  DE promotes mixed data/tree inputs, then SR asserts an incompatible result vector type.
+likelihood: |-
+  PySR default-path likelihood: conditional, Julia evaluation with mixed precision |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: eval_tree_array
+
+  # InterfaceDynamicExpressions.jl:91,110,122 assert the data's element type,
+  # while DE promotes the tree and data element types before returning.
+  options = Options(; binary_operators=[+])
+  tree = Node(Float64; val=1.0)
+  X = ones(Float32, 1, 2)
+  expected, complete = eval_tree_array(tree, X, options.operators)
+  @assert complete
+  @assert expected isa Vector{Float64}
+  @assert expected == [1.0, 1.0]
+  err = try
+      eval_tree_array(tree, X, options)
+      nothing
+  catch e
+      e
+  end
+  println("direct DE output type=", typeof(expected), "; SR wrapper=", typeof(err),
+      "; error=", sprint(showerror, err))
+  @assert err isa TypeError
+  println("REPRODUCED ide-mixed-type-eval")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    direct DE output type=Vector{Float64}; SR wrapper=TypeError; error=TypeError: in typeassert, expected Vector{Float32}, got a value of type Vector{Float64}
+    REPRODUCED ide-mixed-type-eval
+expected: |-
+  Return the same promoted vector that DE returns for supported mixed scalar types.
+promised_by: |-
+  The SR wrapper forwards evaluation to DE and does not document an equal-type restriction.
+cause: |-
+  src/InterfaceDynamicExpressions.jl:91,110,122: DE promotes mixed data/tree inputs, then SR asserts an incompatible result vector type.
+possible_fix: "Assert the promoted result type instead of the input matrix element type."
+duplicates:
+  issues: []
+  queries:
+    [
+      "gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR",
+      "gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'",
+      "gh search issues --repo astroautomata/PySR 'template guess'",
+    ]
+lean:
+  property: "SymReg.Interface.mixedTypeForwarding"
+  theorem: "SymReg.Interface.mixedTypeForwarding_refuted"
+covers: []
