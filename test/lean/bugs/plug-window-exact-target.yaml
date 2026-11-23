@@ -1,0 +1,47 @@
+id: "plug-window-exact-target"
+title: "Moving the parsimony window can leave nearly all excess counts"
+priority: "P2"
+kind: "wrong-result"
+area: "Plugins"
+files: ["src/plugins/AdaptiveParsimony.jl"]
+functions: ["move_window!"]
+summary: |-
+  The break compares the last decrement instead of the remaining excess and can leave the window almost twice the target.
+likelihood: |-
+  PySR default-path likelihood: default plugin; witness uses a manually initialized window |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.AdaptiveParsimonyModule: RunningSearchStatistics, move_window!
+
+  s = RunningSearchStatistics(2, [1.0000001, 3.0], [0.5, 0.5])
+  println("window = ", s.window_size, "; initial counts = ", s.frequencies)
+  move_window!(s)
+  println("actual counts = ", s.frequencies, "; actual sum = ", sum(s.frequencies),
+      "; expected sum = ", s.window_size)
+  @assert all(>=(1), s.frequencies)
+  @assert sum(s.frequencies) > s.window_size + 1
+  println("REPRODUCED plug-window-exact-target")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    window = 2; initial counts = [1.0000001, 3.0]
+    actual counts = [1.0, 2.9999998999999997]; actual sum = 3.9999998999999997; expected sum = 2
+    REPRODUCED plug-window-exact-target
+expected: |-
+  A feasible above-window count vector should shrink to the requested total.
+promised_by: |-
+  The move_window! docstring describes a fixed sum.
+cause: |-
+  src/plugins/AdaptiveParsimony.jl:83-94: The break compares the last decrement instead of the remaining excess and can leave the window almost twice the target.
+possible_fix: "Test the residual excess after each step rather than the step size."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'adaptive_parsimony_scaling'","gh search issues --repo astroautomata/PySR 'adaptive_parsimony_scaling'"]
+lean:
+  property: "SymReg.Plugins.window_exact_target"
+  theorem: "SymReg.Plugins.window_exact_target_refuted"
+covers: []

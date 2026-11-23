@@ -1,0 +1,67 @@
+id: "ext-enzyme-optimizable-hooks"
+title: "Enzyme cannot set a template’s optimizer parameters"
+priority: "P1"
+kind: "wrong-exception"
+area: "Extensions"
+files: ["ext/SymbolicRegressionEnzymeExt.jl"]
+functions: ["GradEvaluator"]
+summary: |-
+  The Enzyme wrapper calls the raw setter with template optimizer references, causing MethodError before differentiation.
+likelihood: |-
+  PySR default-path likelihood: conditional, Enzyme and templates |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions
+  using Enzyme
+  using SymbolicRegression.ConstantOptimizationModule: Evaluator, EvaluatorContext, GradEvaluator
+
+  operators = OperatorEnum(; binary_operators=(+, *))
+  options = Options(; operators)
+  structure = TemplateStructure{(:f,),(:p,)}(
+      ((; f), (; p), (x,)) -> f(x) * p[1]; num_parameters=(; p=1)
+  )
+  ex = TemplateExpression(
+      (; f=ComposableExpression(Node{Float64}(; val=3.0); operators));
+      structure, operators, parameters=(; p=[2.0]),
+  )
+  x, refs = SymbolicRegression.get_optimizable_parameters(ex, options)
+  dataset = Dataset(reshape([1.0, 2.0], 1, :), [0.0, 0.0])
+  e = Evaluator(ex, refs, EvaluatorContext(dataset, options, nothing))
+  expected = e([4.0, 5.0])
+  @assert expected == 400.0
+  SymbolicRegression.set_optimizable_parameters!(ex, x, refs)
+  ext = Base.get_extension(SymbolicRegression, :SymbolicRegressionEnzymeExt)
+  g = GradEvaluator(e, ext.AutoEnzyme())
+  actual = try
+      g(nothing, zeros(2), [4.0, 5.0])
+  catch error
+      error
+  end
+  println("non-extension loss = ", expected, "; Enzyme result = ", actual)
+  @assert actual isa MethodError
+  @assert actual.f === iterate
+  @assert first(actual.args) === refs
+  println("REPRODUCED ext-enzyme-optimizable-hooks")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    non-extension loss = 400.0; Enzyme result = MethodError(iterate, (SymbolicRegression.TemplateExpressionModule.TemplateOptimizableRefs{Tuple{@NamedTuple{n::Int64, ref::Vector{Base.RefValue{Node{Float64, 2}}}}}}(((n = 1, ref = Base.RefValue{Node{Float64, 2}}[Base.RefValue{Node{Float64, 2}}(3.0)]),), 2),), 0x00000000000097b7)
+    REPRODUCED ext-enzyme-optimizable-hooks
+expected: |-
+  The Enzyme wrapper accepts the same template optimizer parameter vector and references as the normal evaluator.
+promised_by: |-
+  Optimizer extension hooks should use the expression’s matching getter and setter.
+cause: |-
+  ext/SymbolicRegressionEnzymeExt.jl:40: The Enzyme wrapper calls the raw setter with template optimizer references, causing MethodError before differentiation.
+possible_fix: "Call set_optimizable_parameters! in the Enzyme evaluator."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'num_parameters'","gh search issues --repo astroautomata/PySR 'num_parameters'"]
+lean:
+  property: "SymReg.Ext.enzymeOptimizableHooks"
+  theorem: "SymReg.Ext.enzymeOptimizableHooks_refuted"
+covers: []

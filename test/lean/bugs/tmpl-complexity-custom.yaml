@@ -1,0 +1,58 @@
+id: "tmpl-complexity-custom"
+title: "Template complexity_mapping never receives a template"
+priority: "P1"
+kind: "wrong-result"
+area: "Templates"
+files: ["src/TemplateExpression.jl"]
+functions: ["compute_complexity"]
+summary: |-
+  The configured callback receives component expressions only, ignoring its whole-template cost.
+likelihood: |-
+  PySR default-path likelihood: conditional, template with custom complexity |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-complexity-custom` (SymReg/Templates/TemplateOps.lean).
+  # compute_complexity(::TemplateExpression) sums compute_complexity over the inner expressions
+  # (src/TemplateExpression.jl:707-716), so a user complexity function is never called on the
+  # template, only on each inner ComposableExpression.
+  using SymbolicRegression
+  using SymbolicRegression: ComposableExpression, TemplateExpression, TemplateStructure, compute_complexity
+  using DynamicExpressions: Node
+
+  st = TemplateStructure{(:f, :g)}(((; f, g), (a,)) -> f(a) + g(a); num_features=(; f=1, g=1))
+  seen = Type[]
+  cfun(ex) = (push!(seen, typeof(ex)); ex isa TemplateExpression ? 1 : 1000)
+  opts = Options(; binary_operators=(+, *), complexity_mapping=cfun, expression_spec=TemplateExpressionSpec(; structure=st))
+  x1 = ComposableExpression(Node{Float64}(; feature=1); operators=opts.operators)
+  ex = TemplateExpression((; f=x1, g=x1); structure=st, operators=opts.operators)
+  c = compute_complexity(ex, opts)
+  println("complexity_mapping returns 1 for a TemplateExpression and 1000 otherwise")
+  println("compute_complexity(template) = ", c, "  (expected 1)")
+  println("argument types seen: ", unique(nameof.(seen)))
+  if c == 2000 && all(T -> T <: ComposableExpression, seen)
+      println("REPRODUCED tmpl-complexity-custom")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    complexity_mapping returns 1 for a TemplateExpression and 1000 otherwise
+    compute_complexity(template) = 2000  (expected 1)
+    argument types seen: [:ComposableExpression]
+    REPRODUCED tmpl-complexity-custom
+expected: |-
+  A callback which returns 1 for a TemplateExpression should set its complexity to 1.
+promised_by: |-
+  Options documents a function that maps an expression to its complexity.
+cause: |-
+  src/TemplateExpression.jl:707-716: The configured callback receives component expressions only, ignoring its whole-template cost.
+possible_fix: "Call the callback for the whole template before falling back to sum of inner sizes."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.complexityCustom"
+  theorem: "SymReg.Templates.complexityCustom_refuted"
+covers: []

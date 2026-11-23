@@ -1,0 +1,51 @@
+id: loss-equal-weights
+title: "Equal sample weights can turn a finite mean into NaN"
+priority: P3
+kind: wrong-result
+area: Loss
+files: [src/LossFunctions.jl]
+functions: [_loss, _weighted_loss]
+summary: |
+  Unit point losses average to 1.0, but enabling equal weights near floatmax
+  makes the weighted sum and the sum of weights both overflow. Dividing the
+  two infinities returns NaN.
+likelihood: |
+  The two-point example needs weights near floatmax. For longer datasets the
+  threshold falls with the total weight. Ordinary scaled weights are unlikely
+  to trigger this overflow.
+maybe_intended: "The delegated normalized sum follows IEEE arithmetic and does not rescale weights."
+reproducer: |
+  using SymbolicRegression.LossFunctionsModule: _loss, _weighted_loss
+  using LossFunctions: L1DistLoss
+
+  loss = L1DistLoss()
+  x, y = [0.0, 0.0], [1.0, 1.0]
+  unweighted = _loss(x, y, loss)
+  weighted = _weighted_loss(x, y, fill(floatmax(Float64), length(x)), loss)
+  @assert unweighted == 1.0 && isnan(weighted)
+  println("unweighted = ", unweighted, "; weighted = ", weighted)
+  println("REPRODUCED loss-equal-weights")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    unweighted = 1.0; weighted = NaN
+    REPRODUCED loss-equal-weights
+expected: "A finite weighted mean of 1.0."
+promised_by: |
+  Equal finite nonzero weights should leave the mean unchanged up to
+  floating-point rounding and preserve its finiteness.
+cause: |
+  src/LossFunctions.jl:68-69 delegates to LossFunctions.jl's normalized sum.
+  That method divides by sum(weights) after accumulation (LossFunctions.jl
+  src/losses.jl:48-51).
+possible_fix: "Rescale finite weights before computing the normalized supervised loss."
+duplicates:
+  issues: []
+  queries:
+    - 'repo:astroautomata/SymbolicRegression.jl "floatmax" "weights"'
+    - 'repo:astroautomata/PySR "floatmax" "weights"'
+lean:
+  property: SymReg.Loss.equal_weights
+  theorem: SymReg.Loss.equal_weights_refuted

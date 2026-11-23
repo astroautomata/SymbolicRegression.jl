@@ -1,0 +1,52 @@
+id: "mlj-defaults-doc"
+title: "MLJ docs list the wrong niterations default"
+priority: "P3"
+kind: "documentation"
+area: "MLJ"
+files: ["src/MLJInterface.jl"]
+functions: ["modelexpr","tag_with_docstring"]
+summary: |-
+  The documentation lists ten iterations while the constructors default to 100.
+likelihood: |-
+  PySR default-path likelihood: off |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mlj-defaults-doc` (SymReg/MLJ/FitProps.lean).
+  # The hyper-parameter docstring (src/MLJInterface.jl:808) says `niterations::Int=10`,
+  # but modelexpr builds SRRegressor and MultitargetSRRegressor with default 100
+  # (src/MLJInterface.jl:68,129-130).
+  using SymbolicRegression
+  using SymbolicRegression.MLJInterfaceModule: SRRegressor, MultitargetSRRegressor
+
+  doc = string(@doc SRRegressor)
+  i = findfirst("`niterations::Int=", doc)
+  documented = doc[i[1]:(i[1] + 20)]
+  println("docstring: ", documented)
+  println("SRRegressor().niterations = ", SRRegressor().niterations,
+      ", MultitargetSRRegressor().niterations = ", MultitargetSRRegressor().niterations)
+  if occursin("=10`", documented) && SRRegressor().niterations == 100
+      println("REPRODUCED mlj-defaults-doc")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    docstring: `niterations::Int=10`
+    SRRegressor().niterations = 100, MultitargetSRRegressor().niterations = 100
+    REPRODUCED mlj-defaults-doc
+expected: |-
+  The documentation should say 100 iterations for ordinary non-test models.
+promised_by: |-
+  MLJInterface.jl:808 lists 10; the constructor defaults to 100.
+cause: |-
+  src/MLJInterface.jl:68,129,808: The documentation lists ten iterations while the constructors default to 100.
+possible_fix: "Update the documented default."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'warm_start'","gh search issues --repo astroautomata/PySR 'warm_start'"]
+lean:
+  property: "SymReg.MLJ.defaults_doc"
+  theorem: "SymReg.MLJ.defaults_doc_refuted"
+covers: []

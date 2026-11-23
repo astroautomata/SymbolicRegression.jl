@@ -1,0 +1,61 @@
+id: "tmpl-embed-create"
+title: "Template metadata differs between create and embed paths"
+priority: "P2"
+kind: "wrong-result"
+area: "Templates"
+files: ["src/TemplateExpression.jl","src/ExpressionBuilder.jl"]
+functions: ["embed_metadata","create_expression"]
+summary: |-
+  Direct embedding and create-with-metadata disagree about component variable names.
+likelihood: |-
+  PySR default-path likelihood: conditional, component introspection |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-embed-create` (SymReg/Templates/Builder.lean).
+  # create_expression(..., Val(true)) gives every inner expression of a template the dataset's
+  # variable names (src/TemplateExpression.jl:605), but embed_metadata only rewrites the template
+  # metadata (src/ExpressionBuilder.jl:105-109), so embedding a created template differs from
+  # creating it embedded.
+  using SymbolicRegression
+  using SymbolicRegression: TemplateStructure, create_expression
+  using SymbolicRegression.ExpressionBuilderModule: embed_metadata
+  using DynamicExpressions: Node, get_contents, get_metadata
+
+  st = TemplateStructure{(:f, :g)}(((; f, g), (a,)) -> f(a) + g(a); num_features=(; f=1, g=1))
+  opts = Options(; binary_operators=(+, *), expression_spec=TemplateExpressionSpec(; structure=st))
+  ds = Dataset(randn(1, 5), randn(5); variable_names=["z"])
+  t = Node{Float64}(; val=1.5)
+  embedded = embed_metadata(create_expression(t, opts, ds), opts, ds)
+  created = create_expression(t, opts, ds, Val(true))
+  inner_names(ex) = map(e -> get_metadata(e).variable_names, values(get_contents(ex)))
+  println("template variable_names: embedded=", get_metadata(embedded).variable_names,
+      " created=", get_metadata(created).variable_names)
+  println("inner variable_names after embed_metadata:   ", inner_names(embedded))
+  println("inner variable_names from create(Val(true)): ", inner_names(created), "  (expected equal)")
+  if all(isnothing, inner_names(embedded)) && all(==(["z"]), inner_names(created))
+      println("REPRODUCED tmpl-embed-create")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    template variable_names: embedded=["z"] created=["z"]
+    inner variable_names after embed_metadata:   (nothing, nothing)
+    inner variable_names from create(Val(true)): (["z"], ["z"])  (expected equal)
+    REPRODUCED tmpl-embed-create
+expected: |-
+  Expose the same inner variable-name metadata through both embedding paths.
+promised_by: |-
+  Constructing with metadata should agree with embedding the same expression afterward.
+cause: |-
+  src/TemplateExpression.jl:605; src/ExpressionBuilder.jl:105-109: Direct embedding and create-with-metadata disagree about component variable names.
+possible_fix: "Use one rule for component argument names in both paths."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.tmplEmbedCreate"
+  theorem: "SymReg.Templates.tmplEmbedCreate_refuted"
+covers: []

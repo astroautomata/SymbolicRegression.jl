@@ -1,0 +1,64 @@
+id: "opts-doc-mutation-defaults"
+title: "Options docstring lists outdated mutation weights"
+priority: "P3"
+kind: "documentation"
+area: "Options"
+files: ["src/Options.jl"]
+functions: ["Options","default_options"]
+summary: |-
+  Ten listed values disagree with actual tuned `Options()` weights.
+likelihood: |-
+  PySR default-path likelihood: default backend settings, documentation only |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  const OM = SymbolicRegression.CoreModule.OptionsModule
+  const expected = Dict(
+      :ConstantMutation => 0.0353, :OperatorMutation => 3.63, :FeatureMutation => 0.1,
+      :SwapOperandsMutation => 0.00608, :RotateTreeMutation => 1.42, :AddNodeMutation => 0.0771,
+      :InsertNodeMutation => 2.44, :DeleteNodeMutation => 0.369, :SimplifyMutation => 0.00148,
+      :RandomizeMutation => 0.00695, :DoNothingMutation => 0.431, :OptimizeMutation => 0.0,
+      :BacksolveMutation => 0.0, :FormConnectionMutation => 0.5, :BreakConnectionMutation => 0.1,
+  )
+  @assert occursin("ConstantMutation() => 0.0353", OM.OPTION_DESCRIPTIONS)
+  options = Options(; define_helper_functions=false)
+  actual = Dict(nameof(typeof(mutation)) => weight for (mutation, weight) in options.mutations)
+  mismatches = sort!([name for name in keys(expected) if actual[name] != expected[name]])
+  for name in mismatches
+      println(name, ": actual=", actual[name], " expected(docstring)=", expected[name])
+  end
+  @assert actual[:ConstantMutation] == 0.0346
+  @assert actual[:ConstantMutation] != expected[:ConstantMutation]
+  @assert length(mismatches) == 10
+  println("REPRODUCED opts-doc-mutation-defaults")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    AddNodeMutation: actual=2.47 expected(docstring)=0.0771
+    ConstantMutation: actual=0.0346 expected(docstring)=0.0353
+    DeleteNodeMutation: actual=0.87 expected(docstring)=0.369
+    DoNothingMutation: actual=0.273 expected(docstring)=0.431
+    InsertNodeMutation: actual=0.0112 expected(docstring)=2.44
+    OperatorMutation: actual=0.293 expected(docstring)=3.63
+    RandomizeMutation: actual=0.000502 expected(docstring)=0.00695
+    RotateTreeMutation: actual=4.26 expected(docstring)=1.42
+    SimplifyMutation: actual=0.00209 expected(docstring)=0.00148
+    SwapOperandsMutation: actual=0.198 expected(docstring)=0.00608
+    REPRODUCED opts-doc-mutation-defaults
+expected: |-
+  List the actual Options() defaults or link the canonical defaults table.
+promised_by: |-
+  The Options docstring presents its list as default weights.
+cause: |-
+  src/Options.jl:472-493,1336-1350: Ten listed values disagree with actual tuned `Options()` weights.
+possible_fix: "Generate the table from the constructor defaults or reference one maintained source."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+lean:
+  property: "SymReg.Options.documentedMutationDefaults"
+  theorem: "SymReg.Options.documentedMutationDefaults_refuted"
+covers: []

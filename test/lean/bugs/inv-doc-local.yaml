@@ -1,0 +1,45 @@
+id: "inv-doc-local"
+title: "approx_inverse docstring names an unsupported abs inverse"
+priority: "P3"
+kind: "documentation"
+area: "Backsolve"
+files: ["src/InverseFunctions.jl"]
+functions: ["approx_inverse"]
+summary: |-
+  The docstring uses `abs` as a supported local inverse, while lookup deliberately declines it.
+likelihood: |-
+  PySR default-path likelihood: off, helper or optional backsolve |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  const IF = SymbolicRegression.InverseFunctionsModule
+
+  # The approx_inverse docstring (src/InverseFunctions.jl:13-20) says `abs` has an approx_inverse
+  # of `abs`, but the method table returns `nothing` for it (src/InverseFunctions.jl:114).
+  g = IF.approx_inverse(abs)
+  println("approx_inverse(abs) = ", repr(g))
+  if g === nothing
+      println("REPRODUCED inv-doc-local")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    approx_inverse(abs) = nothing
+    REPRODUCED inv-doc-local
+expected: |-
+  Remove abs from the examples or explicitly mark it unsupported.
+promised_by: |-
+  InverseFunctions.jl:16-18 presents abs as locally invertible using the helper.
+cause: |-
+  src/InverseFunctions.jl:16-18,114: The docstring uses `abs` as a supported local inverse, while lookup deliberately declines it.
+possible_fix: "Use an example that the implementation actually supports."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.Backsolve.docLocalInverse"
+  theorem: "SymReg.Backsolve.docLocalInverse_refuted"
+covers: []

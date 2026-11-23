@@ -1,0 +1,35 @@
+id: "pop-tournament-member"
+title: "A nested tournament can return a member outside the outer sample"
+priority: "P3"
+kind: "wrong-result"
+area: "Population"
+files: ["src/Population.jl", "src/Plugin.jl"]
+functions: ["best_of_sample", "_best_of_sample", "tournament_cost_multiplier"]
+summary: |-
+  A custom tournament-cost multiplier that runs a nested tournament on the same task can make the outer tournament return a population member outside its original sample.
+likelihood: |-
+  Requires a custom multiplier that runs a tournament on the same task. The shipped AdaptiveParsimony multiplier does not call a tournament.
+maybe_intended: ""
+reproducer: |
+  include(joinpath(@__DIR__, "pop-tournament-member.jl"))
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    Original sample slot: 1; returned population slot: 2
+    REPRODUCED pop-tournament-member
+expected: |-
+  The winner comes from the original sample of the outer tournament.
+promised_by: |-
+  src/Population.jl:169-174 describes the result as the winner of the sample.
+cause: |-
+  src/Population.jl:155-166,179-182,189-194,212: The nested tournament overwrites the task-local index vector before the outer tournament reads the winning slot again.
+possible_fix: "Give each active tournament its own scratch buffer while a multiplier can reenter tournament selection."
+duplicates:
+  issues: []
+  queries: ["gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament scratch reentrant'"]
+lean:
+  property: "SymReg.Population.tournament_member_live"
+  theorem: "SymReg.Population.tournament_member_live_refuted"
+covers: []

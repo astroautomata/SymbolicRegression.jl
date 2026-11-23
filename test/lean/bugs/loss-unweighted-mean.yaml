@@ -1,0 +1,63 @@
+id: loss-unweighted-mean
+title: "The elementwise_loss option describes its first two arguments in reverse order"
+priority: P3
+kind: documentation
+area: Loss
+files: [src/Options.jl, src/LossFunctions.jl]
+functions: [Options, _loss, _weighted_loss]
+summary: |
+  The Options docstring says to put the target first. Both custom elementwise
+  methods pass the prediction first, followed by the target and, when supplied,
+  the weight.
+likelihood: |
+  A user following this sentence can reverse the direction of an asymmetric
+  loss such as pinball loss. Symmetric losses are unaffected.
+maybe_intended: |
+  Prediction first is consistent with the implementation and other examples:
+  SymbolicRegression.jl docs/src/examples.md uses loss_fnc(prediction, target),
+  src/Configure.jl:122 specifies f(prediction, target, weight), and the PySR
+  README uses loss(prediction, target).
+reproducer: |
+  using SymbolicRegression: Options, Dataset, Node, eval_loss
+
+  options = Options(; elementwise_loss=(target, prediction) -> target)
+  dataset = Dataset(reshape([2.0], 1, 1), [7.0])
+  actual = eval_loss(Node(Float64; feature=1), dataset, options)
+  @assert actual == 2.0 && actual != 7.0
+  println("expected 7.0; got ", actual)
+  println("REPRODUCED loss-unweighted-mean")
+
+  weighted_options = Options(; elementwise_loss=(target, prediction, weight) -> weight * target)
+  weighted_dataset = Dataset(reshape([2.0], 1, 1), [7.0]; weights=[3.0])
+  weighted = eval_loss(Node(Float64; feature=1), weighted_dataset, weighted_options)
+  @assert weighted == 2.0 && weighted != 7.0
+  println("weighted: expected 7.0; got ", weighted)
+  println("REPRODUCED loss-custom-weighted-sum")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    expected 7.0; got 2.0
+    REPRODUCED loss-unweighted-mean
+    weighted: expected 7.0; got 2.0
+    REPRODUCED loss-custom-weighted-sum
+expected: |
+  The documentation should describe the observed argument order, with prediction
+  first and target second. The current wording implies both examples yield 7.0.
+promised_by: |
+  src/Options.jl:321-325 specifies a "scalar target (left argument), and scalar
+  predicted (right argument)" and adds the weight as a third argument.
+cause: |
+  src/LossFunctions.jl:129-137 supplies the prediction first to the reducers;
+  lines 60 and 71 retain that order when calling the custom loss.
+possible_fix: "Reverse the argument descriptions in the Options docstring sentence."
+duplicates:
+  issues: []
+  queries:
+    - 'repo:astroautomata/SymbolicRegression.jl "elementwise_loss" "argument order"'
+    - 'repo:astroautomata/PySR "elementwise_loss" "argument order"'
+lean:
+  property: SymReg.Loss.unweighted_mean
+  theorem: SymReg.Loss.unweighted_mean_refuted
+covers: [loss-custom-weighted-sum]

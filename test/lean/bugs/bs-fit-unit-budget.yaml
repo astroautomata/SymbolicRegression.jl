@@ -1,0 +1,67 @@
+id: bs-fit-unit-budget
+title: "Backsolve skips an exact unit-coefficient fit within the complexity limit"
+priority: P3
+kind: wrong-result
+area: Backsolve
+files: [src/Backsolve.jl, src/Mutate.jl]
+functions: [fit_sparse_expression, weighted_sum_costs, combine_trees_weighted_sum]
+summary: |
+  Fitting a target equal to a feature returns nothing with max_complexity=1,
+  although the feature itself is a library term of complexity 1 and fits all
+  twelve valid rows exactly. This is a missed fit; no invalid tree is returned.
+likelihood: |
+  Backsolve has zero mutation weight in the defaults, so the default search
+  never takes this path. When enabled, the replacement budget is the sampled
+  subtree complexity plus the parent tree's remaining size allowance. At the
+  size limit a leaf inherits a budget of one; the same multiplier overhead can
+  exclude a complexity-two subtree at budget two. The experiment sets the
+  tight budget directly and does not estimate its frequency with backsolve enabled.
+maybe_intended: "Pre-solve pricing is deliberately conservative. The helper is greedy and the documentation allows nothing if fitting fails."
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.BacksolveModule: combine_trees_weighted_sum, fit_sparse_expression
+
+  x = collect(1.0:12.0)
+  X = reshape(x, 1, :)
+  options = Options(; binary_operators=[+, *])
+  dataset = Dataset(X, copy(x))
+  feature = Node(Float64; feature=1)
+  mask = trues(length(x))
+  mutation = BacksolveMutation()
+  exact = combine_trees_weighted_sum([feature], [1.0], options)
+  values, valid = eval_tree_array(exact, X, options.operators)
+  @assert valid && values == x && compute_complexity(exact, options) == 1
+
+  fit = fit_sparse_expression(feature, x, dataset, options, 1;
+      backsolve_options=mutation, valid_mask=mask, max_complexity=1)
+  if isnothing(fit)
+      println("exact unit-coefficient fit has complexity=1 on 12 valid rows; fit returned nothing")
+      println("REPRODUCED bs-fit-unit-budget")
+  else
+      error("The in-budget exact fit was not missed")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    exact unit-coefficient fit has complexity=1 on 12 valid rows; fit returned nothing
+    REPRODUCED bs-fit-unit-budget
+expected: |
+  A feasible exact one-term fit is considered when the term itself already
+  evaluates to the target and does not need a coefficient node.
+promised_by: |
+  src/Backsolve.jl:566-568 describes max_complexity as a limit on the returned
+  tree. The exact-fit invariant compares that actual tree size to the limit.
+cause: |
+  The selection guard at src/Backsolve.jl:233-245 uses pre-solve costs which
+  always include coefficient and multiplication overhead. The constructor at
+  lines 438-447 drops both nodes when the fitted coefficient is one.
+possible_fix: "Try exact unweighted basis terms at their actual complexity before the greedy weighted fit."
+duplicates:
+  issues: []
+  queries: ["SymbolicRegression.jl backsolve max_complexity weighted_sum_costs unit coefficient"]
+lean:
+  property: SymReg.Backsolve.unit_fit_within_budget
+  theorem: SymReg.Backsolve.unit_fit_within_budget_refuted
+covers: []

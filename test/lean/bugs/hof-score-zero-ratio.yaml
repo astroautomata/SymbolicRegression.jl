@@ -1,0 +1,46 @@
+id: "hof-score-zero-ratio"
+title: "Equal zero losses get a positive logarithmic improvement score"
+priority: "P2"
+kind: "wrong-result"
+area: "HofMig"
+files: ["src/HallOfFame.jl"]
+functions: ["compute_zero_centered_score"]
+summary: |-
+  At equal zeros the ratio is undefined and epsilon takes over. The strict Pareto display never passes such a pair.
+likelihood: |-
+  Outside ordinary PySR defaults; depends on a direct helper call, optional templates, or an exceptionally rare zero draw.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  hall = SymbolicRegression.HallOfFameModule
+  score = hall.compute_zero_centered_score(0.0, 0.0, 1)
+  println("compute_zero_centered_score(0.0, 0.0, 1)=", score)
+  println("log(eps(0.0)) exact Float64 rational=", rationalize(BigInt, log(eps(0.0)); tol=0))
+  println("relu(NaN)=", SymbolicRegression.relu(NaN), ", relu(-Inf)=", SymbolicRegression.relu(-Inf))
+  if isfinite(score) && score > 0.0
+      println("REPRODUCED hof-score-zero-ratio")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    compute_zero_centered_score(0.0, 0.0, 1)=744.4400719213812
+    log(eps(0.0)) exact Float64 rational=-6548164122079683//8796093022208
+    relu(NaN)=0.0, relu(-Inf)=-0.0
+    REPRODUCED hof-score-zero-ratio
+expected: |-
+  For equal losses, score zero.
+promised_by: |-
+  Expected invariant for compute_zero_centered_score at src/HallOfFame.jl.
+cause: |-
+  At equal zeros the ratio is undefined and epsilon takes over. The strict Pareto display never passes such a pair.
+possible_fix: ""
+duplicates:
+  issues: []
+  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+lean:
+  property: "SymReg.HofMig.zero_ratio_no_improvement"
+  theorem: "SymReg.HofMig.zero_ratio_no_improvement_refuted"
+covers: []

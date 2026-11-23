@@ -1,0 +1,62 @@
+id: "tmpl-mutconst-total"
+title: "Constant mutation can sample an empty template parameter vector"
+priority: "P2"
+kind: "wrong-exception"
+area: "Templates"
+files: ["src/TemplateExpression.jl"]
+functions: ["mutate_constant"]
+summary: |-
+  Template construction accepts a zero-length parameter vector, but mutation can sample its empty range.
+likelihood: |-
+  PySR default-path likelihood: conditional, template with empty parameter group |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-mutconst-total` (SymReg/Templates/TemplateInit.lean).
+  # A template with a zero-length parameter vector is accepted by TemplateStructure and the
+  # constructor, but mutate_constant's parameter branch draws rand(rng, 1:num_params)
+  # (src/TemplateExpression.jl:1093), which throws on the empty range.
+  using SymbolicRegression
+  using SymbolicRegression: ComposableExpression, TemplateExpression, TemplateStructure
+  using SymbolicRegression.MutationFunctionsModule: mutate_constant
+  using SymbolicRegression.CoreModule: ConstantMutation
+  using DynamicExpressions: Node, OperatorEnum, get_metadata
+  using Random
+
+  operators = OperatorEnum(1 => (sin,), 2 => (+, *))
+  st = TemplateStructure{(:f,), (:p,)}(((; f), (; p), (a,)) -> f(a); num_features=(; f=1), num_parameters=(; p=0))
+  ex = TemplateExpression((; f=ComposableExpression(Node{Float64}(; feature=1); operators)); structure=st, operators)
+  println("template built, parameters = ", get_metadata(ex).parameters)
+  opts = Options(; binary_operators=(+, *), expression_spec=TemplateExpressionSpec(; structure=st))
+  err = try
+      mutate_constant(ex, 1.0, opts, ConstantMutation(), MersenneTwister(0))
+      nothing
+  catch e
+      e
+  end
+  println("mutate_constant -> ", err === nothing ? "ok" : sprint(showerror, err), "  (expected a mutated template)")
+  if err isa ArgumentError
+      println("REPRODUCED tmpl-mutconst-total")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    template built, parameters = (p = Float64[],)
+    mutate_constant -> ArgumentError: collection must be non-empty  (expected a mutated template)
+    REPRODUCED tmpl-mutconst-total
+expected: |-
+  Skip empty groups during mutation or reject them at construction.
+promised_by: |-
+  Every accepted parameter group must be safe for enabled template mutations.
+cause: |-
+  src/TemplateExpression.jl:1093: Template construction accepts a zero-length parameter vector, but mutation can sample its empty range.
+possible_fix: "Choose among nonempty groups only."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.mutConstTotal"
+  theorem: "SymReg.Templates.mutConstTotal_refuted"
+covers: []

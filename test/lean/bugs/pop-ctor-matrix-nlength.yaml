@@ -1,0 +1,54 @@
+id: "pop-ctor-matrix-nlength"
+title: "Matrix Population constructor ignores nlength"
+priority: "P1"
+kind: "wrong-result"
+area: "Population"
+files: ["src/Population.jl"]
+functions: ["Population"]
+summary: |-
+  The matrix constructor silently drops its advertised initialization length.
+likelihood: |-
+  PySR default-path likelihood: off, search supplies a Dataset |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `pop-ctor-matrix-nlength` (SymReg/Population/Pop.lean).
+  # Population(X, y; nlength) does not forward nlength (src/Population.jl:144), so the trees are
+  # built with the default nlength=3. With only binary operators, gen_random_tree(l, ...) yields
+  # exactly l operators, i.e. 2l + 1 nodes.
+  using SymbolicRegression
+  using SymbolicRegression: Dataset
+  using DynamicExpressions: count_nodes
+  using Random
+
+  Random.seed!(0)
+  options = Options(; binary_operators=[+, *], population_size=10, tournament_selection_n=2)
+  X = randn(2, 50)
+  y = X[1, :] .+ 1
+  plugin_states = SymbolicRegression.init_plugin_states(options, Dataset(X, y))
+  pop = Population(X, y; population_size=8, nlength=10, options, nfeatures=2, plugin_states)
+  sizes = [count_nodes(m.tree) for m in pop.members]
+  println("node counts with nlength=10: ", sizes, " (expected 21 each)")
+  if all(==(7), sizes)
+      println("REPRODUCED pop-ctor-matrix-nlength")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    node counts with nlength=10: [7, 7, 7, 7, 7, 7, 7, 7] (expected 21 each)
+    REPRODUCED pop-ctor-matrix-nlength
+expected: |-
+  With binary operators and nlength=10, generated trees have 21 nodes.
+promised_by: |-
+  The matrix constructor exposes nlength as the seed-tree growth parameter.
+cause: |-
+  src/Population.jl:131-145: The matrix constructor silently drops its advertised initialization length.
+possible_fix: "Forward nlength to the Dataset overload."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.Population.ctor_matrix_nlength"
+  theorem: "SymReg.Population.ctor_matrix_nlength_refuted"
+covers: []

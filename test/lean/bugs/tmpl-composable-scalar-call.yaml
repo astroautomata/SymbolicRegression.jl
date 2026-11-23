@@ -1,0 +1,57 @@
+id: "tmpl-composable-scalar-call"
+title: "Scalar composable evaluation leaks the incomplete result"
+priority: "P2"
+kind: "wrong-result"
+area: "Templates"
+files: ["src/ComposableExpression.jl"]
+functions: ["(ex::AbstractComposableExpression)(x::Number...)"]
+summary: |-
+  Scalar calls can expose the value of an incomplete evaluation, while the corresponding vector call returns NaN.
+likelihood: |-
+  PySR default-path likelihood: off, direct scalar call |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-composable-scalar-call` (SymReg/Templates/Composable.lean).
+  # A ComposableExpression called on numbers returns the value of an incomplete evaluation
+  # (src/ComposableExpression.jl:203-209), while the one-sample vector call maps it to NaN
+  # (src/ComposableExpression.jl:186-202).
+  using SymbolicRegression
+  using SymbolicRegression: ComposableExpression
+  using DynamicExpressions: Node, OperatorEnum
+
+  operators = OperatorEnum(1 => (inv, -), 2 => (+, /))
+  x1 = Node{Float64}(; feature=1)
+  f = ComposableExpression(Node{Float64}(; op=2, children=(Node{Float64}(; op=1, children=(x1,)),)); operators)
+
+  scalar = f(0.0)
+  vector = f([0.0])
+  println("f = -(inv(x1))")
+  println("scalar call f(0.0)   = ", scalar, "  (expected the vector call's value)")
+  println("vector call f([0.0]) = ", vector)
+  if scalar == Inf && length(vector) == 1 && isnan(only(vector))
+      println("REPRODUCED tmpl-composable-scalar-call")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    f = -(inv(x1))
+    scalar call f(0.0)   = Inf  (expected the vector call's value)
+    vector call f([0.0]) = [NaN]
+    REPRODUCED tmpl-composable-scalar-call
+expected: |-
+  f(0.0) should signal the same invalid result as f([0.0]).
+promised_by: |-
+  Scalar and vector forms represent the same expression on a single sample.
+cause: |-
+  src/ComposableExpression.jl:186-209: Scalar calls can expose the value of an incomplete evaluation, while the corresponding vector call returns NaN.
+possible_fix: "Check the evaluation completion flag before returning the scalar value."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.scalarCallAgrees"
+  theorem: "SymReg.Templates.scalarCallAgrees_refuted"
+covers: []

@@ -1,0 +1,52 @@
+id: "mut-gen-fixed-size-realizable"
+title: "Fixed-size tree generation can stop below an achievable size"
+priority: "P2"
+kind: "wrong-result"
+area: "Mutations"
+files: ["src/MutationFunctions.jl"]
+functions: ["gen_random_tree_fixed_size","_arity_picker"]
+summary: |-
+  Greedy growth can leave an unreachable remainder even when the requested size was achievable.
+likelihood: |-
+  PySR default-path likelihood: conditional, sparse mixed arities.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mut-gen-fixed-size-realizable` (SymReg/Mutations/Refute.lean).
+  # gen_random_tree_fixed_size (src/MutationFunctions.jl:464-494) grows the tree greedily: with
+  # binary and ternary operators only (nops == (0, 1, 1)) and node_count = 4, the first arity is 2
+  # or 3 with equal probability; after arity 2 one node remains, no unary operator exists, and the
+  # loop stops at 3 nodes, although a ternary root over three leaves has exactly 4.
+  using SymbolicRegression, DynamicExpressions, Random
+  using SymbolicRegression.MutationFunctionsModule: gen_random_tree_fixed_size
+
+  options = Options(; operators=OperatorEnum(1 => (), 2 => (+,), 3 => (fma,)))
+  println("nops = ", options.nops)
+  sizes = [count_nodes(gen_random_tree_fixed_size(4, options, 1, Float64, Xoshiro(seed))) for seed in 1:200]
+  println("sizes for node_count = 4 over 200 seeds: ", sort(unique(sizes)),
+          ", count of size 4: ", count(==(4), sizes), ", count of size 3: ", count(==(3), sizes))
+  if any(!=(4), sizes)
+      println("REPRODUCED mut-gen-fixed-size-realizable")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    nops = (0, 1, 1)
+    sizes for node_count = 4 over 200 seeds: [3, 4], count of size 4: 106, count of size 3: 94
+    REPRODUCED mut-gen-fixed-size-realizable
+expected: |-
+  With binary and ternary operators available, return four nodes for a request of four.
+promised_by: |-
+  When the requested node count is feasible, fixed-size generation should attain it.
+cause: |-
+  src/MutationFunctions.jl:464-494: Greedy growth can leave an unreachable remainder even when the requested size was achievable.
+possible_fix: "Pick only arities that leave a feasible remainder, or retry a dead end."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.Mutations.gen_fixed_size_realizable"
+  theorem: "SymReg.Mutations.gen_fixed_size_realizable_refuted"
+covers: []

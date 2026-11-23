@@ -1,0 +1,67 @@
+id: "mutgen-cond-swap-arity"
+title: "Ternary nodes cannot enable SwapOperandsMutation"
+priority: "P1"
+kind: "wrong-result"
+area: "Mutation sampling"
+files: ["src/Mutate.jl"]
+functions: ["condition_mutation_weights!"]
+summary: |-
+  A ternary node supports swapping operands but cannot enable its mutation weight.
+likelihood: |-
+  PySR default-path likelihood: conditional, arity above two |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mutgen-cond-swap-arity` (SymReg/MutateGen/ConditionProps.lean).
+  # condition_mutation_weights! zeroes SwapOperandsMutation unless some node has degree == 2
+  # (src/Mutate.jl:193-195), but swap_operands swaps two children of any node with degree > 1
+  # (src/MutationFunctions.jl:88-101). On a tree whose only operator is ternary the swap is
+  # disabled although it applies.
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.MutateModule: condition_mutation_weights!
+  using SymbolicRegression.MutationFunctionsModule: swap_operands
+  using DynamicExpressions: Node, OperatorEnum
+  using Random
+
+  X = randn(3, 20)
+  dataset = Dataset(X, X[1, :])
+  options = Options(; operators=OperatorEnum(1 => (cos,), 2 => (+,), 3 => (fma,)))
+  leaf(i) = Node{Float64,3}(; feature=i)
+  tree = Node{Float64,3}(; op=1, children=(leaf(1), leaf(2), leaf(3)))
+  member = PopMember(dataset, tree, options; deterministic=false)
+
+  weights = copy(options.mutations)
+  condition_mutation_weights!(weights, member, options, 10, 3)
+  before = only(p.second for p in options.mutations if p.first isa SwapOperandsMutation)
+  after = only(p.second for p in weights if p.first isa SwapOperandsMutation)
+  Random.seed!(0)
+  swapped = swap_operands(copy(member.tree))
+  changed = string(swapped) != string(member.tree)
+  println("tree: ", member.tree, "  swap_operands gives: ", swapped)
+  println("SwapOperandsMutation weight: options ", before, ", conditioned ", after)
+  if before > 0 && after == 0 && changed
+      println("REPRODUCED mutgen-cond-swap-arity")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    tree: operator_deg3[1](x1, x2, x3)  swap_operands gives: operator_deg3[1](x3, x2, x1)
+    SwapOperandsMutation weight: options 0.198, conditioned 0.0
+    REPRODUCED mutgen-cond-swap-arity
+expected: |-
+  A configured swap weight stays enabled when the expression has any node with at least two children.
+promised_by: |-
+  The swap implementation explicitly supports nodes above arity one.
+cause: |-
+  src/Mutate.jl:193-195: A ternary node supports swapping operands but cannot enable its mutation weight.
+possible_fix: "Share the swap operator’s eligibility test with conditioning."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.MutateGen.swap_kept"
+  theorem: "SymReg.MutateGen.swap_kept_refuted"
+covers: []

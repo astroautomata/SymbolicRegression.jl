@@ -1,0 +1,69 @@
+id: "search-extra-cycles"
+title: "Search executes and discards surplus evolution jobs"
+priority: "P1"
+kind: "wrong-result"
+area: "Search"
+files: ["src/SymbolicRegression.jl"]
+functions: ["_warmup_search!","_main_search_loop!","_tear_down!"]
+summary: |-
+  Dispatch runs up to `populations-1` extra jobs per output at normal completion. Teardown waits for surplus jobs but discards their results and work accounting.
+likelihood: |-
+  PySR default-path likelihood: default, most visible on short runs |; default |.
+maybe_intended: "The iteration limit may be intended to count only collected results. That still leaves avoidable work and an incomplete count (QUESTIONS.md Q24)."
+reproducer: |
+  using SymbolicRegression
+
+  struct SearchCountProbe <: SymbolicRegression.AbstractPlugin
+      cycles::Base.RefValue{Int}
+      collections::Base.RefValue{Int}
+  end
+  SymbolicRegression.on_cycle_end!(_, p::SearchCountProbe, pop, data, hof, options) =
+      (p.cycles[] += 1; nothing)
+  SymbolicRegression.on_generation_end!(_, p::SearchCountProbe, state, data, options, ropt, pop) =
+      (p.collections[] += 1; nothing)
+
+  probe = SearchCountProbe(Ref(0), Ref(0))
+  options = Options(;
+      binary_operators=[+], populations=2, population_size=4,
+      tournament_selection_n=1, ncycles_per_iteration=1,
+      should_optimize_constants=false, should_simplify=false,
+      save_to_file=false, input_stream=devnull, plugins=(probe,),
+      verbosity=0, progress=false, seed=123,
+  )
+  X = reshape(Float64[1, 2, 3, 4], 1, :)
+  y = Float64[2, 4, 6, 8]
+  equation_search(X, y; options, niterations=1, parallelism=:serial, runtests=false)
+  actual = probe.cycles[]
+  expected = options.populations
+  println("executed dispatch cycles actual=$actual expected=$expected; collected=$(probe.collections[])")
+  @assert actual == 3
+  @assert probe.collections[] == 2
+  @assert actual != expected
+  println("REPRODUCED search-extra-cycles")
+  println("collected results actual=$(probe.collections[]) expected=$actual")
+  println("REPRODUCED search-uncollected-results")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    executed dispatch cycles actual=3 expected=2; collected=2
+    REPRODUCED search-extra-cycles
+    collected results actual=2 expected=3
+    REPRODUCED search-uncollected-results
+expected: |-
+  For one completed iteration with two populations, execute and collect two jobs under the normal iteration limit.
+promised_by: |-
+  The iteration budget should govern execution as well as collected results; work outside it should not be silently discarded.
+cause: |-
+  src/SymbolicRegression.jl:1021-1060,1210-1260: Dispatch runs up to `populations-1` extra jobs per output at normal completion.
+  src/SymbolicRegression.jl:1133,1356-1378: Teardown waits for surplus jobs but discards their results and work accounting.
+possible_fix: "Count jobs already in flight against the dispatch limit."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'max_evals'","gh search issues --repo astroautomata/PySR 'max_evals'"]
+lean:
+  property: "SymReg.Search.exact_launched_cycles"
+  theorem: "SymReg.Search.exact_launched_cycles_refuted"
+covers: ["search-uncollected-results"]

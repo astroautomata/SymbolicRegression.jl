@@ -1,0 +1,49 @@
+id: "ide-raw-keyword-forward"
+title: "Raw string_tree drops the constant formatter"
+priority: "P2"
+kind: "wrong-result"
+area: "DynamicExpressions interface"
+files: ["src/InterfaceDynamicExpressions.jl"]
+functions: ["string_tree"]
+summary: |-
+  Raw rendering drops an accepted custom constant formatter that pretty rendering honors.
+likelihood: |-
+  PySR default-path likelihood: off, direct Julia rendering |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: string_tree
+
+  # InterfaceDynamicExpressions.jl:238-244 omits kws... on the default raw branch.
+  options = Options(; binary_operators=[+])
+  tree = Node(Float64; val=1.0)
+  custom = _ -> "CUSTOM"
+  actual = string_tree(tree, options; f_constant=custom)
+  expected = string_tree(tree, options.operators; f_constant=custom, pretty=false)
+  println("raw string_tree with f_constant: actual=", repr(actual), "; expected=", repr(expected))
+  @assert actual == "1.0"
+  @assert expected == "CUSTOM"
+  @assert actual != expected
+  println("REPRODUCED ide-raw-keyword-forward")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    raw string_tree with f_constant: actual="1.0"; expected="CUSTOM"
+    REPRODUCED ide-raw-keyword-forward
+expected: |-
+  Use f_constant in raw output just as in pretty output.
+promised_by: |-
+  A supported formatting keyword must be forwarded to the selected formatter.
+cause: |-
+  src/InterfaceDynamicExpressions.jl:238-244: Raw rendering drops an accepted custom constant formatter that pretty rendering honors.
+possible_fix: "Forward kws to the DE renderer in the raw branch."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Interface.rawKeywordForwarding"
+  theorem: "SymReg.Interface.rawKeywordForwarding_refuted"
+covers: []

@@ -1,0 +1,59 @@
+id: "plug-annealing-zero-tie"
+title: "A zero-temperature tie produces a NaN annealing multiplier"
+priority: "P2"
+kind: "wrong-result"
+area: "Plugins"
+files: ["src/plugins/SimulatedAnnealing.jl"]
+functions: ["mutation_acceptance_multiplier"]
+summary: |-
+  At the final zero temperature the tie multiplier is NaN; the current acceptance test still accepts the tie.
+likelihood: |-
+  PySR default-path likelihood: default, terminal tie |.
+maybe_intended: "The standard acceptance path happens to accept an equal-cost proposal because NaN < rand() is false (QUESTIONS.md Q31)."
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember, MutationAcceptanceContext,
+      mutation_acceptance_multiplier, init_plugin_state, on_cycle_start!
+  using SymbolicRegression.SimulatedAnnealingModule: SimulatedAnnealingPlugin
+
+  p = SimulatedAnnealingPlugin()
+  options = Options(; binary_operators=[+, *], plugins=(p,), default_plugins=())
+  X = reshape([1.0, 2.0, 3.0], 1, :)
+  dataset = Dataset(X, vec(X))
+  m = PopMember(dataset, Node{Float64}(; feature=1), options; deterministic=false)
+  s = init_plugin_state(p, options, dataset)
+  on_cycle_start!(s, p, 2, 2, options)
+  probabilities = map((2.0, 1.0, 0.0)) do after
+      ctx = MutationAcceptanceContext(m, m.tree, 1.0, after)
+      mutation_acceptance_multiplier(s, p, ctx, options)
+  end
+  println("last-cycle temperature = ", s.temperature)
+  println("worse/equal/better costs give multipliers = ", probabilities,
+      "; expected equal-cost multiplier = 1.0")
+  println("engine accepts equal-cost NaN multiplier at draw .5 = ", !(probabilities[2] < 0.5))
+  @assert probabilities[1] == 0.0 && isnan(probabilities[2]) && isinf(probabilities[3])
+  println("REPRODUCED plug-annealing-zero-tie")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    last-cycle temperature = 0.0
+    worse/equal/better costs give multipliers = (0.0, NaN, Inf); expected equal-cost multiplier = 1.0
+    engine accepts equal-cost NaN multiplier at draw .5 = true
+    REPRODUCED plug-annealing-zero-tie
+expected: |-
+  An equal-cost mutation at the final cycle has unit acceptance multiplier.
+promised_by: |-
+  Equal costs confer neither a bonus nor a penalty.
+cause: |-
+  src/plugins/SimulatedAnnealing.jl:71,92-93: At the final zero temperature the tie multiplier is NaN; the current acceptance test still accepts the tie.
+possible_fix: "Handle zero temperature before dividing."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'adaptive_parsimony_scaling'","gh search issues --repo astroautomata/PySR 'adaptive_parsimony_scaling'"]
+lean:
+  property: "SymReg.Plugins.annealing_zero_tie"
+  theorem: "SymReg.Plugins.annealing_zero_tie_refuted"
+covers: []

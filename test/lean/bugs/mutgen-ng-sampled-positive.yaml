@@ -1,0 +1,65 @@
+id: mutgen-ng-sampled-positive
+title: "A subnormal mutation weight can select a zero-weight mutation"
+priority: P3
+kind: wrong-result
+area: Mutation sampling
+files: [src/Mutate.jl]
+functions: [_sample_mutation, next_generation]
+summary: |
+  A finite positive subnormal total can round rand() * total up to the total.
+  No prefix then crosses the threshold, and the last entry can have zero weight.
+likelihood: |
+  The reproducer supplies a custom minimum subnormal weight and a trailing zero.
+  The installed default weights are unaffected by this extreme-input case.
+maybe_intended: "The last-index fallback handles a missing crossing without making another draw."
+reproducer: |
+  using Random
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember
+  using SymbolicRegression.MutateModule: next_generation
+  using DynamicExpressions: Node
+
+  X = reshape([1.0, 2.0, 3.0], 1, :)
+  dataset = Dataset(X, vec(X))
+  options = Options(;
+      binary_operators=[+],
+      mutations=[RotateTreeMutation() => nextfloat(0.0), DoNothingMutation() => 0.0],
+      default_plugins=(),
+      default_mutations=[],
+  )
+  parent = PopMember(dataset, Node(Float64; feature=1), options; deterministic=false)
+  state = Random.Xoshiro(0, 1, 2, 0x0000018000000000)
+  copy!(Random.default_rng(), state)
+  draw = rand()
+  copy!(Random.default_rng(), state)
+  trace = Dict{String,Any}()
+  _, accepted, count = next_generation(dataset, parent, 10, options;
+      tmp_trace=trace, plugin_states=())
+  println("draw = ", draw, "; mutation = ", trace["type"], "; accepted = ", accepted,
+      "; evaluations = ", count)
+  if draw == 0.75 && trace["type"] == "identity" && accepted && count == 0.0
+      println("REPRODUCED mutgen-ng-sampled-positive")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    draw = 0.75; mutation = identity; accepted = true; evaluations = 0.0
+    REPRODUCED mutgen-ng-sampled-positive
+expected: |
+  Select RotateTreeMutation, the only entry with positive weight.
+promised_by: |
+  Weight zero denotes a disabled mutation in src/Mutate.jl:143-162,174-210.
+cause: |
+  Float64 multiplication in src/Mutate.jl:255 rounds 0.75 * nextfloat(0.0)
+  to nextfloat(0.0). The strict crossing at lines 256-260 is never reached,
+  and line 261 returns the last index, regardless of its weight.
+possible_fix: "Retain the last positive entry as the fallback when the total is finite."
+duplicates:
+  issues: []
+  queries: ['site:github.com/MilesCranmer/SymbolicRegression.jl "_sample_mutation" "subnormal" OR "zero weight"']
+lean:
+  property: SymReg.MutateGen.ng_positive
+  theorem: SymReg.MutateGen.ng_positive_refuted
+covers: []

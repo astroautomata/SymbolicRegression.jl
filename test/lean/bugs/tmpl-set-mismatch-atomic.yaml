@@ -1,0 +1,65 @@
+id: "tmpl-set-mismatch-atomic"
+title: "A short template constants vector partially overwrites the expression"
+priority: "P2"
+kind: "wrong-exception"
+area: "Templates"
+files: ["src/TemplateExpression.jl"]
+functions: ["set_scalar_constants!"]
+summary: |-
+  A short argument causes an exception after altering both inner constants and parameters.
+likelihood: |-
+  PySR default-path likelihood: off, direct setter; optimizer uses checked setter |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-set-mismatch-atomic` (SymReg/Templates/ConstantsProps.lean).
+  # set_scalar_constants! on a TemplateExpression with a too-short vector writes the inner
+  # constants and the first parameter before throwing (src/TemplateExpression.jl:468-484).
+  using SymbolicRegression
+  using SymbolicRegression: ComposableExpression, TemplateExpression, TemplateStructure
+  using DynamicExpressions: Node, OperatorEnum, get_scalar_constants, set_scalar_constants!
+
+  operators = OperatorEnum(1 => (sin,), 2 => (+, *))
+  c1 = ComposableExpression(Node{Float64}(; val=2.0); operators)
+  c2 = ComposableExpression(Node{Float64}(; val=3.0); operators)
+  st = TemplateStructure{(:f, :g), (:p,)}(
+      ((; f, g), (; p), (a,)) -> f(a) + g(a) + p[1]; num_features=(; f=1, g=1), num_parameters=(; p=2)
+  )
+  ex = TemplateExpression((; f=c1, g=c2); structure=st, operators, parameters=(; p=[5.0, 7.0]))
+  before, refs = get_scalar_constants(ex)
+  err = try
+      set_scalar_constants!(ex, [1.0, 2.0, 3.0], refs)
+      nothing
+  catch e
+      e
+  end
+  after = get_scalar_constants(ex)[1]
+  println("constants before:        ", before)
+  println("set with [1.0, 2.0, 3.0] threw: ", typeof(err))
+  println("constants after the throw: ", after, "  (expected unchanged ", before, ")")
+  if err isa BoundsError && after == [1.0, 2.0, 3.0, 7.0]
+      println("REPRODUCED tmpl-set-mismatch-atomic")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    constants before:        [2.0, 3.0, 5.0, 7.0]
+    set with [1.0, 2.0, 3.0] threw: BoundsError
+    constants after the throw: [1.0, 2.0, 3.0, 7.0]  (expected unchanged [2.0, 3.0, 5.0, 7.0])
+    REPRODUCED tmpl-set-mismatch-atomic
+expected: |-
+  Reject the length mismatch before writing any constants or template parameters.
+promised_by: |-
+  The optimizer-facing setter rejects mismatched lengths before writing. The raw setter should likewise avoid partial writes on a shape error.
+cause: |-
+  src/TemplateExpression.jl:468-484: A short argument causes an exception after altering both inner constants and parameters.
+possible_fix: "Validate the required length once at the start."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.templateSetMismatchAtomic"
+  theorem: "SymReg.Templates.templateSetMismatchAtomic_refuted"
+covers: []

@@ -1,0 +1,56 @@
+id: "mutgen-sample-infinite"
+title: "Overflowing mutation weights can select a zero-weight mutation"
+priority: "P2"
+kind: "wrong-result"
+area: "Mutation sampling"
+files: ["src/Mutate.jl","src/plugins/AdaptiveMutationWeights.jl"]
+functions: ["_sample_mutation","condition_mutation_weights!"]
+summary: |-
+  Infinities and overflowing sums can select a zero-weight last entry. Finite near-limit base weight becomes infinite when multiplied by an ordinary learned multiplier.
+likelihood: |-
+  PySR default-path likelihood: conditional, extreme custom weights |; conditional, opt-in and extreme weights |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `mutgen-sample-infinite` (SymReg/MutateGen/SampleProps.lean).
+  # _sample_mutation (src/Mutate.jl:247-262) accepts an infinite weight (Inf >= 0.0), so the
+  # threshold rand() * total is Inf (or NaN when rand() == 0.0), no running sum exceeds it,
+  # and the fallback `lastindex(mutations)` returns the last entry even when its weight is 0.
+  # Finite weights whose sum overflows behave the same way.
+  using SymbolicRegression
+  using SymbolicRegression.MutateModule: _sample_mutation
+
+  inf_choice = _sample_mutation([:operator => Inf, :constant => 0.0])
+  overflow_choice = _sample_mutation([:operator => 1e308, :feature => 1e308, :constant => 0.0])
+  println("weights [Inf, 0.0] -> index ", inf_choice, "; weights [1e308, 1e308, 0.0] -> index ", overflow_choice)
+  if inf_choice == 2 && overflow_choice == 3
+      println("REPRODUCED mutgen-sample-infinite")
+  end
+
+  include("plug-adaptive-weights-finite.jl")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    weights [Inf, 0.0] -> index 2; weights [1e308, 1e308, 0.0] -> index 3
+    REPRODUCED mutgen-sample-infinite
+    after one improving mutation: multipliers = [1.0011098779134295, 0.9988901220865706]; all finite and nonnegative = true
+    base weights = [1.7976931348623157e308, 1.0]
+    adjusted weights = [Inf, 0.9988901220865706]; expected finite nonnegative weights
+    REPRODUCED plug-adaptive-weights-finite
+expected: |-
+  Reject an invalid distribution, or scale it safely before sampling so a zero weight is never drawn.
+promised_by: |-
+  A zero weight disables a choice in a weighted draw.
+cause: |-
+  src/Mutate.jl:247-261: Infinities and overflowing sums can select a zero-weight last entry.
+  src/plugins/AdaptiveMutationWeights.jl:148-158,173-179: Finite near-limit base weight becomes infinite when multiplied by an ordinary learned multiplier.
+possible_fix: "Normalize finite weights before summing and define how to reject or treat explicit infinities."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.MutateGen.sample_positive_extended"
+  theorem: "SymReg.MutateGen.sample_positive_extended_refuted"
+covers: ["plug-adaptive-weights-finite"]

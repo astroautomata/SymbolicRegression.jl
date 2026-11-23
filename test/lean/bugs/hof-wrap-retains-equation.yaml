@@ -1,0 +1,40 @@
+id: "hof-wrap-retains-equation"
+title: "Long output names erase displayed equations"
+priority: "P3"
+kind: "wrong-result"
+area: "Hall of fame"
+files: ["src/HallOfFame.jl"]
+functions: ["wrap_equation_string","string_dominating_pareto_curve"]
+summary: |-
+  Long output names can exhaust the wrap width and hide the equation.
+likelihood: |-
+  PySR default-path likelihood: conditional, printed Julia table |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  wrapped = SymbolicRegression.HallOfFameModule.wrap_equation_string("abc", 100, 100)
+  println("wrap_equation_string(\"abc\", 100, 100)=", repr(String(wrapped)))
+  if isempty(wrapped)
+      println("REPRODUCED hof-wrap-retains-equation")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    wrap_equation_string("abc", 100, 100)=""
+    REPRODUCED hof-wrap-retains-equation
+expected: |-
+  Print the equation even when its name leaves no room on the stats line.
+promised_by: |-
+  The printed Pareto curve is meant to display each listed equation.
+cause: |-
+  src/HallOfFame.jl:240,257-281: Long output names can exhaust the wrap width and hide the equation.
+possible_fix: "Move a long prefix to a separate line and keep the chunk width positive."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.HofMig.wrap_retains_equation"
+  theorem: "SymReg.HofMig.wrap_retains_equation_refuted"
+covers: []

@@ -1,0 +1,45 @@
+id: "util-poisson-support"
+title: "A tiny positive Poisson rate can produce −1"
+priority: "P2"
+kind: "wrong-result"
+area: "Utilities"
+files: ["src/Utils.jl"]
+functions: ["poisson_sample"]
+summary: |-
+  If `exp(-lambda)` rounds to one, the loop performs no draws and yields −1.
+likelihood: |-
+  PySR default-path likelihood: conditional, effectively zero migration rate.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression.CoreModule.UtilsModule: poisson_sample
+  using Random: MersenneTwister
+  lambda = 1.0e-20
+  actual = poisson_sample(MersenneTwister(1), lambda)
+  println("lambda=", lambda, " exp(-lambda)=", exp(-lambda), " sample=", actual, " expected nonnegative integer")
+  @assert lambda > 0
+  @assert exp(-lambda) == 1.0
+  @assert actual == -1
+  println("REPRODUCED util-poisson-support")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    lambda=1.0e-20 exp(-lambda)=1.0 sample=-1 expected nonnegative integer
+    REPRODUCED util-poisson-support
+expected: |-
+  Return a nonnegative integer, including zero at tiny positive rates.
+promised_by: |-
+  The Poisson distribution has support only on nonnegative integers.
+cause: |-
+  src/Utils.jl:146-156: If `exp(-lambda)` rounds to one, the loop performs no draws and yields −1.
+possible_fix: "Use a first iteration before comparing the product with exp(-lambda)."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'tournament'","gh search issues --repo astroautomata/PySR 'tournament'"]
+lean:
+  property: "SymReg.CrossMut.poissonSupport"
+  theorem: "SymReg.CrossMut.poissonSupport_refuted"
+covers: []

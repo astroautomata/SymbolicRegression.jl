@@ -1,0 +1,54 @@
+id: "simp-custom-maxsize"
+title: "SimplifyMutation can accept a tree above maxsize"
+priority: "P2"
+kind: "wrong-result"
+area: "Constraints and simplification"
+files: ["src/Mutate.jl"]
+functions: ["mutate!","_next_generation"]
+summary: |-
+  Simplification can increase a valid custom price and bypasses the normal constraint check.
+likelihood: |-
+  PySR default-path likelihood: conditional, custom mapping and simplification.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: Node, get_tree, count_nodes
+
+  options = SymbolicRegression.Options(;
+      binary_operators=[+], should_simplify=true, should_optimize_constants=false,
+      complexity_mapping=(ex -> 20 - count_nodes(get_tree(ex))))
+  dataset = SymbolicRegression.Dataset(reshape([0.0], 1, :), [3.0])
+  tree = Node(1, Node(Float64; val=1.0), Node(Float64; val=2.0))
+  parent = SymbolicRegression.PopMember(dataset, tree, options; deterministic=false)
+  before = SymbolicRegression.compute_complexity(parent.tree, options)
+  result = SymbolicRegression.MutateModule.mutate!(
+      copy(parent.tree), parent, SymbolicRegression.SimplifyMutation(), options;
+      trace=nothing, dataset, parent_ref=parent.ref, curmaxsize=18)
+  after = SymbolicRegression.compute_complexity(result.member.tree, options)
+  accepted = result.return_immediately && result.success
+  println("custom complexity=20-count_nodes: before=", before, ", after=", after,
+          ", curmaxsize=18, immediate acceptance=", accepted)
+  if before == 17 && after == 19 && accepted
+      println("REPRODUCED simp-custom-maxsize")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    custom complexity=20-count_nodes: before=17, after=19, curmaxsize=18, immediate acceptance=true
+    REPRODUCED simp-custom-maxsize
+expected: |-
+  Reject simplification when its custom complexity exceeds the current limit.
+promised_by: |-
+  The search's maxsize option applies to candidate complexity, including functional prices.
+cause: |-
+  src/Mutate.jl:411-449,894-927: Simplification can increase a valid custom price and bypasses the normal constraint check.
+possible_fix: "Check the simplified candidate before returning it as an accepted child."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'complexity_mapping'","gh search issues --repo astroautomata/PySR 'complexity_mapping'"]
+lean:
+  property: "SymReg.SimpCons.customSimplificationBound"
+  theorem: "SymReg.SimpCons.customSimplificationBound_refuted"
+covers: []

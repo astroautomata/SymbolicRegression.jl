@@ -1,0 +1,70 @@
+id: "tmpl-crossover-valid"
+title: "Cross-key template crossover can construct invalid children"
+priority: "P2"
+kind: "wrong-result"
+area: "Templates"
+files: ["src/TemplateExpression.jl"]
+functions: ["crossover_trees"]
+summary: |-
+  Search runs constraint checks and retries before accepting children. Direct proposal callers can see the invalid child.
+likelihood: |-
+  Outside ordinary PySR defaults; depends on a direct helper call, optional templates, or an exceptionally rare zero draw.
+maybe_intended: "Search treats low-level output as a proposal."
+reproducer: |
+  # Reproducer for registry entry `tmpl-crossover-valid` (SymReg/Templates/TemplateMut.lean).
+  # crossover_trees(::TemplateExpression) samples a key independently in each parent
+  # (src/TemplateExpression.jl:1003-1004), so a subtree of `g` (two features) can land in `f`
+  # (one feature), giving a child with invalid variables from two valid parents.
+  using SymbolicRegression
+  using SymbolicRegression: ComposableExpression, TemplateExpression, TemplateStructure
+  using SymbolicRegression.TemplateExpressionModule: has_invalid_variables
+  using SymbolicRegression.MutationFunctionsModule: crossover_trees
+  using DynamicExpressions: Node, OperatorEnum, get_contents, get_tree
+  using Random
+
+  operators = OperatorEnum(1 => (sin,), 2 => (+, *))
+  st = TemplateStructure{(:f, :g)}(((; f, g), (a, b)) -> f(a) + g(a, b); num_features=(; f=1, g=2))
+  make() = TemplateExpression(
+      (; f=ComposableExpression(Node{Float64}(; feature=1); operators),
+         g=ComposableExpression(Node{Float64}(; feature=2); operators));
+      structure=st, operators,
+  )
+  p1, p2 = make(), make()
+  println("parents valid: ", !has_invalid_variables(p1), " ", !has_invalid_variables(p2))
+  found = false
+  for seed in 1:200
+      c1, c2 = crossover_trees(p1, p2, MersenneTwister(seed))
+      if has_invalid_variables(c1) || has_invalid_variables(c2)
+          bad = has_invalid_variables(c1) ? c1 : c2
+          println("seed $seed: child f = ", get_tree(get_contents(bad).f), ", g = ", get_tree(get_contents(bad).g),
+              "  (f may only use x1)")
+          global found = true
+          break
+      end
+  end
+  if found
+      println("REPRODUCED tmpl-crossover-valid")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    parents valid: true true
+    seed 1: child f = x2, g = x2  (f may only use x1)
+    REPRODUCED tmpl-crossover-valid
+expected: |-
+  Crossovers of valid templates preserve feature bounds.
+promised_by: |-
+  Expected invariant for crossover_trees at src/TemplateExpression.jl.
+cause: |-
+  Search runs constraint checks and retries before accepting children. Direct proposal callers can see the invalid child.
+possible_fix: ""
+duplicates:
+  issues: []
+  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+lean:
+  property: "SymReg.Templates.crossoverValid"
+  theorem: "SymReg.Templates.crossoverValid_refuted"
+covers: []

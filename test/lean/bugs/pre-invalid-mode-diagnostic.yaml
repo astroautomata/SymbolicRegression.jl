@@ -1,0 +1,49 @@
+id: "pre-invalid-mode-diagnostic"
+title: "Invalid precompile mode raises the wrong exception"
+priority: "P2"
+kind: "wrong-exception"
+area: "Infrastructure"
+files: ["src/precompile.jl"]
+functions: ["@maybe_setup_workload","@maybe_compile_workload","do_precompilation"]
+summary: |-
+  Concatenating `show(mode)` loses the intended invalid-mode diagnostic and throws MethodError.
+likelihood: |-
+  PySR default-path likelihood: off |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+
+  caught = try
+      SymbolicRegression.do_precompilation(Val(:invalid))
+      nothing
+  catch e
+      e
+  end
+  @assert caught isa MethodError
+  @assert caught.f === *
+  println("\ndo_precompilation(Val(:invalid)) throws ", typeof(caught),
+      " from string * nothing; expected ErrorException with Invalid value for mode")
+  println("REPRODUCED pre-invalid-mode-diagnostic")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    :invalid
+    do_precompilation(Val(:invalid)) throws MethodError from string * nothing; expected ErrorException with Invalid value for mode
+    REPRODUCED pre-invalid-mode-diagnostic
+expected: |-
+  Raise ErrorException with the stated invalid-mode message.
+promised_by: |-
+  The invalid branch is meant to report an unsupported mode through error(...).
+cause: |-
+  src/precompile.jl:1-55: Concatenating `show(mode)` loses the intended invalid-mode diagnostic and throws MethodError.
+possible_fix: "Use repr or sprint(show, mode) when building the message."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'","gh search issues --repo astroautomata/PySR 'batching'"]
+lean:
+  property: "SymReg.Infra.precompileInvalidDiagnostic"
+  theorem: "SymReg.Infra.precompileInvalidDiagnostic_refuted"
+covers: []

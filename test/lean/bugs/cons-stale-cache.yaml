@@ -1,0 +1,46 @@
+id: "cons-stale-cache"
+title: "A stale size integer bypasses the maximum size check"
+priority: "P2"
+kind: "wrong-result"
+area: "SimpCons"
+files: ["src/CheckConstraints.jl"]
+functions: ["check_constraints"]
+summary: |-
+  The top-level check trusts the optional caller cache. If this is intentional, document the caller responsibility.
+likelihood: |-
+  Outside ordinary PySR defaults; depends on a direct helper call, optional templates, or an exceptionally rare zero draw.
+maybe_intended: "The cache avoids recomputing the expression size."
+reproducer: |
+  using SymbolicRegression
+  using DynamicExpressions: Node
+
+  options = SymbolicRegression.Options(; binary_operators=[+], complexity_of_variables=2)
+  tree = Node(Float64; feature=1)
+  fresh = SymbolicRegression.CheckConstraintsModule.check_constraints(tree, options, 1)
+  cached = SymbolicRegression.CheckConstraintsModule.check_constraints(tree, options, 1, 1)
+  println("complexity=2, maxsize=1: uncached=", fresh, ", stale cached_size=1 -> ", cached)
+  if !fresh && cached
+      println("REPRODUCED cons-stale-cache")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    complexity=2, maxsize=1: uncached=false, stale cached_size=1 -> true
+    REPRODUCED cons-stale-cache
+expected: |-
+  An oversized tree fails the size check even when an inconsistent size is supplied.
+promised_by: |-
+  Expected invariant for check_constraints at src/CheckConstraints.jl.
+cause: |-
+  The top-level check trusts the optional caller cache. If this is intentional, document the caller responsibility.
+possible_fix: ""
+duplicates:
+  issues: []
+  queries: ["Read-only issue lists for SymbolicRegression.jl and PySR; tournament, get_tree, max_evals, and template guess searches"]
+lean:
+  property: "SymReg.SimpCons.staleCacheSound"
+  theorem: "SymReg.SimpCons.staleCacheSound_refuted"
+covers: []

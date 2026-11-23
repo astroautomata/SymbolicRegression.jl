@@ -1,0 +1,48 @@
+id: "cfg-weights-shape"
+title: "Dataset configuration accepts the wrong number of weights"
+priority: "P1"
+kind: "missing-error"
+area: "Infrastructure"
+files: ["src/Configure.jl"]
+functions: ["test_dataset_configuration"]
+summary: |-
+  Dataset configuration accepts one weight for several samples despite describing a matching length requirement.
+likelihood: |-
+  PySR default-path likelihood: off, Python validates input weights.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, test_dataset_configuration
+
+  X = reshape([1.0, 2.0, 3.0], 1, :)
+  dataset = Dataset(X, zeros(3); weights=[1.0])
+  options = Options(; binary_operators=[+])
+  result = test_dataset_configuration(dataset, options, 0)
+  @assert dataset.n == 3 && length(dataset.weights) == 1
+  @assert result === nothing
+  println("test_dataset_configuration accepted n=3 with one weight; expected dimension rejection")
+  println("REPRODUCED cfg-weights-shape")
+  println("REPRODUCED cfg-dataset-acceptance")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    test_dataset_configuration accepted n=3 with one weight; expected dimension rejection
+    REPRODUCED cfg-weights-shape
+    REPRODUCED cfg-dataset-acceptance
+expected: |-
+  Reject a weight vector of length 1 for a dataset with three samples.
+promised_by: |-
+  Dataset.jl states that weights have shape (n,); Configure.jl describes the same input dimension.
+cause: |-
+  src/Configure.jl:99-125: Dataset configuration accepts one weight for several samples despite describing a matching length requirement.
+possible_fix: "Compare weight length with sample count during dataset validation."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'batching'","gh search issues --repo astroautomata/PySR 'batching'"]
+lean:
+  property: "SymReg.Infra.datasetWeightsShape"
+  theorem: "SymReg.Infra.datasetWeightsShape_refuted"
+covers: ["cfg-dataset-acceptance"]

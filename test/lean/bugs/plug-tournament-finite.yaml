@@ -1,0 +1,74 @@
+id: "plug-tournament-finite"
+title: "Adaptive parsimony can erase ordinary Float32 tournament ordering"
+priority: "P0"
+kind: "wrong-result"
+area: "Plugins"
+files: ["src/plugins/AdaptiveParsimony.jl"]
+functions: ["tournament_cost_multiplier"]
+summary: |-
+  Ordinary Float32 fitness loses ordering when the exponential multiplier overflows, even with default scaling.
+likelihood: |-
+  PySR default-path likelihood: default, concentrated frequencies or small `maxsize` |.
+maybe_intended: ""
+reproducer: |
+  using SymbolicRegression
+  using SymbolicRegression: Dataset, PopMember, tournament_cost_multiplier, compute_complexity
+  using SymbolicRegression.AdaptiveParsimonyModule: AdaptiveParsimonyPlugin, init_plugin_state
+  using SymbolicRegression.PopulationModule: _best_of_sample
+
+  p = AdaptiveParsimonyPlugin()
+  options = Options(; binary_operators=[+, *], plugins=(p,), default_plugins=(),
+      maxsize=10, tournament_selection_n=2, population_size=10, tournament_selection_p=1.0)
+  X = reshape(Float32[1, 2, 3, 4], 1, :)
+  dataset = Dataset(X, vec(X))
+  s = init_plugin_state(p, options, dataset)
+  members = [PopMember(dataset, Node{Float32}(; feature=1), options; deterministic=false)
+      for _ in 1:2]
+  @assert typeof(members[1].cost) === Float32
+  members[1].cost = 2.0f0
+  members[2].cost = 1.0f0
+  f = s.rss.normalized_frequencies[compute_complexity(members[1], options)]
+  multiplier = tournament_cost_multiplier(s, p, members[1], options)
+  adjusted = [m.cost * tournament_cost_multiplier(s, p, m, options) for m in members]
+  winner = _best_of_sample(members, [1, 2], options; plugin_states=(s,))
+  zero_adjusted = 0.0f0 * multiplier
+  println("Float32 data; default scaling = ", options.adaptive_parsimony_scaling,
+      "; normalized frequency = ", f)
+  println("Float32 threshold log(floatmax)/scaling = ",
+      log(Float64(floatmax(Float32))) / options.adaptive_parsimony_scaling)
+  println("Float64 threshold log(floatmax)/scaling = ",
+      log(floatmax(Float64)) / options.adaptive_parsimony_scaling)
+  println("plugin multiplier = ", multiplier, "; expected finite multiplier for finite inputs")
+  println("costs = ", [m.cost for m in members], "; adjusted costs = ", adjusted,
+      "; zero adjusted cost = ", zero_adjusted)
+  println("winner cost = ", winner.cost, "; expected lower cost = ", members[2].cost)
+  @assert isinf(multiplier) && all(isinf, adjusted) && isnan(zero_adjusted)
+  @assert winner === members[1]
+  println("REPRODUCED plug-tournament-finite")
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    Float32 data; default scaling = 1040.0; normalized frequency = 0.1
+    Float32 threshold log(floatmax)/scaling = 0.08531042216545034
+    Float64 threshold log(floatmax)/scaling = 0.6824833777821
+    plugin multiplier = Inf; expected finite multiplier for finite inputs
+    costs = Float32[2.0, 1.0]; adjusted costs = Float32[Inf, Inf]; zero adjusted cost = NaN
+    winner cost = 2.0; expected lower cost = 1.0
+    REPRODUCED plug-tournament-finite
+expected: |-
+  Prefer the lower-cost member when the two members receive the same adaptive penalty.
+promised_by: |-
+  A multiplier shared by two finite costs should preserve their ordering.
+cause: |-
+  src/plugins/AdaptiveParsimony.jl:174-179: Ordinary Float32 fitness loses ordering when the exponential multiplier overflows, even with default scaling.
+possible_fix: "Compare penalized costs in a representation that avoids overflow, including zero-cost members."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'adaptive_parsimony_scaling'","gh search issues --repo astroautomata/PySR 'adaptive_parsimony_scaling'"]
+lean:
+  property: "SymReg.Plugins.tournament_finite"
+  theorem: "SymReg.Plugins.tournament_finite_refuted"
+covers: []

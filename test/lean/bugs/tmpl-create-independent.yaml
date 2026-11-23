@@ -1,0 +1,57 @@
+id: "tmpl-create-independent"
+title: "Independent expression builds share a parameter matrix"
+priority: "P1"
+kind: "wrong-result"
+area: "Templates"
+files: ["src/ExpressionBuilder.jl"]
+functions: ["create_expression","extra_init_params"]
+summary: |-
+  Two generic ParametricExpression builds share the caller's parameter matrix and edits leak between them.
+likelihood: |-
+  PySR default-path likelihood: off, generic Julia expression type |.
+maybe_intended: ""
+reproducer: |
+  # Reproducer for registry entry `tmpl-create-independent` (SymReg/Templates/Builder.lean).
+  # The generic extra_init_params returns options.expression_options itself
+  # (src/ExpressionBuilder.jl:84-93, "TODO: Potential aliasing here"), so every DE
+  # ParametricExpression created from one Options object holds the same parameter matrix.
+  using SymbolicRegression
+  using SymbolicRegression: create_expression
+  using DynamicExpressions: ParametricExpression, ParametricNode, get_metadata
+
+  P = ones(1, 2)
+  opts = Options(; binary_operators=(+,), expression_type=ParametricExpression, node_type=ParametricNode,
+      expression_options=(; parameters=P, parameter_names=["p"]))
+  ds = Dataset(randn(1, 5), randn(5))
+  a = create_expression(1.0, opts, ds)
+  b = create_expression(2.0, opts, ds)
+  get_metadata(a).parameters[1, 1] = 42.0
+  println("a and b share the parameter matrix: ", get_metadata(a).parameters === get_metadata(b).parameters)
+  println("after writing 42.0 into a's parameters: b[1,1] = ", get_metadata(b).parameters[1, 1],
+      ", options matrix P[1,1] = ", P[1, 1], "  (expected 1.0)")
+  if get_metadata(a).parameters === get_metadata(b).parameters && get_metadata(b).parameters[1, 1] == 42.0
+      println("REPRODUCED tmpl-create-independent")
+  end
+runtime:
+  julia_version: "1.12.6"
+  sr_commit: "103f5d4299222fa4af70110f4886ced4f3fdac1b"
+  de_version: "2.13.0"
+  output: |
+    RUNTIME julia=1.12.6 de=2.13.0
+    a and b share the parameter matrix: true
+    after writing 42.0 into a's parameters: b[1,1] = 42.0, options matrix P[1,1] = 42.0  (expected 1.0)
+    REPRODUCED tmpl-create-independent
+expected: |-
+  Editing one search candidate does not change another candidate or Options.
+promised_by: |-
+  Independent candidate construction must not couple mutable optimizer parameters.
+cause: |-
+  src/ExpressionBuilder.jl:84-93: Two generic ParametricExpression builds share the caller's parameter matrix and edits leak between them.
+possible_fix: "Copy parameters that candidate optimization can mutate."
+duplicates:
+  issues: []
+  queries: ["gh issue list --state all on astroautomata/SymbolicRegression.jl and astroautomata/PySR","gh search issues --repo astroautomata/SymbolicRegression.jl 'template guess'","gh search issues --repo astroautomata/PySR 'template guess'"]
+lean:
+  property: "SymReg.Templates.createIndependent"
+  theorem: "SymReg.Templates.createIndependent_refuted"
+covers: []
