@@ -2,6 +2,7 @@ module DatasetModule
 
 using Random: AbstractRNG, default_rng
 using DynamicQuantities: Quantity
+using DynamicExpressions: FeatureMajorMatrix, feature_major_matrix, feature_major_batch
 
 using ..UtilsModule: subscriptify, get_base_type
 using ..ProgramConstantsModule: DATA_TYPE, LOSS_TYPE
@@ -61,6 +62,7 @@ mutable struct BasicDataset{
     YU<:Union{Quantity,Nothing},
     XUS<:Union{AbstractVector{<:Quantity},Nothing},
     YUS<:Union{Quantity,Nothing},
+    AXE<:AbstractMatrix{T},
 } <: Dataset{T,L}
     const X::AX
     const y::AY
@@ -79,6 +81,7 @@ mutable struct BasicDataset{
     const y_units::YU
     const X_sym_units::XUS
     const y_sym_units::YUS
+    const X_eval::AXE
 end
 
 """
@@ -87,13 +90,22 @@ end
 A dataset type that represents a batch of data from a BasicDataset. Calls to `.X`, `.y`,
 `.weights`, etc. will return the batched versions of these.
 """
-struct SubDataset{T<:DATA_TYPE,L<:LOSS_TYPE,D<:BasicDataset{T,L},I<:AbstractVector{Int}} <:
-       Dataset{T,L}
+struct SubDataset{
+    T<:DATA_TYPE,
+    L<:LOSS_TYPE,
+    D<:BasicDataset{T,L},
+    I<:AbstractVector{Int},
+    AXE<:AbstractMatrix{T},
+} <: Dataset{T,L}
     _dataset::D
     _indices::I
+    _X_eval::AXE
 end
 @inline get_full_dataset(d::SubDataset) = getfield(d, :_dataset)
 @inline get_indices(d::SubDataset) = getfield(d, :_indices)
+@inline eval_X(d::BasicDataset) = getfield(d, :X_eval)
+@inline eval_X(d::SubDataset) = getfield(d, :_X_eval)
+@inline eval_X(d::Dataset) = d.X
 @inline function Base.getproperty(d::SubDataset, prop::Symbol)
     if prop == :X
         return view(get_full_dataset(d).X, :, get_indices(d))
@@ -220,6 +232,8 @@ function Dataset(
 
     error_on_mismatched_size(nfeatures, X_si_units)
 
+    X_eval = X isa Matrix ? feature_major_matrix(X) : X
+
     return BasicDataset{
         T,
         out_loss_type,
@@ -231,6 +245,7 @@ function Dataset(
         typeof(y_si_units),
         typeof(X_sym_units),
         typeof(y_sym_units),
+        typeof(X_eval),
     }(
         X,
         y,
@@ -249,6 +264,7 @@ function Dataset(
         y_si_units,
         X_sym_units,
         y_sym_units,
+        X_eval,
     )
 end
 
@@ -282,6 +298,8 @@ function Base.fill!(d::Dataset, val)
     _fill!(d.y, val)
     _fill!(d.weights, val)
     _fill!(d.extra, val)
+    Xe = eval_X(d)
+    Xe === d.X || _fill!(Xe, val)
     return d
 end
 _fill!(x::AbstractArray, val) = fill!(x, val)
@@ -305,7 +323,11 @@ Create a batched dataset by randomly sampling from the original dataset.
 - `batch_size::Int`: The size of the batch to create
 """
 function batch(dataset::BasicDataset{T,L}, indices::AbstractVector{Int}) where {T,L}
-    return SubDataset{T,L,typeof(dataset),typeof(indices)}(dataset, indices)
+    X_eval = dataset.X isa Matrix ? feature_major_batch(dataset.X, indices) :
+        view(dataset.X, :, indices)
+    return SubDataset{T,L,typeof(dataset),typeof(indices),typeof(X_eval)}(
+        dataset, indices, X_eval
+    )
 end
 function batch(rng::AbstractRNG, dataset::BasicDataset{T,L}, batch_size::Int) where {T,L}
     return batch(dataset, rand(rng, 1:(dataset.n), batch_size))
