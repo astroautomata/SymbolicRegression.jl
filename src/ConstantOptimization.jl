@@ -8,13 +8,32 @@ using ADTypes: AbstractADType, AutoEnzyme
 using DifferentiationInterface: value_and_gradient, prepare_gradient
 using DynamicExpressions:
     AbstractExpression,
+    AbstractExpressionNode,
     Expression,
+    OperatorEnum,
+    FeatureMajorMatrix,
+    get_tree,
+    get_child,
+    get_operators,
+    preserve_sharing,
+    with_contents,
+    eval_tree_array,
+    constructorof,
     get_scalar_constants,
     set_scalar_constants!,
     extract_gradient
+using DynamicExpressions.EvaluateModule: reset_index!
 using DispatchDoctor: @unstable
 using ..CoreModule:
-    AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, specialized_options, dataset_fraction
+    AbstractOptions,
+    Dataset,
+    DATA_TYPE,
+    LOSS_TYPE,
+    specialized_options,
+    dataset_fraction,
+    eval_X,
+    with_eval_X,
+    has_units
 using ..UtilsModule: get_birth_order, PerTaskCache, stable_get!
 using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost
 using ..PopMemberModule: AbstractPopMember, PopMember
@@ -282,9 +301,11 @@ end
     dataset::Dataset{T,L},
     options::AbstractOptions,
     eval_context,
+    n_params::Int,
 ) where {T<:Number,L<:LOSS_TYPE,N<:AbstractExpressionNode{T}}
     preserve_sharing(N) && return nothing
-    options.operators isa OperatorEnum || return nothing
+    ops = get_operators(ex, options)
+    ops isa OperatorEnum || return nothing
     options.autodiff_backend === nothing || return nothing
     options.turbo isa Val{false} || return nothing
     has_units(dataset) && return nothing
@@ -305,28 +326,29 @@ end
     k == 0 && return nothing
 
     n = dataset.n
+    nfeatures_base = size(X_base, 1)
     data = Matrix{T}(undef, n, m_orig + k)
     for i in 1:m_orig
         src_col = Int(@inbounds orig_features[i])
+        (1 <= src_col <= nfeatures_base) || return nothing
         @inbounds copyto!(data, (i - 1) * n + 1, X_base.data, (src_col - 1) * n + 1, n)
     end
     for m in 1:k
         eval_context === nothing || reset_index!(eval_context.buffer)
-        pred, ok = eval_tree_array(
-            hoisted_nodes[m], X_base, options.operators; eval_context
-        )
+        pred, ok = eval_tree_array(hoisted_nodes[m], X_base, ops; eval_context)
         ok || return nothing
         @inbounds copyto!(data, (m_orig + m - 1) * n + 1, pred, 1, n)
     end
 
     opt_refs = Vector{Base.RefValue{N}}()
     opt_node = _build_hoisted_node(raw_tree, orig_features, hoisted_nodes, m_orig, opt_refs)
+    length(opt_refs) == n_params || return nothing
     X_hoisted = FeatureMajorMatrix{T}(data)
     opt_dataset = with_eval_X(dataset, X_hoisted)
     opt_ex = with_contents(ex, opt_node)
     return (opt_ex, opt_refs, opt_dataset)
 end
-_try_hoist_for_optimization(_, _, _, _) = nothing
+_try_hoist_for_optimization(_, _, _, _, _) = nothing
 
 function _optimize_constants(
     dataset, member::P, x0, refs, options, algorithm, optimizer_options, rng
@@ -337,7 +359,9 @@ function _optimize_constants(
     else
         nothing
     end
-    hoisted = _try_hoist_for_optimization(tree, dataset, options, eval_context)
+    hoisted = _try_hoist_for_optimization(
+        tree, dataset, options, eval_context, length(x0)
+    )
     if hoisted !== nothing
         opt_tree, opt_refs, opt_dataset = hoisted
         ctx = EvaluatorContext(opt_dataset, options, eval_context)
