@@ -116,16 +116,22 @@ example : ¬ (0 < (0 : Int) ∧ 0 ≤ (1 : Int)) := by decide
 theorem less_self (x : JF) : less x x = false := by
   cases x <;> simp [less, DynExpr.Expressions.Sampling.greater]
 
+theorem isless_self (x : JF) : isless x x = false := by
+  cases x <;> simp [isless, less, DynExpr.Expressions.Sampling.greater]
 
 def nan_recovery : Prop := ∀ (incumbent challenger : Member) (fresh : Nat),
   incumbent.cost = .nan → challenger.cost ≠ .nan →
   (((updateUnchecked ⟨[⟨incumbent, true⟩]⟩ challenger 1 fresh).1.slots[0]?).map
     (fun s => s.member.cost)) = some challenger.cost
 
-theorem nan_recovery_refuted : ¬ nan_recovery := by
-  intro hp
-  have hh := hp (specimen .nan (.fin 1)) (specimen (.fin 1) (.fin 1)) 2 rfl (by decide)
-  simp [updateUnchecked, specimen, less, DynExpr.Expressions.Sampling.greater] at hh
+theorem nan_recovery_holds : nan_recovery := by
+  intro incumbent challenger fresh hi hc
+  have his : isless challenger.cost incumbent.cost = true := by
+    rw [hi]
+    cases h : challenger.cost with
+    | nan => exact absurd h hc
+    | _ => rfl
+  simp [updateUnchecked, hc, his, copyMember]
 
 def checked_size_reject : Prop :=
   ∀ (h : Hof) (m : Member) (maxsize : Int) (fresh : Nat)
@@ -209,31 +215,42 @@ def ReplacementEffects (s : UpdateServices) (m : Member) (size : Int)
       actual.2.hall.slots = stop.hall.slots.set (size.toNat - 1) ⟨stored, true⟩ ∧
       actual.2.events = stop.events ++ [.mark size]))
 
-def update_rule : Prop := ∀ (s : UpdateServices) m size st slot,
+def update_rule : Prop := ∀ (s : UpdateServices) m size st,
   0 < size → size ≤ (st.hall.slots.length : Int) →
-  st.hall.slots[size.toNat - 1]? = some slot →
   let actual := runUnchecked s m size st
-  (slot.exists = false → ReplacementEffects s m size st actual) ∧
-  (slot.exists = true →
-    let first := s.cost (st.readMember m) st
-    (∀ e next, first = (.error e, next) → actual = (.error e, next)) ∧
-    (∀ a next, first = (.ok a, next) →
-      (next.hall.slots[size.toNat - 1]? = none → actual = (.error .boundsError, next)) ∧
-      ∀ incumbent, next.hall.slots[size.toNat - 1]? = some incumbent →
-      let second := s.cost (next.readMember incumbent.member) next
-      (∀ e stop, second = (.error e, stop) → actual = (.error e, stop)) ∧
-      ∀ b tested, second = (.ok b, tested) →
-      let compared := s.compare a b (tested.record (.compare size))
-      (∀ e stop, compared = (.error e, stop) → actual = (.error e, stop)) ∧
-      (∀ stop, compared = (.ok false, stop) → actual = (.ok (), stop)) ∧
-      (∀ accepted, compared = (.ok true, accepted) →
-        ReplacementEffects s m size accepted actual)))
+  let checkCost := s.cost (st.readMember m) st
+  (∀ e next, checkCost = (.error e, next) → actual = (.error e, next)) ∧
+  (∀ c next, checkCost = (.ok c, next) →
+    let checkNaN := s.isNaN c next
+    (∀ e stop, checkNaN = (.error e, stop) → actual = (.error e, stop)) ∧
+    (∀ stop, checkNaN = (.ok true, stop) → actual = (.ok (), stop)) ∧
+    (∀ ready, checkNaN = (.ok false, ready) →
+      (ready.hall.slots[size.toNat - 1]? = none → actual = (.error .boundsError, ready)) ∧
+      ∀ slot, ready.hall.slots[size.toNat - 1]? = some slot →
+      (slot.exists = false → ReplacementEffects s m size ready actual) ∧
+      (slot.exists = true →
+        let first := s.cost (ready.readMember m) ready
+        (∀ e next, first = (.error e, next) → actual = (.error e, next)) ∧
+        (∀ a next, first = (.ok a, next) →
+          (next.hall.slots[size.toNat - 1]? = none → actual = (.error .boundsError, next)) ∧
+          ∀ incumbent, next.hall.slots[size.toNat - 1]? = some incumbent →
+          let second := s.cost (next.readMember incumbent.member) next
+          (∀ e stop, second = (.error e, stop) → actual = (.error e, stop)) ∧
+          ∀ b tested, second = (.ok b, tested) →
+          let compared := s.compare a b (tested.record (.compare size))
+          (∀ e stop, compared = (.error e, stop) → actual = (.error e, stop)) ∧
+          (∀ stop, compared = (.ok false, stop) → actual = (.ok (), stop)) ∧
+          (∀ accepted, compared = (.ok true, accepted) →
+            ReplacementEffects s m size accepted actual)))))
 
 private theorem replacement_effects (s : UpdateServices) (m : Member) (size : Int)
-    (st : UpdateState) (slot : Slot) (hp : 0 < size) (hn : size ≤ (st.hall.slots.length : Int))
-    (hs : st.hall.slots[size.toNat - 1]? = some slot)
+    (st next ready : UpdateState) (c : JF) (slot : Slot)
+    (hp : 0 < size) (hn : size ≤ (st.hall.slots.length : Int))
+    (hc : s.cost (st.readMember m) st = (.ok c, next))
+    (hnan : s.isNaN c next = (.ok false, ready))
+    (hs : ready.hall.slots[size.toNat - 1]? = some slot)
     (accepted : UpdateState)
-    (h : (if slot.exists then compareCosts s m size st else (.ok true, st)) =
+    (h : (if slot.exists then compareCosts s m size ready else (.ok true, ready)) =
       (.ok true, accepted)) : ReplacementEffects s m size accepted (runUnchecked s m size st) := by
   have step : runUnchecked s m size st =
       (match s.copy (accepted.readMember m) (accepted.record (.copy m.objectId)) with
@@ -244,7 +261,7 @@ private theorem replacement_effects (s : UpdateServices) (m : Member) (size : In
          | (.ok stored, stop) => (.ok (), { (stop.record (.mark size)) with
              hall := ⟨stop.hall.slots.set (size.toNat - 1) ⟨stored, true⟩⟩ })) := by
     have hi : 0 < size ∧ size ≤ (st.hall.slots.length : Int) := ⟨hp, hn⟩
-    simp only [runUnchecked, if_pos hi, hs, h] <;> rfl
+    simp only [runUnchecked, if_pos hi, hc, hnan, hs, h] <;> rfl
   unfold ReplacementEffects
   rw [step]
   refine ⟨?_, ?_⟩
@@ -256,31 +273,38 @@ private theorem replacement_effects (s : UpdateServices) (m : Member) (size : In
       fun stored stop hw => by simp only [hw] <;> simp [UpdateState.record]⟩
 
 theorem update_rule_holds : update_rule := by
-  intro s m size st slot hp hn hs
+  intro s m size st hp hn
+  refine ⟨fun e next hc => by simp [runUnchecked, hp, hn, hc], ?_⟩
+  intro c next hc
+  refine ⟨fun e stop hnan => by simp [runUnchecked, hp, hn, hc, hnan],
+    fun stop hnan => by simp [runUnchecked, hp, hn, hc, hnan], ?_⟩
+  intro ready hnan
+  refine ⟨fun hs => by simp [runUnchecked, hp, hn, hc, hnan, hs], ?_⟩
+  intro slot hs
   refine ⟨?_, ?_⟩
   · intro he
-    exact replacement_effects s m size st slot hp hn hs st (by simp [he])
+    exact replacement_effects s m size st next ready c slot hp hn hc hnan hs ready (by simp [he])
   · intro he
     refine ⟨?_, ?_⟩
-    · intro e next hc
-      simp [runUnchecked, compareCosts, hp, hn, hs, he, hc]
-    · intro a next hc
+    · intro e next' hc'
+      simp [runUnchecked, compareCosts, hp, hn, hc, hnan, hs, he, hc']
+    · intro a next' hc'
       refine ⟨?_, ?_⟩
       · intro hi
-        simp [runUnchecked, compareCosts, hp, hn, hs, he, hc, hi]
+        simp [runUnchecked, compareCosts, hp, hn, hc, hnan, hs, he, hc', hi]
       · intro incumbent hi
         refine ⟨?_, ?_⟩
         · intro e stop ht
-          simp [runUnchecked, compareCosts, hp, hn, hs, he, hc, hi, ht]
+          simp [runUnchecked, compareCosts, hp, hn, hc, hnan, hs, he, hc', hi, ht]
         · intro b tested ht
           refine ⟨?_, ?_, ?_⟩
           · intro e stop hr
-            simp [runUnchecked, compareCosts, hp, hn, hs, he, hc, hi, ht, hr]
+            simp [runUnchecked, compareCosts, hp, hn, hc, hnan, hs, he, hc', hi, ht, hr]
           · intro stop hr
-            simp [runUnchecked, compareCosts, hp, hn, hs, he, hc, hi, ht, hr]
+            simp [runUnchecked, compareCosts, hp, hn, hc, hnan, hs, he, hc', hi, ht, hr]
           · intro accepted hr
-            exact replacement_effects s m size st slot hp hn hs accepted
-              (by simp [compareCosts, he, hc, hi, ht, hr])
+            exact replacement_effects s m size st next ready c slot hp hn hc hnan hs accepted
+              (by simp [compareCosts, he, hc', hi, ht, hr])
 
 example : (0 < (1 : Int) ∧ 1 ≤ (1 : Int)) ∧
     ([⟨specimen (.fin 0) (.fin 1), false⟩] : List Slot)[0]? =
@@ -289,7 +313,8 @@ example : (0 < (1 : Int) ∧ 1 ≤ (1 : Int)) ∧
 private def stockCost (s : UpdateServices) : UpdateServices :=
   { s with
     cost := fun m st => (.ok m.cost, st)
-    compare := fun a b st => (.ok (less a b), st) }
+    isNaN := fun a st => (.ok (a == .nan), st)
+    compare := fun a b st => (.ok (isless a b), st) }
 
 def update_tie : Prop := ∀ (s : UpdateServices) m size st slot,
   0 < size → size ≤ (st.hall.slots.length : Int) →
@@ -298,16 +323,25 @@ def update_tie : Prop := ∀ (s : UpdateServices) m size st slot,
   let actual := runUnchecked s m size st
   let a := (st.readMember m).cost
   let b := (st.readMember slot.member).cost
-  (a = b → actual = (.ok (), st.record (.compare size))) ∧
-  (less a b = true → ReplacementEffects s m size (st.record (.compare size)) actual)
+  (a = b → a ≠ .nan → actual = (.ok (), st.record (.compare size))) ∧
+  (a = .nan → actual = (.ok (), st)) ∧
+  (isless a b = true → ReplacementEffects s m size (st.record (.compare size)) actual)
 
 theorem update_tie_holds : update_tie := by
   intro s m size st slot hp hn hs he
-  refine ⟨?_, ?_⟩
+  refine ⟨?_, ?_, ?_⟩
+  · intro hc hnotnan
+    have hbnan : ((st.readMember slot.member).cost == .nan) = false := by
+      rw [← hc]; simp [hnotnan]
+    simp [runUnchecked, compareCosts, stockCost, hp, hn, hs, he, hc, hbnan, isless_self]
+  · intro hnan
+    simp [runUnchecked, stockCost, hp, hn, hnan]
   · intro hc
-    simp [runUnchecked, compareCosts, stockCost, hp, hn, hs, he, hc, less_self]
-  · intro hc
-    exact replacement_effects (stockCost s) m size st slot hp hn hs _
+    have hnotnan : (st.readMember m).cost ≠ .nan := by
+      intro h; simp [h, isless] at hc
+    have hbnan : ((st.readMember m).cost == .nan) = false := by simp [hnotnan]
+    exact replacement_effects (stockCost s) m size st st st (st.readMember m).cost slot hp hn
+      rfl (by simp [stockCost, hbnan]) hs _
       (by simp [compareCosts, stockCost, hs, he, hc])
 
 def nan_incumbent_frozen : Prop := ∀ (s : UpdateServices) m size st slot,
@@ -316,32 +350,47 @@ def nan_incumbent_frozen : Prop := ∀ (s : UpdateServices) m size st slot,
   (st.readMember slot.member).cost = .nan →
   let s := stockCost s
   let actual := runUnchecked s m size st
-  (slot.exists = true → actual = (.ok (), st.record (.compare size))) ∧
-  (slot.exists = false → ReplacementEffects s m size st actual)
+  ((st.readMember m).cost = .nan → actual = (.ok (), st)) ∧
+  ((st.readMember m).cost ≠ .nan →
+    (slot.exists = true → ReplacementEffects s m size (st.record (.compare size)) actual) ∧
+    (slot.exists = false → ReplacementEffects s m size st actual))
 
 theorem nan_incumbent_frozen_holds : nan_incumbent_frozen := by
   intro s m size st slot hp hn hs hc
-  refine ⟨?_, (update_rule_holds (stockCost s) m size st slot hp hn hs).1⟩
-  intro he
-  simp [runUnchecked, compareCosts, stockCost, hp, hn, hs, he, hc, less,
-    DynExpr.Expressions.Sampling.greater]
+  refine ⟨fun hnan => by simp [runUnchecked, stockCost, hp, hn, hnan], fun hnotnan => ?_⟩
+  have hbnan : ((st.readMember m).cost == .nan) = false := by simp [hnotnan]
+  have his : isless (st.readMember m).cost (st.readMember slot.member).cost = true := by
+    rw [hc]
+    cases h : (st.readMember m).cost with
+    | nan => exact absurd h hnotnan
+    | _ => rfl
+  refine ⟨fun he => ?_, fun he => ?_⟩
+  · exact replacement_effects (stockCost s) m size st st st (st.readMember m).cost slot hp hn
+      rfl (by simp [stockCost, hbnan]) hs _
+      (by simp [compareCosts, stockCost, hs, he, his])
+  · exact replacement_effects (stockCost s) m size st st st (st.readMember m).cost slot hp hn
+      rfl (by simp [stockCost, hbnan]) hs _
+      (by simp [he])
 
-example : let m := specimen .nan (.fin 1)
-    let s : Slot := ⟨m, true⟩
-    ([s] : List Slot)[0]? = some s ∧ s.exists = true ∧ m.cost = s.member.cost ∧
-      s.member.cost = .nan := by decide
+example : let m := specimen (.fin 1) (.fin 1)
+    let inc := specimen .nan (.fin 1)
+    let s : Slot := ⟨inc, true⟩
+    ([s] : List Slot)[0]? = some s ∧ s.exists = true ∧ inc.cost = .nan ∧ m.cost ≠ .nan := by decide
 
 def update_range_effects : Prop := ∀ (s : UpdateServices) m size st,
   (¬ (0 < size ∧ size ≤ (st.hall.slots.length : Int)) →
     runUnchecked s m size st = (.ok (), st)) ∧
-  (∀ slot, 0 < size → size ≤ (st.hall.slots.length : Int) →
-    st.hall.slots[size.toNat - 1]? = some slot → slot.exists = false →
-    ReplacementEffects s m size st (runUnchecked s m size st))
+  (∀ c next ready slot, 0 < size → size ≤ (st.hall.slots.length : Int) →
+    s.cost (st.readMember m) st = (.ok c, next) →
+    s.isNaN c next = (.ok false, ready) →
+    ready.hall.slots[size.toNat - 1]? = some slot → slot.exists = false →
+    ReplacementEffects s m size ready (runUnchecked s m size st))
 
 theorem update_range_effects_holds : update_range_effects := by
   intro s m size st
   exact ⟨fun hn => by simp [runUnchecked, hn],
-    fun slot hp hn hs => (update_rule_holds s m size st slot hp hn hs).1⟩
+    fun c next ready slot hp hn hc hnan hs he =>
+      (((((update_rule_holds s m size st hp hn).2 c next hc).2.2 ready hnan).2 slot hs).1 he)⟩
 
 def checked_size_effects : Prop := ∀ (s : UpdateServices) m st,
   (∀ e next, runComplexity s m st = (.error e, next) →
@@ -389,7 +438,7 @@ theorem checked_constraint_effects_holds : checked_constraint_effects := by
     fun accepted hc => by simp [runChecked, hr, hp', hm, hn', ht, hl, hc]⟩
 
 def checked_step_effects : Prop := ∀ (s : UpdateServices) m st size next limit tested tree live
-    current called accepted slot,
+    current called accepted c costed ready slot,
   runComplexity s m st = (.ok size, next) → 0 < size →
   s.maxsize next = (.ok limit, tested) → size ≤ limit →
   s.tree (tested.readMember m) tested = (.ok tree, live) →
@@ -397,15 +446,17 @@ def checked_step_effects : Prop := ∀ (s : UpdateServices) m st size next limit
   s.check tree s.options current size (called.record (.check tree s.options current size)) =
     (.ok true, accepted) →
   size ≤ (accepted.hall.slots.length : Int) →
-  accepted.hall.slots[size.toNat - 1]? = some slot → slot.exists = false →
-  ReplacementEffects s m size accepted (runChecked s m st)
+  s.cost (accepted.readMember m) accepted = (.ok c, costed) →
+  s.isNaN c costed = (.ok false, ready) →
+  ready.hall.slots[size.toNat - 1]? = some slot → slot.exists = false →
+  ReplacementEffects s m size ready (runChecked s m st)
 
 theorem checked_step_effects_holds : checked_step_effects := by
-  intro s m st size next limit tested tree live current called accepted slot hr hp hm hn ht hl hc
-    hs hi he
+  intro s m st size next limit tested tree live current called accepted c costed ready slot
+    hr hp hm hn ht hl hc hs hcost hnan hi he
   have step := checked_constraint_effects_holds s m st size next limit tested hr hp hm hn
   rw [(step.2 tree live ht |>.2 current called hl |>.2.2 accepted hc)]
-  exact (update_range_effects_holds s m size accepted).2 slot hp hs hi he
+  exact (update_range_effects_holds s m size accepted).2 c costed ready slot hp hs hcost hnan hi he
 
 example :
     let m := specimen (.fin 1) (.fin 2) (-1)

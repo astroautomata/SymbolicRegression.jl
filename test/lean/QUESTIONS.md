@@ -98,12 +98,12 @@ Modelled as written: both clamps apply before the two independent draw vectors. 
 
 ## Q8. NaN ordering in hall updates and the front
 
-`src/HallOfFame.jl:130,172,181`. An empty slot accepts a member with NaN cost, after which `< NaN` prevents replacement. The front skips NaN-loss members (line 172, PR #790) and otherwise rejects a member only when `loss >= simpler.loss`.
+`src/HallOfFame.jl:130-131,173,182`. Hall updates reject NaN-cost challengers and compare occupied slots with `isless` so non-NaN challengers replace any pre-existing NaN incumbent. The front skips NaN-loss members (line 173, PR #790) and otherwise rejects a member only when `loss >= simpler.loss`.
 
 - Reading A: nonfinite cost and loss values are excluded before these public methods are called.
 - Reading B: these methods must maintain best-member and Pareto guarantees for every well-typed member they accept, including user losses that return NaN.
 
-Modelled as written without a finiteness restriction. `hof-nan-recovery` refutes Reading B for hall updates, with the actual default PopMember implementation; `hof-frontier-strict-all` proves Reading B for the front.
+Modelled as written without a finiteness restriction. Both `hof-nan-recovery` (hall updates) and `hof-frontier-strict-all` (the front) now prove Reading B.
 
 ## Q9. Equal zero losses in logarithmic scores
 
