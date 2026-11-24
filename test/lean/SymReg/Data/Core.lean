@@ -384,4 +384,57 @@ def batchDefault {R : Type} (sample : R → Nat → Int → Jl (List Int))
     (rng : R) (d : SymReg.Loss.Basic) (size : Int) : Jl BatchView :=
   batchWithRNG sample rng d size
 
+-- Source: src/Dataset.jl:296-304
+-- function Base.fill!(d::Dataset, val)
+--     _fill!(d.X, val)
+--     _fill!(d.y, val)
+--     _fill!(d.weights, val)
+--     _fill!(d.extra, val)
+--     Xe = eval_X(d)
+--     Xe === d.X || _fill!(Xe, val)
+--     return d
+-- end
+def fillDatasetWithEvalX {D R V S : Type} [DecidableEq R]
+    (readProperty : D → String → Effect S (FillValue R))
+    (readEvalX : D → Effect S (FillValue R))
+    (fillArray : R → V → Effect S R) (d : D) (v : V) : Effect S D := fun s =>
+  match fillDataset readProperty fillArray d v s with
+  | (.error e, s') => (.error e, s')
+  | (.ok d', s') =>
+    match readProperty d "X" s' with
+    | (.error e, s1) => (.error e, s1)
+    | (.ok xVal, s1) =>
+      match readEvalX d s1 with
+      | (.error e, s2) => (.error e, s2)
+      | (.ok xeVal, s2) =>
+        let sameRef := match xVal, xeVal with
+          | .array rx, .array rxe => decide (rx = rxe)
+          | _, _ => false
+        if sameRef then (.ok d', s2)
+        else
+          match fillValue fillArray v xeVal s2 with
+          | (.error e, s3) => (.error e, s3)
+          | (.ok _, s3) => (.ok d', s3)
+
+/-- `eval_X` selection in `src/Dataset.jl:99-101, 235, 326`: Matrix datasets store
+a transposed `FeatureMajorMatrix` copy, non-Matrix datasets alias `X`. -/
+inductive EvalXKind where
+  | featureMajor
+  | aliased
+  deriving DecidableEq
+
+def selectEvalXKind (isMatrix : Bool) : EvalXKind :=
+  if isMatrix then .featureMajor else .aliased
+
+/-- `eval_tree_dispatch` input selection (`src/LossFunctions.jl:88, 105`):
+uses `dataset.X` under `turbo = true` and `eval_X(dataset)` under `turbo = false`. -/
+def dispatchInputMatrix {M : Type} (turbo : Bool) (rawX evalX : M) : M :=
+  if turbo then rawX else evalX
+
+/-- `expected_array_type(::FeatureMajorMatrix{T}, ::Type)` (`src/InterfaceDynamicExpressions.jl:123`,
+`src/TemplateExpression.jl:903-905`): `Vector{T}` for ordinary expressions and `Any` for
+`TemplateExpression`. -/
+def expectedArrayTypeFeatureMajor (isTemplate : Bool) (vecTypeId : Nat) : Option Nat :=
+  if isTemplate then none else some vecTypeId
+
 end SymReg.Data
