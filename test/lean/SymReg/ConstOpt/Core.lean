@@ -156,11 +156,23 @@ def evaluate {C H R : Type} (e : Evaluator C H R) (regularization : Bool) (x : L
   writeParameters e x
   callContext e regularization
 
-/-- Context construction in `_optimize_constants`, `src/ConstantOptimization.jl:181-187`. -/
+/-- Context construction in `_optimize_constants`, `src/ConstantOptimization.jl:199-203`:
+when `autodiff_backend === nothing`, reuses caller-supplied `eval_context` if present,
+otherwise calls `create_eval_context(dataset, options, 0)`. -/
 def initialContext {S : Type} (backend : Option Nat)
     (create : Int → Effect S (Option SymReg.Loss.Context)) :
     Effect S (Option SymReg.Loss.Context) :=
   if backend.isNone then create 0 else pure none
+
+def initialContextPooled {S : Type} (backend : Option Nat)
+    (supplied : Option SymReg.Loss.Context)
+    (create : Int → Effect S (Option SymReg.Loss.Context)) :
+    Effect S (Option SymReg.Loss.Context) :=
+  if backend.isNone then
+    match supplied with
+    | some ctx => pure (some ctx)
+    | none => create 0
+  else pure none
 
 structure PrepServices (S : Type) where
   read : S → PrepStore
@@ -505,6 +517,31 @@ def stockFinishServices {C H : Type}
 --     set_optimizable_parameters!(member.tree, x0, refs)
 -- end
 -- return member, num_evals
+-- Source: src/ConstantOptimization.jl:261-277
+-- When `!has_units(dataset) && isnothing(options.loss_function) && isnothing(options.loss_function_expression)`,
+-- reuses `convert(L, result.minimum)` without re-evaluating `f(result.minimizer; regularization=true)`.
+def finishFast {C H R : Type} (e : Evaluator C H R) (svc : FinishServices C H)
+    (canSkipFinalEval : Bool) (x0 : List C) (baseline : JF) (best : OptimResult C)
+    (evals fraction : JF) (member : Nat) : Effect (EvalState C H) JF := do
+  if less best.minimum baseline then
+    let current ← svc.tree member
+    writeParameters {e with tree := current} best.minimizer
+    let (loss, nextEvals) ← if canSkipFinalEval then
+        pure (best.minimum, evals)
+      else do
+        let l ← evaluate e true best.minimizer
+        pure (l, round64 (evals + fraction))
+    svc.assignLoss member loss
+    let score ← svc.cost member
+    svc.assignCost member score
+    let birth ← svc.birth
+    svc.assignBirth member birth
+    pure nextEvals
+  else
+    let current ← svc.tree member
+    writeParameters {e with tree := current} x0
+    pure evals
+
 def finish {C H R : Type} (e : Evaluator C H R) (svc : FinishServices C H)
     (x0 : List C) (baseline : JF) (best : OptimResult C) (evals fraction : JF)
     (member : Nat) : Effect (EvalState C H) JF := do

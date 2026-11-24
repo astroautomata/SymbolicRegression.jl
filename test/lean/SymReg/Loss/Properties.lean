@@ -639,38 +639,28 @@ def dimension_no_units : Prop :=
   ∀ (E L : Type) (ex : E) (getTree : E → Jl (Tree JF))
     (columns : Unit → Jl (List (List JF))) (zero penalty : Unit → Jl L)
     (checker : Tree JF → List JF → Jl Bool) (tree : Tree JF),
-    dimensionalRegularizationWith
+    dimensionalRegularizationGuarded false
       (fun _ => nodeDimensionalCheck (columns ()) false false (checker tree))
-      zero penalty = noUnitsResult (columns ()) (zero ()) ∧
-    dimensionalRegularizationWith
+      zero penalty = zero () ∧
+    dimensionalRegularizationGuarded false
       (fun _ => expressionDimensionalCheck getTree ex columns false false checker)
-      zero penalty = (getTree ex >>= fun _ => noUnitsResult (columns ()) (zero ())) ∧
-    dimensionalRegularizationWith (fun _ => templateDimensionalCheck false false)
+      zero penalty = zero () ∧
+    dimensionalRegularizationGuarded false (fun _ => templateDimensionalCheck false false)
       zero penalty = zero ()
 
 theorem dimension_no_units_holds : dimension_no_units := by
   intro E L ex getTree columns zero penalty checker tree
-  have node (t : Tree JF) :
-      dimensionalRegularizationWith
-        (fun _ => nodeDimensionalCheck (columns ()) false false (checker t))
-        zero penalty = noUnitsResult (columns ()) (zero ()) := by
-    cases h : columns () with
-    | error e => simp [h, noUnitsResult, dimensionalRegularizationWith, nodeDimensionalCheck] <;> rfl
-    | ok xs => cases xs <;>
-      simp [h, noUnitsResult, dimensionalRegularizationWith, nodeDimensionalCheck, at1] <;> rfl
-  refine ⟨node tree, ?_, rfl⟩
-  cases h : getTree ex with
-  | error e => simp [h, dimensionalRegularizationWith, expressionDimensionalCheck] <;> rfl
-  | ok t =>
-    simpa [h, expressionDimensionalCheck, bind, Except.bind] using node t
+  exact ⟨rfl, rfl, rfl⟩
 
 def dimension_empty : Prop :=
   ∀ (L : Type) (xUnits yUnits : Bool) (zero penalty : Unit → Jl L)
     (checker : List JF → Jl Bool) (columns : Jl (List (List JF))),
     (columns = .ok [] →
-      dimensionalRegularizationWith (fun _ => nodeDimensionalCheck columns xUnits yUnits checker)
-        zero penalty = .error .boundsError) ∧
-    (dimensionalRegularizationWith (fun _ => templateDimensionalCheck xUnits yUnits)
+      dimensionalRegularizationGuarded (xUnits || yUnits)
+        (fun _ => nodeDimensionalCheck columns xUnits yUnits checker)
+        zero penalty = if xUnits || yUnits then .error .boundsError else zero ()) ∧
+    (dimensionalRegularizationGuarded (xUnits || yUnits)
+      (fun _ => templateDimensionalCheck xUnits yUnits)
       zero penalty = if xUnits ∨ yUnits then .error (.assertionError "!has_units(dataset)")
         else zero ())
 
@@ -678,9 +668,24 @@ theorem dimension_empty_holds : dimension_empty := by
   intro L xUnits yUnits zero penalty checker columns
   refine ⟨fun h => ?_, ?_⟩
   · subst columns
-    rfl
-  · cases xUnits <;> cases yUnits <;> simp [dimensionalRegularizationWith,
-      templateDimensionalCheck] <;> rfl
+    cases xUnits <;> cases yUnits <;> rfl
+  · cases xUnits <;> cases yUnits <;> simp [dimensionalRegularizationGuarded,
+      dimensionalRegularizationWith, templateDimensionalCheck] <;> rfl
+
+/-- `EvalContextPool` reuses released contexts without reallocating, falls back
+to `create_eval_context` when empty or `nothing`, and treats `release(nothing, _)`
+as a no-op (`src/LossFunctions.jl:53-87`). -/
+def eval_context_pool : Prop :=
+  ∀ (C : Type) (items : List C) (c : C) (create : Unit → Jl C),
+    acquirePool (some (c :: items)) create = .ok (c, some items) ∧
+    acquirePool (some ([] : List C)) create = (create ()).map (·, some []) ∧
+    acquirePool (none : Option (List C)) create = (create ()).map (·, none) ∧
+    acquirePool (releasePool (some items) c) create = .ok (c, some items) ∧
+    releasePool (none : Option (List C)) c = none
+
+theorem eval_context_pool_holds : eval_context_pool := by
+  intro C items c create
+  exact ⟨rfl, rfl, rfl, rfl, rfl⟩
 
 example : (Except.ok [] : Jl (List (List JF))) = .ok [] := rfl
 

@@ -652,14 +652,32 @@ def resetContext : Option Context → Option Context
   | none => none
   | some c => some { c with buffer := resetBuffer c.buffer }
 
--- Source: src/LossFunctions.jl:274-283
--- if !violates_dimensional_constraints(tree, dataset, options)
+-- Source: src/LossFunctions.jl:53-87
+-- EvalContextPool acquire_eval_context / release_eval_context!
+def acquirePool {C : Type} (pool : Option (List C)) (create : Unit → Jl C) :
+    Jl (C × Option (List C)) :=
+  match pool with
+  | none => (create ()).map (·, none)
+  | some [] => (create ()).map (·, some [])
+  | some (c :: rest) => .ok (c, some rest)
+
+def releasePool {C : Type} (pool : Option (List C)) (c : C) : Option (List C) :=
+  match pool with
+  | none => none
+  | some items => some (c :: items)
+
+-- Source: src/LossFunctions.jl:325-333
+-- if !has_units(dataset) || !violates_dimensional_constraints(tree, dataset, options)
 --     return zero(L)
 -- end
 -- return convert(L, something(options.dimensional_constraint_penalty, 1000))
 def dimensionalRegularizationWith {L : Type} (violates : Unit → Jl Bool)
     (getZero convertPenalty : Unit → Jl L) : Jl L := do
   if ← violates () then convertPenalty () else getZero ()
+
+def dimensionalRegularizationGuarded {L : Type} (hasUnits : Bool) (violates : Unit → Jl Bool)
+    (getZero convertPenalty : Unit → Jl L) : Jl L :=
+  if !hasUnits then getZero () else dimensionalRegularizationWith violates getZero convertPenalty
 
 -- Source: src/DimensionalAnalysis.jl:223-230,258-275
 -- X = dataset.X
@@ -689,9 +707,10 @@ def expressionDimensionalCheck {E : Type} (getTree : E → Jl (Tree JF)) (e : E)
   let tree ← getTree e
   nodeDimensionalCheck (columns ()) xUnits yUnits (check tree)
 
-/-- Value projection for the node check and the default IEEE zero. -/
+/-- Value projection for the node check and the default IEEE zero, with the
+`!has_units(dataset)` fast guard (`src/LossFunctions.jl:330`). -/
 def dimensionalRegularization (tree : Expr) (d : Dataset) (o : Options) : Jl JF :=
-  dimensionalRegularizationWith (fun _ =>
+  dimensionalRegularizationGuarded (d.full.xUnits || d.full.yUnits) (fun _ =>
     nodeDimensionalCheck (getX d) d.full.xUnits d.full.yUnits (fun _ => o.dimensionalCheck tree d))
     (fun _ => .ok (.fin 0))
     (fun _ => .ok (d.full.lossPrecision.round (o.penalty.getD (.fin 1000))))
