@@ -523,7 +523,7 @@ tmpl-composable-buffer	proven	general	7	src/ComposableExpression.jl	The composab
 tmpl-macro-expand	proven	general	6	src/TemplateExpressionMacro.jl	@template_spec keys are the expressions in order, parameter keys the parameter names in order with num_parameters the parameters tuple, and num_features/prototype pass through.	Every parameters entry is name = size.
 tmpl-macro-errors	proven	general	7	src/TemplateExpressionMacro.jl	Repeated, unknown or positional arguments, missing or non-tuple expressions, bad parameter entries and non-do-block bodies are rejected.	None.
 tmpl-parse-checks	proven	general	5	src/TemplateExpression.jl	Guesses with unknown names, missing expressions, or parameters given both flat and by keyword are rejected; without parameters a parse has none.	None.
-tmpl-parse-accepts	refuted	general	3	src/TemplateExpression.jl	parse_expression accepts every guess supplying one expression string per key.	None.
+tmpl-parse-accepts	proven	general	3	src/TemplateExpression.jl	parse_expression accepts every guess supplying one expression string per key.	None.
 tmpl-parameter-key-order	proven	general	8	src/TemplateExpression.jl	Constructed templates expose their declared parameter keys in declaration order.	Construction succeeds.
 tmpl-variable-names-priority	proven	general	3	src/TemplateExpression.jl	Explicit names override metadata names, and missing metadata yields no names.	None.
 composable-variable-names-priority	proven	general	3	src/ComposableExpression.jl	Explicit names bypass metadata property access, including when accessing that field would fail.	None.
