@@ -4,20 +4,17 @@ namespace SymReg.Ext
 open DynExpr
 open SymReg.ConstOpt
 
-/-- `ext/SymbolicRegressionEnzymeExt.jl:18-29`. Storage references are obtained
-from the zero tree, independently of the evaluator's optimization references.
-External zeroing and reference discovery remain arbitrary functions. -/
-structure EnzymeStorage (H R : Type) where
+/-- `ext/SymbolicRegressionEnzymeExt.jl:31-39`. Allocates zeroed tree, dataset,
+and options shadows. External zeroing remains arbitrary. -/
+structure EnzymeStorage (H : Type) where
   tree : H
-  refs : R
   dataset : Nat
   options : Nat
 
-def prepareEnzyme {H R : Type} (zeroTree : H → H) (getRefs : H → R)
+def prepareEnzyme {H : Type} (zeroTree : H → H)
     (zeroDataset zeroOptions : Nat → Nat) (tree : H) (dataset options : Nat) :
-    EnzymeStorage H R :=
-  let shadow := zeroTree tree
-  ⟨shadow, getRefs shadow, zeroDataset dataset, zeroOptions options⟩
+    EnzymeStorage H :=
+  ⟨zeroTree tree, zeroDataset dataset, zeroOptions options⟩
 
 
 -- Source: ext/SymbolicRegressionEnzymeExt.jl:32-35
@@ -72,16 +69,16 @@ inductive EnzymeCall (C R : Type) where
   | resetOptions (options : Nat)
   | allocate (value : C)
   | reverse (stacksize : Nat) (args : EnzymeArgs)
-  | extract (tree : Nat)
+  | extract (shadowTree tree : Nat) (refs : R)
   | broadcast (buffer : Nat) (values : List C)
   | readOutput (cell : Nat)
 
 structure EnzymeServices (C R W : Type) where
-  scalarSet : Nat → List C → R → Effect W Unit
+  paramSet : Nat → List C → R → Effect W Unit
   remakeZero : Nat → Effect W Unit
   allocate : C → Effect W Nat
   reverse : Nat → EnzymeArgs → Effect W Unit
-  extract : Nat → Effect W (List C)
+  extract : Nat → Nat → R → Effect W (List C)
   broadcast : Nat → List C → Effect W Unit
   readOutput : Nat → Effect W C
 
@@ -92,10 +89,10 @@ private def enzymeCall {C R W A : Type} (event : EnzymeCall C R) (act : Effect W
 
 abbrev enzymeStackSize : Nat := 32 * 1024 * 1024
 
--- Source: ext/SymbolicRegressionEnzymeExt.jl:39-64
+-- Source: ext/SymbolicRegressionEnzymeExt.jl:48-82
 /-
 function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) where {T}
-    set_scalar_constants!(g.e.tree, x, g.e.refs)
+    set_optimizable_parameters!(g.e.tree, x, g.e.refs)
     remake_zero!(g.extra.storage_tree)
     remake_zero!(g.extra.storage_dataset)
     remake_zero!(g.extra.storage_options)
@@ -115,17 +112,21 @@ function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) wher
     end
 
     if G !== nothing
-        # TODO: This is redundant since we already have the references.
-        # Should just be able to extract from the references directly.
-        G .= first(get_scalar_constants(g.extra.storage_tree))
+        extracted_gradient = extract_optimizable_gradient(
+            g.extra.storage_tree, g.e.tree, g.e.refs
+        )
+        if length(extracted_gradient) != length(G)
+            throw(DimensionMismatch(...))
+        end
+        G .= extracted_gradient
     end
     return output[]
 end
 -/
-def enzymeGradient {C R S W : Type} [Zero C] [OfNat C 1] (f : EnzymeServices C R W)
-    (tree dataset options : Nat) (refs : R) (shadow : EnzymeStorage Nat S)
-    (buffer : Option Nat) (x : List C) : Effect (W × List (EnzymeCall C R)) C := do
-  enzymeCall (.write tree x refs) (f.scalarSet tree x refs)
+def enzymeGradient {C R W : Type} [Zero C] [OfNat C 1] (f : EnzymeServices C R W)
+    (tree dataset options : Nat) (refs : R) (shadow : EnzymeStorage Nat)
+    (buffer : Option (Nat × Nat)) (x : List C) : Effect (W × List (EnzymeCall C R)) C := do
+  enzymeCall (.write tree x refs) (f.paramSet tree x refs)
   enzymeCall (.resetTree shadow.tree) (f.remakeZero shadow.tree)
   enzymeCall (.resetDataset shadow.dataset) (f.remakeZero shadow.dataset)
   enzymeCall (.resetOptions shadow.options) (f.remakeZero shadow.options)
@@ -134,28 +135,30 @@ def enzymeGradient {C R S W : Type} [Zero C] [OfNat C 1] (f : EnzymeServices C R
   let args : EnzymeArgs :=
     ⟨tree, shadow.tree, dataset, shadow.dataset, options, shadow.options, output, seed⟩
   enzymeCall (.reverse enzymeStackSize args) (f.reverse enzymeStackSize args)
-  if let some g := buffer then
-    let values ← enzymeCall (.extract shadow.tree) (f.extract shadow.tree)
+  if let some (g, gLen) := buffer then
+    let values ← enzymeCall (.extract shadow.tree tree refs) (f.extract shadow.tree tree refs)
+    if values.length ≠ gLen then
+      fun st => (.error (.errorException "DimensionMismatch"), st)
     enzymeCall (.broadcast g values) (f.broadcast g values)
   enzymeCall (.readOutput output) (f.readOutput output)
 
 def enzymeGradientRouting : Prop :=
-  ∀ (C R S W : Type) [Zero C] [OfNat C 1] (f : EnzymeServices C R W),
+  ∀ (C R W : Type) [Zero C] [OfNat C 1] (f : EnzymeServices C R W),
     ∀
-    tree dataset options refs (shadow : EnzymeStorage Nat S) g x w events value out,
-    enzymeGradient f tree dataset options refs shadow (some g) x (w, events) =
+    tree dataset options refs (shadow : EnzymeStorage Nat) g gLen x w events value out,
+    enzymeGradient f tree dataset options refs shadow (some (g, gLen)) x (w, events) =
       (.ok value, out) →
-    ∃ output seed values, out.2 = events ++
+    ∃ output seed values, values.length = gLen ∧ out.2 = events ++
         [.write tree x refs, .resetTree shadow.tree, .resetDataset shadow.dataset,
          .resetOptions shadow.options, .allocate 0, .allocate 1,
          .reverse (32 * 1024 * 1024)
             ⟨tree, shadow.tree, dataset, shadow.dataset, options, shadow.options, output, seed⟩,
-         .extract shadow.tree, .broadcast g values, .readOutput output] ∧
+         .extract shadow.tree tree refs, .broadcast g values, .readOutput output] ∧
       ∃ beforeRead, f.readOutput output beforeRead = (.ok value, out.1)
 
 theorem enzymeGradientRouting_holds : enzymeGradientRouting := by
-  intro C R S W _ _ f tree dataset options refs shadow g x w events value out h
-  rcases h1 : f.scalarSet tree x refs w with ⟨r1, w1⟩
+  intro C R W _ _ f tree dataset options refs shadow g gLen x w events value out h
+  rcases h1 : f.paramSet tree x refs w with ⟨r1, w1⟩
   cases r1 <;> simp [enzymeGradient, enzymeCall, h1] at h
   rcases h2 : f.remakeZero shadow.tree w1 with ⟨r2, w2⟩
   cases r2 <;> simp [enzymeCall, h2] at h
@@ -176,24 +179,27 @@ theorem enzymeGradientRouting_holds : enzymeGradientRouting := by
           ⟨tree, shadow.tree, dataset, shadow.dataset, options, shadow.options, output, seed⟩ wSeed
         with ⟨r5, w5⟩
       cases r5 <;> simp [enzymeCall, h5] at h
-      rcases h6 : f.extract shadow.tree w5 with ⟨r6, w6⟩
+      rcases h6 : f.extract shadow.tree tree refs w5 with ⟨r6, w6⟩
       cases r6 with
       | error _ => simp [enzymeCall, h6] at h
       | ok values =>
         simp [enzymeCall, h6] at h
-        rcases h7 : f.broadcast g values w6 with ⟨r7, w7⟩
-        cases r7 <;> simp [enzymeCall, h7] at h
-        rcases h8 : f.readOutput output w7 with ⟨r8, w8⟩
-        cases r8 with
-        | error _ => simp [enzymeCall, h8] at h
-        | ok _ =>
-          simp only [enzymeCall, h8, Prod.mk.injEq, Except.ok.injEq] at h
-          obtain ⟨rfl, rfl⟩ := h
-          exact ⟨output, seed, values, by simp [List.append_assoc], w7, h8⟩
+        by_cases hlen : values.length = gLen
+        · simp [hlen] at h
+          rcases h7 : f.broadcast g values w6 with ⟨r7, w7⟩
+          cases r7 <;> simp [enzymeCall, h7] at h
+          rcases h8 : f.readOutput output w7 with ⟨r8, w8⟩
+          cases r8 with
+          | error _ => simp [enzymeCall, h8] at h
+          | ok _ =>
+            simp only [enzymeCall, h8, Prod.mk.injEq, Except.ok.injEq] at h
+            obtain ⟨rfl, rfl⟩ := h
+            exact ⟨output, seed, values, hlen, by simp [List.append_assoc], w7, h8⟩
+        · simp [hlen] at h
 
 def enzymeNoBuffer : Prop :=
-  ∀ (C R S W : Type) [Zero C] [OfNat C 1] (f : EnzymeServices C R W),
-    ∀ tree dataset options refs (shadow : EnzymeStorage Nat S) x w events value out,
+  ∀ (C R W : Type) [Zero C] [OfNat C 1] (f : EnzymeServices C R W),
+    ∀ tree dataset options refs (shadow : EnzymeStorage Nat) x w events value out,
     enzymeGradient f tree dataset options refs shadow none x (w, events) =
       (.ok value, out) →
     ∃ output seed, out.2 = events ++
@@ -205,8 +211,8 @@ def enzymeNoBuffer : Prop :=
       ∃ beforeRead, f.readOutput output beforeRead = (.ok value, out.1)
 
 theorem enzymeNoBuffer_holds : enzymeNoBuffer := by
-  intro C R S W _ _ f tree dataset options refs shadow x w events value out h
-  rcases h1 : f.scalarSet tree x refs w with ⟨r1, w1⟩
+  intro C R W _ _ f tree dataset options refs shadow x w events value out h
+  rcases h1 : f.paramSet tree x refs w with ⟨r1, w1⟩
   cases r1 <;> simp [enzymeGradient, enzymeCall, h1] at h
   rcases h2 : f.remakeZero shadow.tree w1 with ⟨r2, w2⟩
   cases r2 <;> simp [enzymeCall, h2] at h
@@ -268,30 +274,24 @@ theorem stacksizeRouting_holds : stacksizeRouting := by
     fun task err h h' => by simp [withStacksize, h, h'],
     fun task scheduled h h' => by simp [withStacksize, h, h']⟩
 
-/-- The scalar setter iterates refs via foreach
-(`src/TemplateExpression.jl:468-484`), whereas optimization returns the
-non-iterable TemplateOptimizableRefs (486-508). The extension forwards this
-wrapper without unwrapping scalar_refs. The Julia reproducer checks the
-resulting iteration MethodError before AD runs. -/
-def enzymeTemplateWrite {T : Type} (_x : SymReg.Templates.TConst T)
-    (_values : List T) (_refs : SymReg.Templates.TOptRefs) : Jl (SymReg.Templates.TConst T) :=
-  .error (.methodError "iterate(::TemplateOptimizableRefs)")
+/-- `ext/SymbolicRegressionEnzymeExt.jl:49`: the Enzyme wrapper calls
+`set_optimizable_parameters!(g.e.tree, x, g.e.refs)`, dispatching directly to the
+template optimizer setter (`src/TemplateExpression.jl:486-508`). -/
+def enzymeTemplateWrite {T : Type} (x : SymReg.Templates.TConst T)
+    (values : List T) (refs : SymReg.Templates.TOptRefs) : Jl (SymReg.Templates.TConst T) :=
+  match SymReg.Templates.optSet x values refs with
+  | .ok () state => .ok state
+  | .err error _ => .error error
 
 def enzymeOptimizableHooks : Prop :=
   ∀ (T : Type) fuel root (x : SymReg.Templates.TConst T) original refs,
     (templateHooks T fuel).get root x = .ok (original, refs) →
     enzymeTemplateWrite x original refs = (templateHooks T fuel).set root original refs x
 
-theorem enzymeOptimizableHooks_refuted : ¬ enzymeOptimizableHooks := by
-  intro h
-  have hg : (templateHooks JF 2).get 7 SymReg.Templates.xTwoParams =
-      .ok ([JF.fin 2, .fin 5, .fin 7], ⟨[⟨1, [0]⟩], 3⟩) := rfl
-  have hh := h JF 2 7 SymReg.Templates.xTwoParams _ _ hg
-  have hs : ∃ out, (templateHooks JF 2).set 7 [.fin 2, .fin 5, .fin 7] ⟨[⟨1, [0]⟩], 3⟩
-      SymReg.Templates.xTwoParams = .ok out := ⟨_, rfl⟩
-  obtain ⟨_, hs⟩ := hs
-  rw [hs] at hh
-  cases hh
+theorem enzymeOptimizableHooks_holds : enzymeOptimizableHooks := by
+  intro T fuel root x original refs _
+  simp only [enzymeTemplateWrite, templateHooks]
+  cases SymReg.Templates.optSet x original refs <;> rfl
 
 /-- `ext/SymbolicRegressionMooncakeExt.jl:13-21`. Zip stops at the shorter
 sequence; NoTangent is an assertion failure. Inner extraction remains arbitrary. -/
@@ -404,16 +404,16 @@ example : ([ [JF.fin 1], [JF.fin 2, .fin 3] ] : List (List JF)).length =
       ([[], []] : List (List JF)).length := ⟨rfl, rfl⟩
 
 private def enzymePreparationRouting : Prop :=
-  ∀ (H R : Type) zeroTree getRefs zeroDataset zeroOptions (tree : H) dataset options,
-    let s : EnzymeStorage H R := prepareEnzyme zeroTree getRefs zeroDataset zeroOptions tree dataset options
-    s.tree = zeroTree tree ∧ s.refs = getRefs (zeroTree tree) ∧
+  ∀ (H : Type) zeroTree zeroDataset zeroOptions (tree : H) dataset options,
+    let s : EnzymeStorage H := prepareEnzyme zeroTree zeroDataset zeroOptions tree dataset options
+    s.tree = zeroTree tree ∧
     s.dataset = zeroDataset dataset ∧ s.options = zeroOptions options
 
 def enzymeShadowIsolation : Prop :=
-  ∀ (zeroTree : List Nat → List Nat) (getRefs : List Nat → List Nat) zeroDataset zeroOptions
-    (tree : List Nat) dataset options (primalRefs : List Nat),
-    let shadow := prepareEnzyme zeroTree getRefs zeroDataset zeroOptions tree dataset options
-    primalRefs = getRefs tree → ∀ a ∈ shadow.refs, a ∉ primalRefs
+  ∀ (zeroTree : List Nat → List Nat) zeroDataset zeroOptions
+    (tree : List Nat) dataset options,
+    let shadow := prepareEnzyme zeroTree zeroDataset zeroOptions tree dataset options
+    ∀ a ∈ shadow.tree, a ∉ tree
 
 def enzymePreparation : Prop := enzymePreparationRouting ∧ enzymeShadowIsolation
 
