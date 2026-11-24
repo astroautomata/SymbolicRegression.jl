@@ -16,6 +16,7 @@ using DynamicExpressions:
     ResultOk,
     get_tree,
     get_child,
+    get_operators,
     is_constant,
     preserve_sharing,
     is_valid_array,
@@ -295,7 +296,8 @@ end
 ) where {T<:Union{AbstractFloat,Complex{<:AbstractFloat}},L<:LOSS_TYPE,NT<:AbstractExpressionNode{T}}
     (2 <= nconst <= 64) || return nothing
     preserve_sharing(NT) && return nothing
-    options.operators isa OperatorEnum || return nothing
+    ops = get_operators(ex, options)
+    ops isa OperatorEnum || return nothing
     options.autodiff_backend === nothing || return nothing
     options.turbo isa Val{false} || return nothing
     has_units(dataset) && return nothing
@@ -313,7 +315,6 @@ end
     cache_vecs = Vector{Vector{T}}()
     slotted = _assign_memo_slots(masked, masked.mask, cache_vecs, dataset.n)
     isempty(cache_vecs) && return nothing
-    ops = options.operators
     cX = dataset.X
     y = dataset.y::AbstractArray
     w = dataset.weights
@@ -466,6 +467,7 @@ function _eval_with_memo(
             end
         end
         if diff_mask == UInt64(0)
+            set_optimizable_parameters!(tree, x, refs)
             return memo.base_loss
         end
     end
@@ -596,7 +598,7 @@ Evaluator(tree::N, refs::R, ctx::C) where {N,R,C} = Evaluator{N,R,C}(tree, refs,
 function (e::Evaluator{N,R,EvaluatorContext{D,O,E}})(
     x::AbstractVector; regularization=false
 )::L where {T,L,D<:Dataset{T,L},N,R,O,E}
-    if !regularization && e.memo !== nothing
+    if !regularization && e.memo !== nothing && length(x) == e.memo.nconst
         return _eval_with_memo(e.memo, e.tree, e.refs, x)::L
     end
     set_optimizable_parameters!(e.tree, x, e.refs)
