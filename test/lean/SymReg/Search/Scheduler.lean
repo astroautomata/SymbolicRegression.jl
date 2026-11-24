@@ -291,4 +291,220 @@ def unitReply (_ _ : Nat) : Reply := ⟨[], ⟨[]⟩, 0, .fin 1, 0⟩
   have hh := h 1 2 (fun _ => []) unitReply [(0, true, false), (1, true, false)] (by decide)
   contradiction
 
+/-! ## Event-driven `done_ch` completion channel and single-copy population handoff -/
+
+/-- Event-driven head-loop state (`src/SymbolicRegression.jl:1092-1296`):
+extends `OutputState` with a completion channel `doneCh` carrying `(population, taskOk)`
+events posted by async listener tasks, and a per-population `posted` flag tracking whether
+the currently running listener has already posted its event. -/
+structure EventState where
+  sched : OutputState
+  doneCh : List (Nat × Bool)
+  posted : Nat → Bool
+
+/-- Channel capacity and listener invariant: every queued event belongs to a distinct
+population in `0..populations-1` whose `posted` flag is set, and `posted` is set only for
+running populations in `0..populations-1`. -/
+def EventInvariant (populations : Nat) (es : EventState) : Prop :=
+  (es.doneCh.map Prod.fst).Nodup ∧
+  (∀ p, es.posted p = true → p < populations ∧ (es.sched.cells p).running = true) ∧
+  (∀ p, es.posted p = true ↔ p ∈ es.doneCh.map Prod.fst)
+
+def startEvents (iterations populations : Nat) (initial : Nat → List Member)
+    (work : Nat → Nat → Reply) : EventState :=
+  { sched := startOutput iterations populations initial work
+    doneCh := []
+    posted := fun _ => false }
+
+/-- Listener task finishes for population `p` and pushes `(p, taskOk)` to `done_ch`. -/
+def postDone (es : EventState) (p : Nat) (taskOk : Bool) : EventState :=
+  if (es.sched.cells p).running && !es.posted p then
+    { es with
+      doneCh := es.doneCh ++ [(p, taskOk)]
+      posted := fun i => if i = p then true else es.posted i }
+  else es
+
+/-- Head loop consumes one event from `done_ch` (`src/SymbolicRegression.jl:1134-1148`).
+`none` represents propagating a failed task (`!task_ok || istaskfailed`). -/
+def consumeDone (es : EventState) (externalStop : Bool) (work : Nat → Nat → Reply) :
+    Option EventState :=
+  match es.doneCh with
+  | [] => some es
+  | (_, false) :: _ => none
+  | (p, true) :: rest =>
+    let sched' := collect es.sched p true externalStop work
+    some { sched := sched'
+           doneCh := rest
+           posted := fun i => if i = p then false else es.posted i }
+
+/-- Bounded length of any duplicate-free list of naturals strictly below `n`. -/
+private theorem nodup_lt_length_le :
+    ∀ (xs : List Nat) (n : Nat), xs.Nodup → (∀ x ∈ xs, x < n) → xs.length ≤ n := by
+  intro xs n hnd hlt
+  have hsub : ∀ x ∈ xs, x ∈ List.range n := fun x hx => List.mem_range.mpr (hlt x hx)
+  have hlen : (List.range n).length = n := List.length_range
+  rw [← hlen]
+  exact nodup_length_le_of_subset xs (List.range n) hnd hsub
+where
+  nodup_length_le_of_subset :
+      ∀ (m l : List Nat), m.Nodup → (∀ x ∈ m, x ∈ l) → m.length ≤ l.length
+    | [], _, _, _ => Nat.zero_le _
+    | a :: m, l, hn, hs => by
+      rw [List.nodup_cons] at hn
+      have ha : a ∈ l := hs a (by simp)
+      have hsub : ∀ x ∈ m, x ∈ l.erase a := by
+        intro x hx
+        have hxa : x ≠ a := fun h => hn.1 (h ▸ hx)
+        exact (List.mem_erase_of_ne hxa).2 (hs x (by simp [hx]))
+      have hih := nodup_length_le_of_subset m (l.erase a) hn.2 hsub
+      rw [List.length_erase_of_mem ha] at hih
+      have hpos : 0 < l.length := List.length_pos_of_mem ha
+      simp only [List.length_cons]
+      omega
+
+theorem eventInvariant_bounded (populations : Nat) (es : EventState)
+    (h : EventInvariant populations es) : es.doneCh.length ≤ populations := by
+  have hlen : (es.doneCh.map Prod.fst).length = es.doneCh.length := List.length_map _
+  rw [← hlen]
+  apply nodup_lt_length_le _ populations h.1
+  intro p hp
+  exact (h.2.1 p ((h.2.2 p).mpr hp)).1
+
+theorem postDone_preserves (populations : Nat) (es : EventState) (p : Nat) (taskOk : Bool)
+    (hp : p < populations) (h : EventInvariant populations es) :
+    EventInvariant populations (postDone es p taskOk) ∧
+    (postDone es p taskOk).sched = es.sched := by
+  unfold postDone
+  split
+  · rename_i hc
+    have hrun : (es.sched.cells p).running = true := by simp_all
+    have hnp : es.posted p = false := by simp_all
+    have hnotmem : p ∉ es.doneCh.map Prod.fst := by
+      intro hm
+      have := (h.2.2 p).mpr hm
+      rw [hnp] at this
+      cases this
+    refine ⟨⟨?_, ?_, ?_⟩, rfl⟩
+    · simp only [List.map_append, List.map_cons, List.map_nil]
+      rw [List.nodup_append]
+      refine ⟨h.1, by simp, ?_⟩
+      intro a ha b hb hab
+      simp only [List.mem_singleton] at hb
+      subst hb; subst hab
+      exact hnotmem ha
+    · intro q hq
+      by_cases hqp : q = p
+      · subst hqp; exact ⟨hp, hrun⟩
+      · simp only [hqp, ↓reduceIte] at hq
+        exact h.2.1 q hq
+    · intro q
+      simp only [List.map_append, List.map_cons, List.map_nil, List.mem_append, List.mem_singleton]
+      by_cases hqp : q = p
+      · subst hqp; simp
+      · simp only [hqp, ↓reduceIte, or_false]
+        exact h.2.2 q
+  · exact ⟨h, rfl⟩
+
+theorem consumeDone_preserves (populations total : Nat) (es : EventState)
+    (externalStop : Bool) (work : Nat → Nat → Reply)
+    (hinv : EventInvariant populations es)
+    (hbud : Budget total es.sched)
+    (hrec : ReceiptInvariant es.sched)
+    (hbal : ∀ i, CellBalance (es.sched.cells i)) :
+    match consumeDone es externalStop work with
+    | none => ∃ p rest, es.doneCh = (p, false) :: rest
+    | some es' =>
+      EventInvariant populations es' ∧
+      es'.doneCh.length ≤ populations ∧
+      Budget total es'.sched ∧
+      ReceiptInvariant es'.sched ∧
+      (∀ i, CellBalance (es'.sched.cells i)) := by
+  unfold consumeDone
+  cases hch : es.doneCh with
+  | nil =>
+    exact ⟨hinv, eventInvariant_bounded populations es hinv, hbud, hrec, hbal⟩
+  | cons ev rest =>
+    rcases ev with ⟨p, ok⟩
+    cases ok with
+    | false => exact ⟨p, rest, rfl⟩
+    | true =>
+      dsimp only
+      have hnd_cons : (p :: rest.map Prod.fst).Nodup := by
+        simpa [hch] using hinv.1
+      rw [List.nodup_cons] at hnd_cons
+      have hinv' : EventInvariant populations
+          { sched := collect es.sched p true externalStop work
+            doneCh := rest
+            posted := fun i => if i = p then false else es.posted i } := by
+        refine ⟨hnd_cons.2, ?_, ?_⟩
+        · intro q hq
+          by_cases hqp : q = p
+          · subst hqp; simp at hq
+          · simp only [hqp, ↓reduceIte] at hq
+            have hq0 := hinv.2.1 q hq
+            have hcell := output_isolation_holds es.sched p q true externalStop work (Ne.symm hqp)
+            exact ⟨hq0.1, by rw [hcell]; exact hq0.2⟩
+        · intro q
+          by_cases hqp : q = p
+          · subst hqp
+            simp [hnd_cons.1]
+          · simp only [hqp, ↓reduceIte]
+            have hiff := hinv.2.2 q
+            simp only [hch, List.map_cons, List.mem_cons, hqp, false_or] at hiff
+            exact hiff
+      refine ⟨hinv', eventInvariant_bounded populations _ hinv',
+        collect_budget _ _ _ _ _ _ hbud,
+        collect_receipts _ _ _ _ _ hrec,
+        fun i => collect_cell_balance _ _ _ _ _ _ (hbal i)⟩
+
+/-- Property `search-event-channel`: `done_ch` starts empty with `EventInvariant`, stays
+bounded by `populations` (never filling capacity `populations + 1`), preserves `Budget`,
+`ReceiptInvariant`, and `CellBalance` across every post/consume step, and signals `none`
+on failed-task notifications instead of ignoring them. -/
+def event_channel_sound : Prop :=
+  (∀ iterations populations initial work,
+    EventInvariant populations (startEvents iterations populations initial work)) ∧
+  (∀ populations es p taskOk, p < populations → EventInvariant populations es →
+    EventInvariant populations (postDone es p taskOk) ∧
+    (postDone es p taskOk).doneCh.length ≤ populations ∧
+    (postDone es p taskOk).sched = es.sched) ∧
+  (∀ populations total es externalStop work,
+    EventInvariant populations es → Budget total es.sched →
+    ReceiptInvariant es.sched → (∀ i, CellBalance (es.sched.cells i)) →
+    match consumeDone es externalStop work with
+    | none => ∃ p rest, es.doneCh = (p, false) :: rest
+    | some es' =>
+      EventInvariant populations es' ∧
+      es'.doneCh.length ≤ populations ∧
+      Budget total es'.sched ∧
+      ReceiptInvariant es'.sched ∧
+      (∀ i, CellBalance (es'.sched.cells i)))
+
+theorem event_channel_sound_holds : event_channel_sound := by
+  refine ⟨?_, ?_, ?_⟩
+  · intro iterations populations initial work
+    refine ⟨List.nodup_nil, ?_, ?_⟩
+    · intro p hp; simp [startEvents] at hp
+    · intro p; simp [startEvents]
+  · intro populations es p taskOk hp hinv
+    have ⟨h1, h2⟩ := postDone_preserves populations es p taskOk hp hinv
+    exact ⟨h1, eventInvariant_bounded populations _ h1, h2⟩
+  · intro populations total es externalStop work hinv hbud hrec hbal
+    exact consumeDone_preserves populations total es externalStop work hinv hbud hrec hbal
+
+/-- Single-copy population handoff (`src/SymbolicRegression.jl:1175-1245`):
+`saved_pop = copy(cur_pop)` allocates fresh member IDs disjoint from `cur_pop`;
+`best_sub_pop(saved_pop)` selects a subset of `saved_pop`'s member IDs;
+reusing `in_pop = cur_pop` for the next worker shares zero member IDs with either
+`state.last_pops[j][i]` or `state.best_sub_pops[j][i]`. -/
+def single_copy_handoff : Prop :=
+  ∀ (curIds savedIds bestIds : List Nat),
+    (∀ id ∈ savedIds, id ∉ curIds) →
+    (∀ id ∈ bestIds, id ∈ savedIds) →
+    (∀ id ∈ curIds, id ∉ savedIds ∧ id ∉ bestIds)
+
+theorem single_copy_handoff_holds : single_copy_handoff := by
+  intro curIds savedIds bestIds hdisj hsub id hid
+  refine ⟨fun hs => hdisj id hs hid, fun hb => hdisj id (hsub id hb) hid⟩
+
 end SymReg.Search
