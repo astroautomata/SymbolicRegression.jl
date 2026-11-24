@@ -16,7 +16,7 @@ jobs:
     env:
       LEAN_NUM_THREADS: 2
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: leanprover/lean-action@ba3fdfe5c4476c925da13bf11a005ddb47e47aee # v1
         with:
           lake-package-directory: test/lean
