@@ -1,5 +1,6 @@
 import SymReg.HofMig.Migration
 import SymReg.Loss.Core
+import SymReg.Population.Tournament
 import DynExpr.ParamStruct.Mirror
 
 namespace SymReg.CrossMut
@@ -98,31 +99,22 @@ example :
     findminFast [⟨.nan, false⟩, ⟨.fin 0, true⟩, ⟨.fin 0, false⟩]
       FindminFloat.numeric ⟨.posInf, false⟩ = (⟨.fin 0, true⟩, 2) := by decide +kernel
 
-/-- `src/Utils.jl:121-127`: bubble the newly inserted last entry left, using
-strict comparisons and swapping values and indices together. -/
-def bubble : List (JF × Nat) → List (JF × Nat)
+/-- `src/Utils.jl:106-118`: k=1 scans with `isless` starting at the first element. -/
+def bottomkOne : List JF → List (JF × Nat)
   | [] => []
-  | p :: ps =>
-    match bubble ps with
-    | [] => [p]
-    | q :: qs => if less q.1 p.1 then q :: p :: qs else p :: q :: qs
+  | x :: xs =>
+    [(xs.zipIdx 2).foldl
+      (fun best p => if SymReg.Population.isless p.1 best.1 then p else best) (x, 1)]
 
-/-- `src/Utils.jl:115-130`: replace only a strictly smaller candidate; retain
-sentinels otherwise. Lists model valid MutableTuple slots. -/
-def bottomStep (slots : List (JF × Nat)) (p : JF × Nat) : List (JF × Nat) :=
-  match slots.getLast? with
-  | none => slots
-  | some last => if less p.1 last.1 then bubble (slots.dropLast ++ [p]) else slots
-
-/-- `src/Utils.jl:97-113`: k=1 delegates to findmin_fast; other k initialize
-all indices to one and values to typemax(T). The numerical model uses Float64. -/
+/-- `src/Utils.jl:97-148`: k=1 scans with `isless`; k>=2 runs `_bottomk!` tracking filled slots
+and ordering by `isless`. -/
 def bottomkFast (xs : List JF) (k : Nat) : List (JF × Nat) :=
-  if k = 1 then [findminFast xs id .posInf]
-  else (xs.zipIdx 1).foldl bottomStep (List.replicate k (.posInf, 1))
+  if k = 1 then bottomkOne xs
+  else SymReg.Population.bottomk k xs
 
 /-- Full k-smallest contract: distinct valid indices point at the reported
 values, output is ascending, and no omitted input is smaller than a selected
-value. Legal k=length(x) already exposes an unfilled sentinel index. -/
+value. -/
 def bottomkIndices : Prop := ∀ xs : List JF, ∀ k : Nat,
   0 < k → k ≤ xs.length →
   let out := bottomkFast xs k
@@ -132,13 +124,96 @@ def bottomkIndices : Prop := ∀ xs : List JF, ∀ k : Nat,
   ∀ i value, xs[i]? = some value → i + 1 ∉ out.map Prod.snd →
     ∀ p ∈ out, less value p.1 = false
 
-theorem bottomkIndices_refuted : ¬ bottomkIndices := by
-  intro h
-  have bad := h [.fin 0, .posInf] 2 (by decide) (by decide)
-  have hn : ¬ (let out := bottomkFast [.fin 0, .posInf] 2
-      out.length = 2 ∧ (out.map Prod.snd).Nodup ∧
-        ∀ p ∈ out, ([.fin 0, .posInf] : List JF)[p.2 - 1]? = some p.1) := by decide
-  exact hn bad.1
+private theorem less_false_of_isless_false {a b : JF}
+    (h : SymReg.Population.isless a b = false) : less a b = false := by
+  cases a <;> cases b <;>
+    simp_all [SymReg.Population.isless, SymReg.Population.flt,
+      less, DynExpr.Expressions.Sampling.greater] <;> grind
+
+private theorem bottomkOne_fold_spec (xs : List JF) :
+    ∀ (rest : List JF) (offset : Nat) (best : JF × Nat),
+      1 ≤ best.2 → best.2 ≤ xs.length → xs[best.2 - 1]? = some best.1 →
+      (∀ (i : Nat) (v : JF), i + 1 < offset → xs[i]? = some v →
+        SymReg.Population.isless v best.1 = false) →
+      (∀ (j : Nat), j < rest.length → xs[offset - 1 + j]? = rest[j]?) →
+      offset - 1 + rest.length = xs.length → 1 ≤ offset →
+      let r := (rest.zipIdx offset).foldl
+        (fun b p => if SymReg.Population.isless p.1 b.1 then p else b) best
+      1 ≤ r.2 ∧ r.2 ≤ xs.length ∧ xs[r.2 - 1]? = some r.1 ∧
+      ∀ (i : Nat) (v : JF), xs[i]? = some v → SymReg.Population.isless v r.1 = false := by
+  intro rest
+  induction rest with
+  | nil =>
+    intro offset best h1 h2 h3 hprev _ hlen _
+    refine ⟨h1, h2, h3, fun i v hi => ?_⟩
+    have hlt : i < xs.length := (List.getElem?_eq_some_iff.mp hi).1
+    exact hprev i v (by simp at hlen; omega) hi
+  | cons y ys ih =>
+    intro offset best h1 h2 h3 hprev hrest hlen hoff
+    have hy : xs[offset - 1]? = some y := by
+      have := hrest 0 (by simp)
+      simpa using this
+    have hylen : offset ≤ xs.length := by simp at hlen; omega
+    rw [List.zipIdx_cons, List.foldl_cons]
+    dsimp only
+    split
+    · rename_i hlt
+      apply ih (offset + 1) (y, offset) (by omega) hylen hy ?_ ?_ (by simp at hlen ⊢; omega) (by omega)
+      · intro i v hi hxi
+        by_cases hio : i + 1 < offset
+        · exact SymReg.Population.isless_asymm
+            (SymReg.Population.isless_of_isless_not_isless hlt (hprev i v hio hxi))
+        · have : i = offset - 1 := by omega
+          subst this
+          rw [hy] at hxi
+          cases hxi
+          exact SymReg.Population.isless_irrefl y
+      · intro j hj
+        have := hrest (j + 1) (by simp; omega)
+        simpa [show offset - 1 + (j + 1) = offset + j by omega] using this
+    · rename_i hnlt
+      apply ih (offset + 1) best h1 h2 h3 ?_ ?_ (by simp at hlen ⊢; omega) (by omega)
+      · intro i v hi hxi
+        by_cases hio : i + 1 < offset
+        · exact hprev i v hio hxi
+        · have : i = offset - 1 := by omega
+          subst this
+          rw [hy] at hxi
+          cases hxi
+          simpa using hnlt
+      · intro j hj
+        have := hrest (j + 1) (by simp; omega)
+        simpa [show offset - 1 + (j + 1) = offset + j by omega] using this
+
+theorem bottomkIndices_holds : bottomkIndices := by
+  intro xs k hk hle
+  unfold bottomkFast
+  by_cases h1 : k = 1
+  · subst h1
+    simp only [↓reduceIte]
+    cases xs with
+    | nil => simp at hle
+    | cons x xs =>
+      simp only [bottomkOne]
+      have hspec := bottomkOne_fold_spec (x :: xs) xs 2 (x, 1) (by omega) (by simp) rfl
+        (fun i v hi hxi => by
+          have : i = 0 := by omega
+          subst this
+          simp at hxi
+          subst hxi
+          exact SymReg.Population.isless_irrefl x)
+        (fun j _ => by rw [show 2 - 1 + j = j + 1 by omega]; rfl) (by simp; omega) (by omega)
+      refine ⟨⟨rfl, by simp, fun p hp => ?_⟩, by simp, fun i v hxi _ p hp => ?_⟩
+      · simp at hp; subst hp; exact hspec.2.2.1
+      · simp at hp; subst hp
+        exact less_false_of_isless_false (hspec.2.2.2 i v hxi)
+  · simp only [h1, ↓reduceIte]
+    obtain ⟨hlen, hnd, hsort, hmem, homit⟩ := SymReg.Population.bottomk_spec k xs (by omega) hle
+    refine ⟨⟨hlen, hnd, fun p hp => (hmem p hp).2.2⟩, ?_, ?_⟩
+    · exact hsort.imp (fun {_ _} hab => less_false_of_isless_false hab)
+    · intro i v hxi hnot p hp
+      have hilt : i < xs.length := (List.getElem?_eq_some_iff.mp hxi).1
+      exact less_false_of_isless_false (homit i v hilt hxi hnot p hp)
 
 /- Source: src/Utils.jl:20-30
 function get_birth_order(; deterministic::Bool=false)::Int
