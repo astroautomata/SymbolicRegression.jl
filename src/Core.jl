@@ -21,6 +21,7 @@ using .DatasetModule:
     BasicDataset,
     SubDataset,
     eval_X,
+    with_eval_X,
     is_weighted,
     has_units,
     max_features,

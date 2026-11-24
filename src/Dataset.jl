@@ -106,6 +106,34 @@ end
 @inline eval_X(d::BasicDataset) = getfield(d, :X_eval)
 @inline eval_X(d::SubDataset) = getfield(d, :_X_eval)
 @inline eval_X(d::Dataset) = d.X
+
+function with_eval_X(
+    d::BasicDataset{T,L,AX,AY,AW,NT,XU,YU,XUS,YUS,AXE}, X_eval::AXE
+) where {T,L,AX,AY,AW,NT,XU,YU,XUS,YUS,AXE}
+    return BasicDataset{T,L,AX,AY,AW,NT,XU,YU,XUS,YUS,AXE}(
+        d.X,
+        d.y,
+        d.index,
+        d.n,
+        size(X_eval, 1),
+        d.weights,
+        d.extra,
+        d.avg_y,
+        d.use_baseline,
+        d.baseline_loss,
+        d.variable_names,
+        d.display_variable_names,
+        d.y_variable_name,
+        d.X_units,
+        d.y_units,
+        d.X_sym_units,
+        d.y_sym_units,
+        X_eval,
+    )
+end
+function with_eval_X(d::SubDataset{T,L,D,I,AXE}, X_eval::AXE) where {T,L,D,I,AXE}
+    return SubDataset{T,L,D,I,AXE}(get_full_dataset(d), get_indices(d), X_eval)
+end
 @inline function Base.getproperty(d::SubDataset, prop::Symbol)
     if prop == :X
         return view(get_full_dataset(d).X, :, get_indices(d))
