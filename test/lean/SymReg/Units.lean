@@ -56,23 +56,20 @@ def entries : List Entry := [
     status := .refuted, prop := ``units_root_rounding, thm := some ``units_root_rounding_refuted
     notes := "Exponents are FixedRational{Int32,25200}, so sqrt of m^(1/16) is truncated to m^(787/25200): with X_units=[\"m\"], y_units=\"1\", (s5*s5)/s4 for s4=sqrt(sqrt(sqrt(sqrt(x1)))), s5=sqrt(s4) returns violates=true (residual m^(-1/25200)); it should return false." },
   { id := "units-dimensionless-fn", juliaFile := "src/DimensionalAnalysis.jl"
-    juliaFns := ["degn_eval", "@maybe_return_call"]
+    juliaFns := ["degn_eval", "@maybe_return_call", "has_no_dims"]
     statement := "cos-like functions (Number methods only) and log-like generic functions accept dimensionless arguments with a dimensionless result."
     preconditions := "Arguments non-violating, finite and dimensionless."
-    status := .refuted, prop := ``units_dimensionless_fn, thm := some ``units_dimensionless_fn_refuted
-    notes := "degn_eval reaches the scalar method only when every argument is a wildcard constant: with X_units=[\"m\",\"1\"], y_units=\"1\", violates_dimensional_constraints on cos(x2), exp(x2) or log(x2) returns true; it should return false." },
+    status := .proven, prop := ``units_dimensionless_fn, thm := some ``units_dimensionless_fn_holds },
   { id := "units-neg-preserve", juliaFile := "src/DimensionalAnalysis.jl"
-    juliaFns := ["degn_eval", "@maybe_return_call"]
+    juliaFns := ["degn_eval", "@maybe_return_call", "-", "zero", "*"]
     statement := "neg and relu preserve the dimensions of a non-wildcard argument."
     preconditions := "Argument non-violating, finite, not a wildcard."
-    status := .refuted, prop := ``units_neg_preserve, thm := some ``units_neg_preserve_refuted
-    notes := "WildcardQuantity has no unary - or zero, so neg(x)=-x and relu(x) throw MethodError and fall to the all-wildcard path: with X_units=[\"m\"], y_units=\"m\", neg(x1), relu(x1) and neg(2.0*x1) all return violates=true; they should return false." },
+    status := .proven, prop := ``units_neg_preserve, thm := some ``units_neg_preserve_holds },
   { id := "units-compare", juliaFile := "src/DimensionalAnalysis.jl"
-    juliaFns := ["degn_eval", "@maybe_return_call"]
+    juliaFns := ["degn_eval", "@maybe_return_call", "<", ">", "<=", ">=", "one", "*"]
     statement := "greater, less, greater_equal and less_equal of two equal-dimension arguments are accepted with a dimensionless result."
     preconditions := "Arguments non-violating and finite with equal dimensions."
-    status := .refuted, prop := ``units_compare, thm := some ``units_compare_refuted
-    notes := "x > y needs isless on WildcardQuantity, which is missing: with X_units=[\"m\",\"1\"], y_units=\"1\", greater(x1,x1), less(x1,x1) and even greater(x2,x2) return violates=true (cond(x2,x1) with y_units=\"m\" too); they should return false." },
+    status := .proven, prop := ``units_compare, thm := some ``units_compare_holds },
   { id := "units-degn-guard", juliaFile := "src/DimensionalAnalysis.jl"
     juliaFns := ["degn_eval", "isfinite", "valid"]
     statement := "degn_eval returns the first violating argument unchanged; otherwise any nonfinite argument value on the first data row is reported as a violation."

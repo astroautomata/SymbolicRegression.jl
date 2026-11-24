@@ -137,6 +137,23 @@ theorem unary_sound {bb : Builtin} {dop : Dim → Dim} {l r : WQ} {P : Dim → P
       obtain ⟨a, ha⟩ := hsurj d; exact ⟨a, hl.2 hw a, ha⟩
     exact ⟨hall _, fun _ => hall⟩
 
+theorem cmp_sound {k : Nat} {l rr r : WQ} {Pl Pr : Dim → Prop}
+    (hl : Sat Pl l) (hr : Sat Pr rr) (hlv : l.violates = false) (hrv : rr.violates = false)
+    (h : wCmp sc k l rr = .ok r) :
+    Sat (fun d => ∃ a c, Pl a ∧ Pr c ∧ specRule (.cmp k) [a, c] = some d) r := by
+  unfold wCmp at h
+  simp only [hlv, hrv, Bool.or_self, Bool.false_eq_true, if_false] at h
+  by_cases hc : (decide (l.dim = rr.dim) || l.wildcard || rr.wildcard) = true
+  · simp only [hc, if_true, Except.ok.injEq] at h; subst h
+    simp only [Bool.or_eq_true, decide_eq_true_eq] at hc
+    refine ⟨?_, fun hw => by simp at hw⟩
+    rcases hc with (hd | hlw) | hrw
+    · exact ⟨l.dim, rr.dim, hl.1, hr.1, by simp [specRule, hd]⟩
+    · exact ⟨rr.dim, rr.dim, hl.2 hlw rr.dim, hr.1, by simp [specRule]⟩
+    · exact ⟨l.dim, l.dim, hl.1, hr.2 hrw l.dim, by simp [specRule]⟩
+  · simp only [Bool.not_eq_true] at hc
+    simp [hc] at h
+
 variable (table : List (List Builtin)) (xu : List Dim) (allow : Bool)
 
 /-- Soundness of every `WildcardQuantity` overload against `specRule`. -/
@@ -180,6 +197,10 @@ theorem wop_sound {b : Builtin} {ws : List WQ} {r : WQ} {cs : List (Tree JF)}
       simp only [wop, Option.some.injEq] at hw
       exact one (unary_sound sc (fun a => ⟨_, rfl, fun _ _ => rfl⟩)
         (fun d => ⟨d.inv, by simp [specRule, Dim.inv_inv]⟩) hl hlv hw)
+    case neg =>
+      simp only [wop, Option.some.injEq] at hw
+      exact one (unary_sound sc (fun a => ⟨_, rfl, fun _ _ => rfl⟩)
+        (fun d => ⟨d, by simp [specRule]⟩) hl hlv hw)
   · cases hc with | cons hlc hc' => cases hc' with | cons hrc hc'' => cases hc'' with | nil =>
     obtain ⟨hl, hlv⟩ := hlc
     obtain ⟨hr, hrv⟩ := hrc
@@ -265,22 +286,30 @@ theorem sound_core (D : Nat) (sc : Scalars) (table : List (List Builtin)) (xu : 
       have hds : All2 (Typed table (xu.map Q.dim) allow) cs (List.replicate cs.length Dim.one) :=
         All2.const _ cs fun c hc => by
           obtain ⟨w', hw', hcw⟩ := hchild.mem_left c hc
-          exact hcw.1.2 (hwild w' hw') _
+          rcases hwild w' hw' with hw | hd
+          · exact hcw.1.2 hw _
+          · exact hd ▸ hcw.1.1
       refine typed_branch table (xu.map Q.dim) allow hk hds ?_
       rw [← hlen, hpl]; exact specRule_ones b
     · obtain ⟨hwop, _⟩ := builtin_mrc (pattern_length _ _) hmrc
-      have hroot : ∀ w', ws = [w'] → w'.wildcard = false →
-          (b = .sqrt → w'.dim.RootExact 2) ∧ (b = .cbrt → w'.dim.RootExact 3) := by
-        intro w' hws hww
-        subst hws
-        cases hall with
-        | cons hc1 hrest =>
-          cases hrest
-          have hk1 : kindAt table 1 o = some b := by simpa using hk
-          have := hroots.1 _ w' rfl hc1 (hnv w' (by simp)) hww
-          exact ⟨fun hb => this.1 (hb ▸ hk1), fun hb => this.2 (hb ▸ hk1)⟩
-      exact (wop_sound sc table (xu.map Q.dim) allow hwop hv hchild hroot).mono
-        fun d ⟨ds, hds, hs⟩ => typed_branch table (xu.map Q.dim) allow hk hds hs
+      rcases hwop with hwop | ⟨k, l, rr, rfl, hws, hcmp⟩
+      · have hroot : ∀ w', ws = [w'] → w'.wildcard = false →
+            (b = .sqrt → w'.dim.RootExact 2) ∧ (b = .cbrt → w'.dim.RootExact 3) := by
+          intro w' hws hww
+          subst hws
+          cases hall with
+          | cons hc1 hrest =>
+            cases hrest
+            have hk1 : kindAt table 1 o = some b := by simpa using hk
+            have := hroots.1 _ w' rfl hc1 (hnv w' (by simp)) hww
+            exact ⟨fun hb => this.1 (hb ▸ hk1), fun hb => this.2 (hb ▸ hk1)⟩
+        exact (wop_sound sc table (xu.map Q.dim) allow hwop hv hchild hroot).mono
+          fun d ⟨ds, hds, hs⟩ => typed_branch table (xu.map Q.dim) allow hk hds hs
+      · subst hws
+        cases hchild with | cons hlc hc' => cases hc' with | cons hrc hc'' => cases hc'' with | nil =>
+        exact (cmp_sound sc hlc.1 hrc.1 hlc.2 hrc.2 hcmp).mono
+          fun d ⟨a, c, ha, hc, hs⟩ =>
+            typed_branch table (xu.map Q.dim) allow hk (.cons ha (.cons hc .nil)) hs
 
 /-- Soundness: a tree the check accepts is dimensionally consistent: some choice of
 dimensions for its constants (dimensionless ones when `dimensionless_constants_only`)

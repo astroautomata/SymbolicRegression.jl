@@ -232,15 +232,26 @@ theorem pattern_zero (n : Nat) : pattern n 0 = List.replicate n false := by
     simp [pattern]
 
 theorem allowed_replicate_true :
-    ∀ (ws : List WQ), allowed (List.replicate ws.length true) ws = true → ∀ v ∈ ws, v.wildcard = true
+    ∀ (ws : List WQ), allowed (List.replicate ws.length true) ws = true →
+      ∀ v ∈ ws, v.wildcard = true ∨ v.dim = Dim.one
   | [], _ => by simp
   | w :: ws, h => by
     simp only [List.length_cons, List.replicate_succ, allowed, List.zip_cons_cons, List.all_cons,
-      Bool.not_true, Bool.false_or, Bool.and_eq_true] at h
+      Bool.not_true, Bool.false_or, Bool.and_eq_true, Bool.or_eq_true, decide_eq_true_eq] at h
     intro v hv
     cases List.mem_cons.mp hv with
     | inl he => subst he; exact h.1
     | inr hm => exact allowed_replicate_true ws h.2 v hm
+
+theorem allowed_replicate_true_of_dim_one :
+    ∀ (ws : List WQ), (∀ v ∈ ws, v.dim = Dim.one) →
+      allowed (List.replicate ws.length true) ws = true
+  | [], _ => rfl
+  | w :: ws, h => by
+    simp only [List.length_cons, List.replicate_succ, allowed, List.zip_cons_cons, List.all_cons,
+      Bool.not_true, Bool.false_or, h w List.mem_cons_self, decide_true, Bool.or_true,
+      Bool.true_and]
+    exact allowed_replicate_true_of_dim_one ws (fun v hv => h v (List.mem_cons_of_mem _ hv))
 
 theorem allowed_replicate_false : ∀ (ws : List WQ), allowed (List.replicate ws.length false) ws = true
   | [] => rfl
@@ -289,11 +300,12 @@ theorem mapM_toT_map_t : ∀ (ws : List WQ),
   | w :: ws => by simp [List.mapM_cons, Arg.toT, mapM_toT_map_t ws, bind, Option.bind, pure]
 
 /-- A successful built-in lattice point reaching a `W` method is an all-`W` call of a
-`WildcardQuantity` overload. -/
+`WildcardQuantity` overload or comparison. -/
 theorem builtin_mrc {sc : Scalars} {b : Builtin} {p : List Bool} {ws : List WQ} {r : WQ}
     (hp : p.length = ws.length)
     (h : maybeReturnCall (b.toOp sc) (argsFor p ws) = .ok (some r)) :
-    wop sc b ws = some r ∧ r.violates = false := by
+    (wop sc b ws = some r ∨ ∃ k l rr, b = .cmp k ∧ ws = [l, rr] ∧ wCmp sc k l rr = .ok r) ∧
+      r.violates = false := by
   unfold maybeReturnCall safeCall at h
   simp only [Builtin.toOp] at h
   cases ht : (argsFor p ws).mapM Arg.toT with
@@ -301,17 +313,42 @@ theorem builtin_mrc {sc : Scalars} {b : Builtin} {p : List Bool} {ws : List WQ} 
   | none =>
     simp only [ht] at h
     cases hw : (argsFor p ws).mapM Arg.toW with
-    | none => simp [hw, Option.bind] at h
+    | none => simp [hw] at h
     | some vs =>
       have := mapM_toW_argsFor p ws vs hp hw
       subst this
-      cases hr : wop sc b vs with
-      | none => simp [hw, hr, Option.bind] at h
-      | some r' =>
-        simp [hw, hr, Option.bind, WQ.valid] at h
-        obtain ⟨h1, h2⟩ := h
-        subst h2
-        exact ⟨rfl, by simpa using h1⟩
+      simp only [hw] at h
+      cases hb : b with
+      | cmp k =>
+        cases hvs : vs with
+        | nil => simp [hb, hvs, wop] at h
+        | cons l rest =>
+          cases rest with
+          | nil => simp [hb, hvs, wop] at h
+          | cons rr tail =>
+            cases tail with
+            | nil =>
+              simp only [hb, hvs] at h
+              cases hcmp : wCmp sc k l rr with
+              | error e =>
+                cases e <;> simp only [hcmp, Except.map] at h
+                all_goals first | cases h | (split at h <;> cases h)
+              | ok r' =>
+                simp [hcmp, Except.map, WQ.valid] at h
+                obtain ⟨h1, h2⟩ := h
+                subst h2
+                exact ⟨.inr ⟨k, l, rr, rfl, rfl, hcmp⟩, by simpa using h1⟩
+            | cons _ _ => simp [hb, hvs, wop] at h
+      | _ =>
+        simp only [hb] at h
+        cases hr : wop sc b vs with
+        | none => rw [hb] at hr; simp [hr] at h
+        | some r' =>
+          rw [hb] at hr
+          simp [hr, WQ.valid] at h
+          obtain ⟨h1, h2⟩ := h
+          subst h2
+          exact ⟨.inl (by simpa [hb] using hr), by simpa using h1⟩
 
 /-- The last lattice point of a built-in operator computes a dimensionless non-wildcard. -/
 theorem builtin_allScalar {sc : Scalars} {b : Builtin} {ws : List WQ} {w : WQ}
