@@ -8,13 +8,26 @@ using ADTypes: AbstractADType, AutoEnzyme
 using DifferentiationInterface: value_and_gradient, prepare_gradient
 using DynamicExpressions:
     AbstractExpression,
+    AbstractExpressionNode,
     Expression,
+    OperatorEnum,
+    EvalContext,
+    ArrayBuffer,
+    ResultOk,
+    get_tree,
+    get_child,
+    is_constant,
+    preserve_sharing,
+    is_valid_array,
     get_scalar_constants,
     set_scalar_constants!,
     extract_gradient
+using DynamicExpressions.EvaluateModule:
+    _eval_tree_array, apply_op_array, reset_index!, get_array
 using DispatchDoctor: @unstable
 using ..CoreModule:
     AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, specialized_options, dataset_fraction
+using ..CoreModule.DatasetModule: has_units
 using ..UtilsModule: get_birth_order, PerTaskCache, stable_get!
 using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost, _loss, _weighted_loss
 using ..PopMemberModule: AbstractPopMember, PopMember
@@ -288,8 +301,7 @@ end
     has_units(dataset) && return nothing
     isnothing(options.loss_function) || return nothing
     isnothing(options.loss_function_expression) || return nothing
-    eval_context isa EvalContext || return nothing
-    _kernels_validate(T, eval_context) isa Val{true} || return nothing
+    eval_context isa EvalContext{false,<:Any,true,<:ArrayBuffer{Vector{Vector{T}}}} || return nothing
     cX = dataset.X
     cX isa Union{Matrix{T},SubArray{T,2,Matrix{T}}} || return nothing
     dataset.n >= 512 || return nothing
@@ -325,6 +337,18 @@ end
 end
 _build_memo_plan(_, _, _, _, _) = nothing
 
+@inline function _check_memo_ok(
+    res::ResultOk{Vector{T}}, eval_context::EvalContext
+)::ResultOk{Vector{T}} where {T}
+    if !res.ok
+        return res
+    end
+    if eval_context.early_exit isa Val{true} && !is_valid_array(res.x)
+        return ResultOk(res.x, false)
+    end
+    return res
+end
+
 function _eval_memo_record(
     mnode::MemoNode{T,NT},
     cache_vecs::Vector{Vector{T}},
@@ -333,10 +357,13 @@ function _eval_memo_record(
     eval_context::EvalContext,
 )::ResultOk{Vector{T}} where {T,NT}
     res = if !mnode.has_slots
-        _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+        _check_memo_ok(
+            _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}},
+            eval_context,
+        )
     else
         deg = mnode.node.degree
-        if deg == 1
+        raw = if deg == 1
             r1 = _eval_memo_record(mnode.children[1], cache_vecs, cX, operators, eval_context)
             r1.ok || return r1
             apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
@@ -357,6 +384,7 @@ function _eval_memo_record(
             xs = map(r -> r.x, rs)
             apply_op_array(xs, mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
         end
+        _check_memo_ok(raw, eval_context)
     end
     if mnode.slot > 0 && res.ok
         @inbounds copyto!(cache_vecs[mnode.slot], res.x)
@@ -378,18 +406,24 @@ function _eval_memo_read(
             @inbounds copyto!(out, cache_vecs[mnode.slot])
             return ResultOk(out, true)
         end
-        return _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+        return _check_memo_ok(
+            _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}},
+            eval_context,
+        )
     end
     if !mnode.has_slots
-        return _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+        return _check_memo_ok(
+            _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}},
+            eval_context,
+        )
     end
     deg = mnode.node.degree
-    if deg == 1
+    raw = if deg == 1
         r1 = _eval_memo_read(
             mnode.children[1], diff_mask, cache_vecs, cX, operators, eval_context
         )
         r1.ok || return r1
-        return apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+        apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
     elseif deg == 2
         r1 = _eval_memo_read(
             mnode.children[1], diff_mask, cache_vecs, cX, operators, eval_context
@@ -399,7 +433,7 @@ function _eval_memo_read(
             mnode.children[2], diff_mask, cache_vecs, cX, operators, eval_context
         )
         r2.ok || return r2
-        return apply_op_array(
+        apply_op_array(
             (r1.x, r2.x), mnode.node.op, operators, eval_context
         )::ResultOk{Vector{T}}
     else
@@ -413,8 +447,9 @@ function _eval_memo_read(
             r.ok || return r
         end
         xs = map(r -> r.x, rs)
-        return apply_op_array(xs, mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+        apply_op_array(xs, mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
     end
+    return _check_memo_ok(raw, eval_context)
 end
 
 function _eval_with_memo(
