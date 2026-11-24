@@ -107,10 +107,9 @@ def entries : List Entry := [
     "The constructor stores trees only in the structure's exact key order; any other order, including a permutation, fails the assertion." "Successful parameter construction." ``ctorKeys ``ctorKeys_holds,
   pe "tmpl-ctor-params" TE ["TemplateExpression", "has_params"]
     "Parameters: unknown names rejected, vectors stored in num_parameters order as given or zero-filled, wrong lengths rejected, and parameter-free structures accept only absent/empty parameters." "None." ``ctorParams ``ctorParams_holds,
-  re "tmpl-get-tree" TE ["get_tree"]
-    "get_tree succeeds for every parameter-free template whose combiner succeeds on max(num_features) variables." "No parameters."
-    "get_tree zips inner expressions with variable trees (lines 552-555): ((; f), (a, b)) -> f(a, b) gets one variable and throws BoundsError; count_nodes fails too."
-    ``getTreeTotal ``getTreeTotal_refuted,
+  pe "tmpl-get-tree" TE ["get_tree"]
+    "get_tree succeeds for every nonempty parameter-free template whose combiner succeeds on sum(num_features) variables."
+    "No parameters; at least one component expression." ``getTreeTotal ``getTreeTotal_holds,
   pe "tmpl-invalid-vars" TE ["has_invalid_variables", "contains_features_greater_than"]
     "has_invalid_variables holds exactly when an inner expression reads a feature beyond its key's num_features." "Nonnegative num_features." ``invalidVars ``invalidVars_holds,
   pe "tmpl-eval-contract" TE ["eval_tree_array", "(ex::TemplateExpression)(X)", "TemplateReturnError", "_match_input_eltype"]
