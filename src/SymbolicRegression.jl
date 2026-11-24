@@ -1089,48 +1089,71 @@ function _main_search_loop!(
     print_every_n_seconds = 5
     equation_speed = Float32[]
 
-    if ropt.parallelism in (:multiprocessing, :multithreading)
+    done_ch = if ropt.parallelism in (:multiprocessing, :multithreading) &&
+        sum(state.cycles_remaining) > 0
+        ch = Channel{Tuple{Int,Int,Bool}}(options.populations * nout + 1)
         for j in 1:nout, i in 1:(options.populations)
             # Start listening for each population to finish:
-            t = @filtered_async put!(state.channels[j][i], fetch(state.worker_output[j][i]))
+            t = let j = j, i = i, ch = ch
+                @filtered_async begin
+                    try
+                        put!(state.channels[j][i], fetch(state.worker_output[j][i]))
+                        put!(ch, (j, i, true))
+                    catch ex
+                        put!(ch, (j, i, false))
+                        rethrow(ex)
+                    end
+                end
+            end
             push!(state.tasks[j], t)
         end
+        ch
+    else
+        nothing
     end
     kappa = 0
-    resource_monitor = ResourceMonitor(;
-        # Storing n times as many monitoring intervals as populations seems like it will
-        # help get accurate resource estimates:
-        max_recordings=(options.populations * 100 * nout),
-        start_reporting_at=(options.populations * 3 * nout),
-        window_size=(options.populations * 2 * nout),
-    )
+    head_node_occupation = 0.0
+    need_poll =
+        options.timeout_in_seconds !== nothing ||
+        state.stdin_reader.can_read_user_input ||
+        external_stop(ropt) !== nothing ||
+        (ropt.verbosity > 0 && !ropt.progress)
     while sum(state.cycles_remaining) > 0
-        kappa += 1
-        if kappa > options.populations * nout
-            kappa = 1
-        end
-        # nout, populations:
-        j, i = state.task_order[kappa]
-
-        # Check if error on population:
+        j = 1
+        i = 1
+        population_ready = false
         if ropt.parallelism in (:multiprocessing, :multithreading)
-            if istaskfailed(state.tasks[j][i])
-                fetch(state.tasks[j][i])
-                error("Task failed for population")
+            ch = done_ch::Channel{Tuple{Int,Int,Bool}}
+            if !isready(ch)
+                if need_poll
+                    timedwait(() -> isready(ch), 0.02; pollint=0.002)
+                else
+                    wait(ch)
+                end
             end
-        end
-        # Non-blocking check if a population is ready:
-        population_ready = if ropt.parallelism in (:multiprocessing, :multithreading)
-            # TODO: Implement type assertions based on parallelism.
-            isready(state.channels[j][i])
+            if isready(ch)
+                j, i, task_ok = take!(ch)
+                if !task_ok || istaskfailed(state.tasks[j][i])
+                    fetch(state.tasks[j][i])
+                    if istaskfailed(state.tasks[j][i])
+                        error("Task failed for population")
+                    end
+                else
+                    if state.cycles_remaining[j] > 0
+                        population_ready = true
+                    elseif isready(state.channels[j][i])
+                        take!(state.channels[j][i])
+                    end
+                end
+            end
         else
-            true
+            kappa += 1
+            if kappa > options.populations * nout
+                kappa = 1
+            end
+            j, i = state.task_order[kappa]
+            population_ready = (state.cycles_remaining[j] > 0)
         end
-        record_channel_state!(resource_monitor, population_ready)
-
-        # Don't start more if this output has finished its cycles:
-        # TODO - this might skip extra cycles?
-        population_ready &= (state.cycles_remaining[j] > 0)
         if population_ready
             # Take the fetch operation from the channel since its ready
             (cur_pop, best_seen, cur_trace, cur_num_evals, returned_plugin_states) =
@@ -1149,8 +1172,9 @@ function _main_search_loop!(
                     typeof(state.trace_prototype),
                     eltype(eltype(state.worker_plugin_states)),
                 }
-            state.last_pops[j][i] = copy(cur_pop)
-            state.best_sub_pops[j][i] = best_sub_pop(cur_pop; topn=options.topn)
+            saved_pop = copy(cur_pop)
+            state.last_pops[j][i] = saved_pop
+            state.best_sub_pops[j][i] = best_sub_pop(saved_pop; topn=options.topn)
             write_trace(cur_trace, options.tracing_file)
             state.num_evals[j][i] += cur_num_evals
             dataset = datasets[j]
@@ -1218,7 +1242,7 @@ function _main_search_loop!(
                 )
                 iteration = next_trace_iteration(cur_trace)
 
-                in_pop = copy(cur_pop::Population{T,L,N})
+                in_pop = cur_pop::Population{T,L,N}
                 worker_plugin_states = strictmap(
                     options.plugins, returned_plugin_states, state.plugin_states[j]
                 ) do plugin, worker_state, latest_head_state
@@ -1255,9 +1279,18 @@ function _main_search_loop!(
                         )
                     end
                 if ropt.parallelism in (:multiprocessing, :multithreading)
-                    state.tasks[j][i] = @filtered_async put!(
-                        state.channels[j][i], fetch(state.worker_output[j][i])
-                    )
+                    ch = done_ch::Channel{Tuple{Int,Int,Bool}}
+                    state.tasks[j][i] = let j = j, i = i, ch = ch
+                        @filtered_async begin
+                            try
+                                put!(state.channels[j][i], fetch(state.worker_output[j][i]))
+                                put!(ch, (j, i, true))
+                            catch ex
+                                put!(ch, (j, i, false))
+                                rethrow(ex)
+                            end
+                        end
+                    end
                 end
 
                 total_cycles = ropt.niterations * options.populations
@@ -1265,7 +1298,6 @@ function _main_search_loop!(
                     options, total_cycles, cycles_remaining=state.cycles_remaining[j]
                 )
                 if !isnothing(progress_bar)
-                    head_node_occupation = estimate_work_fraction(resource_monitor)
                     cycles_elapsed = total_cycles * nout - sum(state.cycles_remaining)
                     iterations_elapsed = cycles_elapsed ÷ options.populations
                     update_progress_bar!(
@@ -1284,7 +1316,6 @@ function _main_search_loop!(
                 logging_callback!(ropt.logger; state, datasets, ropt, options)
             end
         end
-        yield()
 
         ################################################################
         ## Search statistics
@@ -1311,7 +1342,6 @@ function _main_search_loop!(
             if ropt.verbosity > 0 && !ropt.progress && length(equation_speed) > 0
 
                 # Dominating pareto curve - must be better than all simpler equations
-                head_node_occupation = estimate_work_fraction(resource_monitor)
                 total_cycles = ropt.niterations * options.populations
                 print_search_state(
                     state.halls_of_fame,
