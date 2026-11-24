@@ -16,7 +16,7 @@ using DispatchDoctor: @unstable
 using ..CoreModule:
     AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, specialized_options, dataset_fraction
 using ..UtilsModule: get_birth_order, PerTaskCache, stable_get!
-using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost
+using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost, _loss, _weighted_loss
 using ..PopMemberModule: AbstractPopMember, PopMember
 
 function can_optimize(::AbstractExpression{T}, options) where {T}
@@ -175,6 +175,302 @@ end
     )
 end
 
+struct MemoNode{T,NT<:AbstractExpressionNode{T}}
+    node::NT
+    mask::UInt64
+    slot::Int
+    has_slots::Bool
+    children::Vector{MemoNode{T,NT}}
+end
+
+mutable struct MemoPlan{T,L,NT<:AbstractExpressionNode{T},OP,CX,EC,AY,AW,LF}
+    const tree::MemoNode{T,NT}
+    const nconst::Int
+    const cache_vecs::Vector{Vector{T}}
+    const base_x::Vector{T}
+    const operators::OP
+    const cX::CX
+    const eval_context::EC
+    const y::AY
+    const weights::AW
+    const loss_fn::LF
+    base_loss::L
+    base_valid::Bool
+end
+
+function _build_memo_masks(
+    node::NT, const_idx::Base.RefValue{Int}
+)::MemoNode{T,NT} where {T,NT<:AbstractExpressionNode{T}}
+    deg = node.degree
+    if deg == 0
+        if node.constant
+            idx = const_idx[]
+            const_idx[] = idx + 1
+            return MemoNode{T,NT}(node, UInt64(1) << (idx - 1), 0, false, MemoNode{T,NT}[])
+        else
+            return MemoNode{T,NT}(node, UInt64(0), 0, false, MemoNode{T,NT}[])
+        end
+    end
+    # Keep constant-only subtrees intact so Evaluate.jl evaluates them in scalar.
+    if is_constant(node)
+        m = UInt64(0)
+        # Advance const_idx for every constant leaf in DFS order.
+        m = _consume_const_mask!(node, const_idx)
+        return MemoNode{T,NT}(node, m, 0, false, MemoNode{T,NT}[])
+    end
+    children = Vector{MemoNode{T,NT}}(undef, deg)
+    m = UInt64(0)
+    for i in 1:deg
+        ch = _build_memo_masks(get_child(node, i), const_idx)
+        children[i] = ch
+        m |= ch.mask
+    end
+    return MemoNode{T,NT}(node, m, 0, false, children)
+end
+
+function _consume_const_mask!(
+    node::AbstractExpressionNode, const_idx::Base.RefValue{Int}
+)::UInt64
+    deg = node.degree
+    if deg == 0
+        if node.constant
+            idx = const_idx[]
+            const_idx[] = idx + 1
+            return UInt64(1) << (idx - 1)
+        end
+        return UInt64(0)
+    end
+    m = UInt64(0)
+    for i in 1:deg
+        m |= _consume_const_mask!(get_child(node, i), const_idx)
+    end
+    return m
+end
+
+function _assign_memo_slots(
+    mnode::MemoNode{T,NT},
+    parent_mask::UInt64,
+    cache_vecs::Vector{Vector{T}},
+    n::Int,
+)::MemoNode{T,NT} where {T,NT<:AbstractExpressionNode{T}}
+    slot = if mnode.node.degree > 0 && !isempty(mnode.children) &&
+        mnode.mask != UInt64(0) && mnode.mask != parent_mask
+        push!(cache_vecs, Vector{T}(undef, n))
+        length(cache_vecs)
+    else
+        0
+    end
+    if isempty(mnode.children)
+        return MemoNode{T,NT}(mnode.node, mnode.mask, slot, false, mnode.children)
+    end
+    new_children = Vector{MemoNode{T,NT}}(undef, length(mnode.children))
+    has_child_slots = false
+    for i in eachindex(mnode.children)
+        nc = _assign_memo_slots(mnode.children[i], mnode.mask, cache_vecs, n)
+        new_children[i] = nc
+        has_child_slots |= (nc.slot > 0 || nc.has_slots)
+    end
+    return MemoNode{T,NT}(mnode.node, mnode.mask, slot, has_child_slots, new_children)
+end
+
+@unstable function _build_memo_plan(
+    ex::Expression{T,NT},
+    dataset::Dataset{T,L},
+    options::AbstractOptions,
+    nconst::Int,
+    eval_context,
+) where {T<:Union{AbstractFloat,Complex{<:AbstractFloat}},L<:LOSS_TYPE,NT<:AbstractExpressionNode{T}}
+    (2 <= nconst <= 64) || return nothing
+    preserve_sharing(NT) && return nothing
+    options.operators isa OperatorEnum || return nothing
+    options.autodiff_backend === nothing || return nothing
+    options.turbo isa Val{false} || return nothing
+    has_units(dataset) && return nothing
+    isnothing(options.loss_function) || return nothing
+    isnothing(options.loss_function_expression) || return nothing
+    eval_context isa EvalContext || return nothing
+    _kernels_validate(T, eval_context) isa Val{true} || return nothing
+    cX = dataset.X
+    cX isa Union{Matrix{T},SubArray{T,2,Matrix{T}}} || return nothing
+    dataset.n >= 512 || return nothing
+
+    raw_tree = get_tree(ex)
+    const_idx = Ref(1)
+    masked = _build_memo_masks(raw_tree, const_idx)
+    (const_idx[] - 1 == nconst) || return nothing
+    cache_vecs = Vector{Vector{T}}()
+    slotted = _assign_memo_slots(masked, masked.mask, cache_vecs, dataset.n)
+    isempty(cache_vecs) && return nothing
+    ops = options.operators
+    cX = dataset.X
+    y = dataset.y::AbstractArray
+    w = dataset.weights
+    lf = options.elementwise_loss
+    return MemoPlan{
+        T,L,NT,typeof(ops),typeof(cX),typeof(eval_context),typeof(y),typeof(w),typeof(lf)
+    }(
+        slotted,
+        nconst,
+        cache_vecs,
+        Vector{T}(undef, nconst),
+        ops,
+        cX,
+        eval_context,
+        y,
+        w,
+        lf,
+        L(Inf),
+        false,
+    )
+end
+_build_memo_plan(_, _, _, _, _) = nothing
+
+function _eval_memo_record(
+    mnode::MemoNode{T,NT},
+    cache_vecs::Vector{Vector{T}},
+    cX::AbstractMatrix{T},
+    operators,
+    eval_context::EvalContext,
+)::ResultOk{Vector{T}} where {T,NT}
+    res = if !mnode.has_slots
+        _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+    else
+        deg = mnode.node.degree
+        if deg == 1
+            r1 = _eval_memo_record(mnode.children[1], cache_vecs, cX, operators, eval_context)
+            r1.ok || return r1
+            apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+        elseif deg == 2
+            r1 = _eval_memo_record(mnode.children[1], cache_vecs, cX, operators, eval_context)
+            r1.ok || return r1
+            r2 = _eval_memo_record(mnode.children[2], cache_vecs, cX, operators, eval_context)
+            r2.ok || return r2
+            apply_op_array((r1.x, r2.x), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+        else
+            rs = ntuple(
+                i -> _eval_memo_record(mnode.children[i], cache_vecs, cX, operators, eval_context),
+                deg,
+            )
+            for r in rs
+                r.ok || return r
+            end
+            xs = map(r -> r.x, rs)
+            apply_op_array(xs, mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+        end
+    end
+    if mnode.slot > 0 && res.ok
+        @inbounds copyto!(cache_vecs[mnode.slot], res.x)
+    end
+    return res
+end
+
+function _eval_memo_read(
+    mnode::MemoNode{T,NT},
+    diff_mask::UInt64,
+    cache_vecs::Vector{Vector{T}},
+    cX::AbstractMatrix{T},
+    operators,
+    eval_context::EvalContext,
+)::ResultOk{Vector{T}} where {T,NT}
+    if (mnode.mask & diff_mask) == UInt64(0)
+        if mnode.slot > 0
+            out = get_array(eval_context.buffer, cX, axes(cX, 2))::Vector{T}
+            @inbounds copyto!(out, cache_vecs[mnode.slot])
+            return ResultOk(out, true)
+        end
+        return _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+    end
+    if !mnode.has_slots
+        return _eval_tree_array(mnode.node, cX, operators, eval_context)::ResultOk{Vector{T}}
+    end
+    deg = mnode.node.degree
+    if deg == 1
+        r1 = _eval_memo_read(
+            mnode.children[1], diff_mask, cache_vecs, cX, operators, eval_context
+        )
+        r1.ok || return r1
+        return apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+    elseif deg == 2
+        r1 = _eval_memo_read(
+            mnode.children[1], diff_mask, cache_vecs, cX, operators, eval_context
+        )
+        r1.ok || return r1
+        r2 = _eval_memo_read(
+            mnode.children[2], diff_mask, cache_vecs, cX, operators, eval_context
+        )
+        r2.ok || return r2
+        return apply_op_array(
+            (r1.x, r2.x), mnode.node.op, operators, eval_context
+        )::ResultOk{Vector{T}}
+    else
+        rs = ntuple(
+            i -> _eval_memo_read(
+                mnode.children[i], diff_mask, cache_vecs, cX, operators, eval_context
+            ),
+            deg,
+        )
+        for r in rs
+            r.ok || return r
+        end
+        xs = map(r -> r.x, rs)
+        return apply_op_array(xs, mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+    end
+end
+
+function _eval_with_memo(
+    memo::MemoPlan{T,L,NT,OP,CX,EC,AY,AW,LF},
+    tree::Expression{T,NT},
+    refs,
+    x::AbstractVector,
+)::L where {T,L,NT,OP,CX,EC,AY,AW,LF}
+    diff_mask = UInt64(0)
+    if memo.base_valid
+        @inbounds for i in 1:(memo.nconst)
+            if convert(T, x[i]) !== memo.base_x[i]
+                diff_mask |= (UInt64(1) << (i - 1))
+            end
+        end
+        if diff_mask == UInt64(0)
+            return memo.base_loss
+        end
+    end
+
+    set_optimizable_parameters!(tree, x, refs)
+    eval_context = memo.eval_context
+    reset_index!(eval_context.buffer)
+    cX = memo.cX
+    ops = memo.operators
+
+    if memo.base_valid && count_ones(diff_mask) == 1
+        res = _eval_memo_read(
+            memo.tree, diff_mask, memo.cache_vecs, cX, ops, eval_context
+        )
+        res.ok || return L(Inf)
+        return if memo.weights !== nothing
+            _weighted_loss(res.x, memo.y, memo.weights, memo.loss_fn)
+        else
+            _loss(res.x, memo.y, memo.loss_fn)
+        end
+    end
+
+    res = _eval_memo_record(memo.tree, memo.cache_vecs, cX, ops, eval_context)
+    if !res.ok
+        memo.base_valid = false
+        return L(Inf)
+    end
+    loss_val = if memo.weights !== nothing
+        _weighted_loss(res.x, memo.y, memo.weights, memo.loss_fn)
+    else
+        _loss(res.x, memo.y, memo.loss_fn)
+    end
+    @inbounds for i in 1:(memo.nconst)
+        memo.base_x[i] = convert(T, x[i])
+    end
+    memo.base_loss = loss_val
+    memo.base_valid = true
+    return loss_val
+end
+
 function _optimize_constants(
     dataset, member::P, x0, refs, options, algorithm, optimizer_options, rng
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
@@ -185,7 +481,8 @@ function _optimize_constants(
         nothing
     end
     ctx = EvaluatorContext(dataset, options, eval_context)
-    f = Evaluator(tree, refs, ctx)
+    memo = _build_memo_plan(tree, dataset, options, length(x0), eval_context)
+    f = Evaluator(tree, refs, ctx, memo)
     fg! = GradEvaluator(f, options.autodiff_backend)
     return _optimize_constants_inner(
         f, fg!, x0, refs, dataset, member, options, algorithm, optimizer_options, rng
@@ -258,8 +555,15 @@ struct Evaluator{N<:AbstractExpression,R,C<:EvaluatorContext} <: Function
     tree::N
     refs::R
     ctx::C
+    memo::Any
 end
-function (e::Evaluator)(x::AbstractVector; regularization=false)
+Evaluator(tree::N, refs::R, ctx::C) where {N,R,C} = Evaluator{N,R,C}(tree, refs, ctx, nothing)
+function (e::Evaluator{N,R,EvaluatorContext{D,O,E}})(
+    x::AbstractVector; regularization=false
+)::L where {T,L,D<:Dataset{T,L},N,R,O,E}
+    if !regularization && e.memo !== nothing
+        return _eval_with_memo(e.memo, e.tree, e.refs, x)::L
+    end
     set_optimizable_parameters!(e.tree, x, e.refs)
     return e.ctx(e.tree; regularization)
 end
