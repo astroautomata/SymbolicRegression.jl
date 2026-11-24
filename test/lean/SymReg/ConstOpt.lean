@@ -5,6 +5,7 @@ import SymReg.ConstOpt.Restarts
 import SymReg.ConstOpt.Identity
 import SymReg.ConstOpt.Construction
 import SymReg.ConstOpt.TemplateBridge
+import SymReg.ConstOpt.Memo
 import DynExpr.Registry.Types
 
 /-!
@@ -19,6 +20,11 @@ namespace SymReg.ConstOpt
 open DynExpr.Registry
 
 def entries : List Entry := [
+  { id := "copt-memo-plan-sound", juliaFile := "src/ConstantOptimization.jl",
+    juliaFns := ["MemoNode", "MemoPlan", "_build_memo_masks", "_consume_const_mask!", "_assign_memo_slots", "_build_memo_plan", "_check_memo_ok", "_eval_memo_record", "_eval_memo_read", "_eval_with_memo"],
+    statement := "For any tree with at most 64 constants, _build_memo_masks and _assign_memo_slots track exact constant-leaf bitmasks; when base_valid holds, _eval_memo_read agrees identically on output and validity (including _check_memo_ok early exit) with unmemoized evaluation, and diff_mask = 0 preserves parameter updates and loss.",
+    preconditions := "2 <= nconst <= 64, non-shared plain Expression node tree, and CacheValid established by a valid _eval_memo_record pass.",
+    status := .proven, prop := ``memo_plan_sound, thm := some ``memo_plan_sound_holds },
   { id := "copt-numeric-support", juliaFile := "src/ConstantOptimization.jl",
     juliaFns := ["can_optimize"],
     statement := "The Number fallback returns true. The expression fallback dispatches on the actual element type and forwards the original options, preserving result, error and effects.",

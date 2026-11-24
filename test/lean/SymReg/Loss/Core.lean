@@ -900,6 +900,31 @@ def evalCost (d : Dataset) (member : Member) (o : Options) (complexity : Option 
     d.full.lossPrecision
   pure ((cost, loss), context')
 
+/-- Fast positional `eval_tree_dispatch` (`src/LossFunctions.jl:83-107`):
+when `tree` is an `Expression`, `turbo = false`, and `ops` is an `OperatorEnum`, calls
+`_eval_tree_array_fast` directly instead of keyword `eval_tree_array`. -/
+def evalDispatchFast {R : Type} (isExpr turbo isOpEnum : Bool)
+    (fastEval slowEval : Jl (Option R × Bool)) : Jl (Option R × Bool) :=
+  if isExpr && !turbo && isOpEnum then fastEval else slowEval
+
+/-- Direct `_eval_loss` shortcut in `eval_cost` (`src/LossFunctions.jl:265-271`):
+bypasses `eval_loss` keyword processing when neither custom loss function is configured. -/
+def evalCostFast (d : Dataset) (member : Member) (o : Options) (complexity : Option Int := none)
+    (context deprecated : Option Context := none) (unknownKeywords : List String := [])
+    (depwarn : String → String → Jl Unit := fun _ _ => .ok ()) :
+    Jl ((JF × JF) × Option Context) := do
+  let context ← processContext context deprecated depwarn "eval_cost"
+  if !unknownKeywords.isEmpty then throw (.methodError "unknown cost keyword")
+  let tree := getTreeFromMember member
+  let (loss, context') ←
+    if o.lossFunction.isNone && o.lossFunctionExpression.isNone then
+      evalLossDefault tree d o true context
+    else
+      evalLoss tree d o true none context
+  let cost ← lossToCost loss d.full.useBaseline d.full.baselineLoss member o complexity
+    d.full.lossPrecision
+  pure ((cost, loss), context')
+
 /-- Finite baselines, including zero and negative values, enable normalization;
 NaN and either infinity store one and disable it (`src/LossFunctions.jl:264-270`). -/
 def updateFromValue (d : Basic) (value : JF) : Basic :=

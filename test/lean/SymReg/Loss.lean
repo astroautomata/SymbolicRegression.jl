@@ -34,6 +34,11 @@ def entries : List Entry := [
     statement := "A missing prediction always forces completion=false."
     preconditions := "None."
     status := .proven, prop := ``dispatch_missing, thm := some ``dispatch_missing_holds },
+  { id := "loss-fast-dispatch-and-cost", juliaFile := "src/LossFunctions.jl"
+    juliaFns := ["eval_tree_dispatch", "eval_cost"]
+    statement := "Fast positional eval_tree_dispatch agrees with eval_tree_array when _eval_tree_array_fast agrees with eval_tree_array; eval_cost calling _eval_loss directly when no custom loss is configured agrees identically with routing through eval_loss."
+    preconditions := "For fast eval_tree_dispatch: turbo=Val(false), OperatorEnum, and _eval_tree_array_fast agrees with eval_tree_array (proven in DE). For eval_cost: none."
+    status := .proven, prop := ``fast_dispatch_and_cost_agree, thm := some ``fast_dispatch_and_cost_agree_holds },
   { id := "loss-de-contract", juliaFile := "src/LossFunctions.jl"
     juliaFns := ["eval_tree_dispatch"]
     statement := "The DE evaluation-result adapter and both dispatch methods preserve an existing output array and completion flag."
