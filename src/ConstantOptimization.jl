@@ -137,6 +137,9 @@ end
 function extract_optimizable_gradient(grad, ex::Expression, refs)
     return extract_gradient(grad, ex)
 end
+function extract_optimizable_gradient(grad::Expression, ::Expression, refs)
+    return first(get_scalar_constants(grad))
+end
 
 @unstable function optimize_constants(
     dataset::Dataset{T,L},

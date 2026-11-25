@@ -2,30 +2,11 @@ module SymbolicRegressionEnzymeExt
 
 using SymbolicRegression.LossFunctionsModule: eval_loss
 using SymbolicRegression.ConstantOptimizationModule:
-    get_optimizable_parameters, set_optimizable_parameters!
-using SymbolicRegression.ComposableExpressionModule: ComposableExpression
-using SymbolicRegression.TemplateExpressionModule:
-    TemplateExpression, TemplateOptimizableRefs
-using DynamicExpressions: Expression, get_scalar_constants
+    set_optimizable_parameters!, extract_optimizable_gradient
 using ADTypes: AutoEnzyme
 using Enzyme: autodiff, Reverse, Active, Const, Duplicated, make_zero, remake_zero!
 
-import SymbolicRegression.ConstantOptimizationModule:
-    Evaluator, GradEvaluator, extract_optimizable_gradient
-
-function extract_optimizable_gradient(grad::Expression, ::Expression, _refs)
-    return first(get_scalar_constants(grad))
-end
-function extract_optimizable_gradient(
-    grad::ComposableExpression, ::ComposableExpression, _refs
-)
-    return first(get_scalar_constants(grad))
-end
-function extract_optimizable_gradient(
-    grad::TemplateExpression, ::TemplateExpression, _refs::TemplateOptimizableRefs
-)
-    return first(get_scalar_constants(grad))
-end
+import SymbolicRegression.ConstantOptimizationModule: Evaluator, GradEvaluator
 
 # We prepare a copy of the tree and all arrays
 function GradEvaluator(f::F, backend::AE) where {F<:Evaluator,AE<:AutoEnzyme}

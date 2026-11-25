@@ -4,7 +4,7 @@ namespace SymReg.Ext
 open DynExpr
 open SymReg.ConstOpt
 
-/-- `ext/SymbolicRegressionEnzymeExt.jl:31-39`. Allocates zeroed tree, dataset,
+/-- `ext/SymbolicRegressionEnzymeExt.jl:12-20`. Allocates zeroed tree, dataset,
 and options shadows. External zeroing remains arbitrary. -/
 structure EnzymeStorage (H : Type) where
   tree : H
@@ -17,7 +17,7 @@ def prepareEnzyme {H : Type} (zeroTree : H → H)
   ⟨zeroTree tree, zeroDataset dataset, zeroOptions options⟩
 
 
--- Source: ext/SymbolicRegressionEnzymeExt.jl:32-35
+-- Source: ext/SymbolicRegressionEnzymeExt.jl:22-25
 /-
 function evaluator(tree, dataset, options, output)
     output[] = eval_loss(tree, dataset, options; regularization=false)
@@ -89,7 +89,7 @@ private def enzymeCall {C R W A : Type} (event : EnzymeCall C R) (act : Effect W
 
 abbrev enzymeStackSize : Nat := 32 * 1024 * 1024
 
--- Source: ext/SymbolicRegressionEnzymeExt.jl:48-82
+-- Source: ext/SymbolicRegressionEnzymeExt.jl:29-64
 /-
 function (g::GradEvaluator{<:Any,<:AutoEnzyme})(_, G, x::AbstractVector{T}) where {T}
     set_optimizable_parameters!(g.e.tree, x, g.e.refs)

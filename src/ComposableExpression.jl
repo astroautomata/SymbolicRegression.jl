@@ -137,6 +137,11 @@ end
 function CO.extract_optimizable_gradient(grad, ex::ComposableExpression, _refs)
     return DE.extract_gradient(grad, ex)
 end
+function CO.extract_optimizable_gradient(
+    grad::ComposableExpression, ::ComposableExpression, _refs
+)
+    return first(DE.get_scalar_constants(grad))
+end
 
 function DE.allocate_container(
     prototype::ComposableExpression, n::Union{Nothing,Integer}=nothing

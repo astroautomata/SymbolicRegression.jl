@@ -20,6 +20,18 @@
     @test g_plain(nothing, G_plain, [4.0]) ≈ 40.0
     @test G_plain ≈ [20.0]
 
+    ex_comp = ComposableExpression(
+        Node{Float64}(; val=3.0) * Node{Float64}(; feature=1); operators
+    )
+    _, refs_comp = SymbolicRegression.get_optimizable_parameters(ex_comp, options)
+    g_comp = GradEvaluator(
+        Evaluator(ex_comp, refs_comp, EvaluatorContext(dataset, options, nothing)),
+        AutoEnzyme(),
+    )
+    G_comp = zeros(1)
+    @test g_comp(nothing, G_comp, [4.0]) ≈ 40.0
+    @test G_comp ≈ [20.0]
+
     structure = TemplateStructure{(:f,),(:p,)}(
         ((; f), (; p), (x,)) -> f(x) * p[1]; num_parameters=(; p=1)
     )

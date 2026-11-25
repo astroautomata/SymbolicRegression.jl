@@ -511,6 +511,11 @@ function CO.extract_optimizable_gradient(
 )
     return DE.extract_gradient(grad, e)
 end
+function CO.extract_optimizable_gradient(
+    grad::TemplateExpression, ::TemplateExpression, _refs::TemplateOptimizableRefs
+)
+    return first(DE.get_scalar_constants(grad))
+end
 Base.@kwdef struct PreallocatedTemplateExpression{A,B}
     trees::A
     parameters::B
