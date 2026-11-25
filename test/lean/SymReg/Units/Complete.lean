@@ -369,7 +369,8 @@ theorem complete_core (D : Nat) (sc : Scalars) (table : List (List Builtin)) (xu
       have : ws.length = b.arity := by rw [hall.length, ← hds.length, hlen]
       cases b <;> simp [Builtin.arith] at hab <;> simp [Builtin.toOp, this, List.all_replicate]
     have hcall : (b.toOp sc).call (ws.map .w) = .ok (.w r) := by
-      simp only [Builtin.toOp, mapM_toT_map_w ws hwsne, mapM_toW_map_w, Option.bind, hwop]
+      cases b <;> simp [Builtin.arith] at hab <;>
+        simp only [Builtin.toOp, mapM_toT_map_w ws hwsne, mapM_toW_map_w, hwop]
     have hdg := degn_first hwsne hnv hfv hm hcall hrv
     have hmap := all2_mapM hall
     have hnif : nifDeg D cs.length = cs.length := by simp [nifDeg, hdeg.1]

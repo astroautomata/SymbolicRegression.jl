@@ -150,11 +150,21 @@ def wPow (l r : WQ) : WQ :=
   then ⟨sc .pow [l.val, r.val], Dim.one, false, false⟩
   else WQ.bad
 
-/-- `sqrt`, `cbrt`, `abs`, `inv` on `WildcardQuantity` (`src/DimensionalAnalysis.jl:105-116`).
-`sqrt` calls the Quantity `safe_sqrt` of `src/DimensionalAnalysis.jl:34-37`, whose value
-agrees with the scalar `safe_sqrt` on every finite input (NaN for negatives). -/
+/-- `sqrt`, `cbrt`, `abs`, `inv`, `neg` on `WildcardQuantity`
+(`src/DimensionalAnalysis.jl:59-71,128-139`). `sqrt` calls the Quantity `safe_sqrt` of
+`src/DimensionalAnalysis.jl:34-37`, whose value agrees with the scalar `safe_sqrt` on every
+finite input (NaN for negatives). -/
 def wUnary (b : Builtin) (dop : Dim → Dim) (l : WQ) : WQ :=
   if l.violates then l else ⟨sc b [l.val], dop l.dim, l.wildcard, false⟩
+
+/-- `greater`, `less`, `greater_equal`, `less_equal` on `WildcardQuantity`
+(`src/DimensionalAnalysis.jl:57,67-83`, `src/Operators.jl:101-112`): equal dimensions
+or either wildcard yields a dimensionless non-wildcard result; otherwise `DimensionError`. -/
+def wCmp (k : Nat) (l r : WQ) : Jl WQ :=
+  if l.violates || r.violates then .error (.errorException "DimensionError")
+  else if decide (l.dim = r.dim) || l.wildcard || r.wildcard then
+    .ok ⟨sc (.cmp k) [l.val, r.val], Dim.one, false, false⟩
+  else .error (.errorException "DimensionError")
 
 end WOps
 
@@ -182,7 +192,7 @@ def dimensionError : JlError := .errorException "DimensionError"
 def typeError : JlError := .errorException "TypeError"
 
 /-- The `WildcardQuantity` overloads reached by an all-`W` call of a built-in operator
-(`src/DimensionalAnalysis.jl:62-116`); `none` where no such method exists. -/
+(`src/DimensionalAnalysis.jl:56-139`); `none` where no such method exists. -/
 def wop (sc : Scalars) : Builtin → List WQ → Option WQ
   | .add, [l, r] => some (wAddSub sc .add l r)
   | .sub, [l, r] => some (wAddSub sc .sub l r)
@@ -193,6 +203,7 @@ def wop (sc : Scalars) : Builtin → List WQ → Option WQ
   | .cbrt, [l] => some (wUnary sc .cbrt (Dim.root 3) l)
   | .abs, [l] => some (wUnary sc .abs id l)
   | .inv, [l] => some (wUnary sc .inv Dim.inv l)
+  | .neg, [l] => some (wUnary sc .neg id l)
   | _, _ => none
 
 /-- The scalar of an argument, if it is one. -/
@@ -210,8 +221,8 @@ def Arg.toW : Arg → Option WQ
 operator has a generic method for any argument types (`safe_pow`, `safe_sqrt`, `neg`,
 `relu`, `safe_log`, `greater`, ...) or overloads for both `W` and `Number` (`cbrt`, `abs`,
 `inv`). Calls with only scalars compute the scalar function; all-`W` calls reaching a `W`
-overload compute it; every other call throws `MethodError` (`-x`, `zero(x)`, `x < y`,
-`log(x)` and mixed `W`/`Float64` arithmetic have no `W` methods). -/
+overload or comparison compute it (throwing `DimensionError` for mismatched non-wildcard
+comparisons); every other call throws `MethodError`. -/
 def Builtin.toOp (sc : Scalars) (b : Builtin) : Op where
   hasMethod p := p.length == b.arity && (match b with
     | .add | .sub | .mul | .div => p.all id || p.all (! ·)
@@ -220,13 +231,17 @@ def Builtin.toOp (sc : Scalars) (b : Builtin) : Op where
   call args :=
     match args.mapM Arg.toT with
     | some vs => .ok (.t (sc b vs))
-    | none => match (args.mapM Arg.toW).bind (wop sc b) with
-      | some r => .ok (.w r)
+    | none => match args.mapM Arg.toW with
+      | some ws => match b, ws with
+        | .cmp k, [l, r] => (wCmp sc k l r).map Arg.w
+        | _, _ => match wop sc b ws with
+          | some r => .ok (.w r)
+          | none => .error (.methodError "no method matching")
       | none => .error (.methodError "no method matching")
 
-/-! ## degn_eval, src/DimensionalAnalysis.jl:133-198 -/
+/-! ## degn_eval, src/DimensionalAnalysis.jl:156-221 -/
 
-/-- `compute_lattice(Val(N), Val(i+1), Val(j+1)) == 1` (`src/DimensionalAnalysis.jl:196-198`)
+/-- `compute_lattice(Val(N), Val(i+1), Val(j+1)) == 1` (`src/DimensionalAnalysis.jl:219-221`)
 for the zero-based lattice index `i`: argument `j` is passed stripped. -/
 def pattern (n i : Nat) : List Bool :=
   (List.range n).map fun j => i / 2 ^ (n - 1 - j) % 2 == 1
@@ -235,9 +250,9 @@ def pattern (n i : Nat) : List Bool :=
 def argsFor (p : List Bool) (ws : List WQ) : List Arg :=
   (p.zip ws).map fun (b, w) => if b then .t w.val else .w w
 
-/-- `@nall(N, j -> lattice_j == 0 ? true : arg_j.wildcard)`. -/
+/-- `@nall(N, j -> lattice_j == 0 ? true : (arg_j.wildcard || has_no_dims(arg_j.val)))`. -/
 def allowed (p : List Bool) (ws : List WQ) : Bool :=
-  (p.zip ws).all fun (b, w) => !b || w.wildcard
+  (p.zip ws).all fun (b, w) => !b || w.wildcard || decide (w.dim = Dim.one)
 
 /-- `safe_call(op, inputs, one(W))` (`src/Utils.jl:234-251`): a `MethodError` gives
 `(default, false)`; any other error is rethrown; a non-`W` result fails the `::D`

@@ -100,6 +100,109 @@
     end
 end
 
+@testitem "Dimensionless scalar operators, negation, and comparisons" begin
+    using SymbolicRegression
+    using SymbolicRegression.CoreModule.OperatorsModule:
+        neg,
+        relu,
+        cond,
+        greater,
+        less,
+        greater_equal,
+        less_equal,
+        logical_or,
+        logical_and,
+        safe_log
+    using SymbolicRegression.DimensionalAnalysisModule: violates_dimensional_constraints
+
+    options = Options(;
+        binary_operators=[
+            +, *, greater, less, greater_equal, less_equal, cond, logical_or, logical_and
+        ],
+        unary_operators=[cos, exp, log, neg, relu],
+    )
+    ops = options.operators
+    un(f) = findfirst(==(f), ops.unaops)
+    bi(f) = findfirst(==(f), ops.binops)
+
+    x1 = Node(Float64; feature=1)
+    x2 = Node(Float64; feature=2)
+    x3 = Node(Float64; feature=3)
+    c = Node(Float64; val=2.0)
+
+    X = [1.0 2.0; 3.0 4.0; 5.0 6.0]
+    y = [1.0, 2.0]
+    ds_dimless = Dataset(X, y; X_units=["m", "1", "s"], y_units="1")
+    ds_meters = Dataset(X, y; X_units=["m", "1", "s"], y_units="m")
+
+    for f in (cos, exp, safe_log)
+        @test !violates_dimensional_constraints(
+            Node(; op=un(f), children=(x2,)), ds_dimless, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=un(f), children=(x1,)), ds_dimless, options
+        )
+    end
+
+    for f in (neg, relu)
+        @test !violates_dimensional_constraints(
+            Node(; op=un(f), children=(x1,)), ds_meters, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=un(f), children=(x1,)), ds_dimless, options
+        )
+    end
+    cx1 = Node(; op=bi(*), children=(c, x1))
+    @test !violates_dimensional_constraints(
+        Node(; op=un(neg), children=(cx1,)), ds_meters, options
+    )
+    @test !violates_dimensional_constraints(
+        Node(; op=bi(cond), children=(x3, x1)), ds_meters, options
+    )
+    @test violates_dimensional_constraints(
+        Node(; op=bi(cond), children=(x3, x1)), ds_dimless, options
+    )
+
+    for f in (greater, less, greater_equal, less_equal)
+        @test !violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x1)), ds_dimless, options
+        )
+        @test !violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x2, x2)), ds_dimless, options
+        )
+        @test !violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, c)), ds_dimless, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x3)), ds_dimless, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x2)), ds_dimless, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x1)), ds_meters, options
+        )
+    end
+    for f in (logical_or, logical_and)
+        @test !violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x3)), ds_dimless, options
+        )
+        @test violates_dimensional_constraints(
+            Node(; op=bi(f), children=(x1, x3)), ds_meters, options
+        )
+    end
+
+    options_dimless_const = Options(;
+        binary_operators=[+, *, greater],
+        unary_operators=[cos, neg, relu],
+        dimensionless_constants_only=true,
+    )
+    bi_dc(f) = findfirst(==(f), options_dimless_const.operators.binops)
+    @test violates_dimensional_constraints(
+        Node(; op=bi_dc(greater), children=(x1, c)), ds_dimless, options_dimless_const
+    )
+end
+
 @testitem "Search with dimensional constraints" begin
     using SymbolicRegression
     using SymbolicRegression.DimensionalAnalysisModule: violates_dimensional_constraints

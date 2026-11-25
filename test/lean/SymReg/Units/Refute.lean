@@ -17,6 +17,103 @@ def sc1 : Scalars := fun _ _ => .fin 1
 
 /-! ## Dimensionless functions -/
 
+private theorem eq_two_pow_sub_one_of_bits : ∀ (n i : Nat),
+    i < 2 ^ n → (∀ j, j < n → i / 2 ^ j % 2 = 1) → i = 2 ^ n - 1
+  | 0, i, hlt, _ => by omega
+  | n + 1, i, hlt, hbits => by
+    have hmod : i % 2 = 1 := by simpa using hbits 0 (by omega)
+    have hdiv_lt : i / 2 < 2 ^ n := by
+      have : 2 ^ (n + 1) = 2 * 2 ^ n := by rw [Nat.pow_succ]; omega
+      omega
+    have hdiv_bits : ∀ j, j < n → (i / 2) / 2 ^ j % 2 = 1 := by
+      intro j hj
+      rw [Nat.div_div_eq_div_mul, show 2 * 2 ^ j = 2 ^ (j + 1) by rw [Nat.pow_succ]; omega]
+      exact hbits (j + 1) (by omega)
+    have hih := eq_two_pow_sub_one_of_bits n (i / 2) hdiv_lt hdiv_bits
+    have hpow : 1 ≤ 2 ^ n := Nat.pow_pos (by decide : 0 < 2)
+    have : 2 ^ (n + 1) = 2 * 2 ^ n := by rw [Nat.pow_succ]; omega
+    omega
+
+private theorem pattern_not_all_true {n i : Nat} (hlt : i < 2 ^ n - 1) :
+    (pattern n i).all id = false := by
+  by_cases hall : (pattern n i).all id = true
+  · exfalso
+    have hbits : ∀ j, j < n → i / 2 ^ j % 2 = 1 := by
+      intro j hj
+      have hmem : (i / 2 ^ (n - 1 - (n - 1 - j)) % 2 == 1) ∈ pattern n i := by
+        unfold pattern
+        exact List.mem_map.mpr ⟨n - 1 - j, List.mem_range.mpr (by omega), rfl⟩
+      have ht := List.all_eq_true.mp hall _ hmem
+      simp only [id, beq_iff_eq, show n - 1 - (n - 1 - j) = j by omega] at ht
+      exact ht
+    have hpow : 1 ≤ 2 ^ n := Nat.pow_pos (by decide : 0 < 2)
+    have heq := eq_two_pow_sub_one_of_bits n i (by omega) hbits
+    omega
+  · cases h : (pattern n i).all id with
+    | false => rfl
+    | true => exact absurd h hall
+
+private theorem mapM_toT_argsFor_none_of_false :
+    ∀ (p : List Bool) (ws : List WQ), p.length = ws.length → false ∈ p →
+      (argsFor p ws).mapM Arg.toT = none
+  | [], [], _, hf => by simp at hf
+  | [], _ :: _, hl, _ => by simp at hl
+  | _ :: _, [], hl, _ => by simp at hl
+  | b :: p, w :: ws, hl, hf => by
+    cases b with
+    | false => simp [argsFor, List.mapM_cons, Arg.toT, bind, Option.bind]
+    | true =>
+      have hf' : false ∈ p := by simpa using hf
+      simp only [argsFor, List.zip_cons_cons, List.map_cons, ↓reduceIte, List.mapM_cons,
+        Arg.toT, bind, Option.bind]
+      change (Option.bind ((argsFor p ws).mapM Arg.toT) _) = none
+      rw [mapM_toT_argsFor_none_of_false p ws (by simpa using hl) hf']
+      rfl
+
+private theorem lattice_fn_prefix {sc : Scalars} {k n : Nat} {ws : List WQ}
+    (hlen : ws.length = n) {b : Builtin} (hb : b = .fn k n ∨ b = .safeFn k n) :
+    ∀ (is : List Nat) (tail : List Nat),
+      (∀ i ∈ is, i < 2 ^ n - 1) →
+      lattice (b.toOp sc) ws (is ++ tail) = lattice (b.toOp sc) ws tail
+  | [], tail, _ => rfl
+  | i :: is, tail, hall => by
+    have hi : i < 2 ^ n - 1 := hall i List.mem_cons_self
+    have hnotall : (pattern ws.length i).all id = false := by
+      rw [hlen]; exact pattern_not_all_true hi
+    have hne : i + 1 ≠ 2 ^ ws.length := by rw [hlen]; omega
+    simp only [List.cons_append, lattice]
+    rcases hb with rfl | rfl
+    · have hm : ((Builtin.fn k n).toOp sc).hasMethod (pattern ws.length i) = false := by
+        simp [Builtin.toOp, hnotall]
+      simp only [hm, Bool.false_and, Bool.false_eq_true, if_false]
+      exact lattice_fn_prefix hlen (.inl rfl) is tail (fun x hx => hall x (List.mem_cons_of_mem _ hx))
+    · by_cases hcond :
+          (((Builtin.safeFn k n).toOp sc).hasMethod (pattern ws.length i) &&
+            allowed (pattern ws.length i) ws) = true
+      · simp only [hcond, if_true, hne, if_false]
+        have hfmem : false ∈ pattern ws.length i := by
+          by_cases hm : false ∈ pattern ws.length i
+          · exact hm
+          · exfalso
+            have hallt : (pattern ws.length i).all id = true :=
+              List.all_eq_true.mpr fun x hx => by
+                cases x with
+                | true => rfl
+                | false => exact absurd hx hm
+            rw [hnotall] at hallt; cases hallt
+        have htoT : (argsFor (pattern ws.length i) ws).mapM Arg.toT = none :=
+          mapM_toT_argsFor_none_of_false (pattern ws.length i) ws (pattern_length _ _) hfmem
+        have hmrc : maybeReturnCall ((Builtin.safeFn k n).toOp sc) (argsFor (pattern ws.length i) ws) =
+            .ok none := by
+          unfold maybeReturnCall safeCall
+          simp only [Builtin.toOp, htoT]
+          cases (argsFor (pattern ws.length i) ws).mapM Arg.toW <;> simp [wop]
+        rw [hmrc]
+        exact lattice_fn_prefix hlen (.inr rfl) is tail (fun x hx => hall x (List.mem_cons_of_mem _ hx))
+      · simp only [Bool.not_eq_true] at hcond
+        simp only [hcond, Bool.false_eq_true, if_false]
+        exact lattice_fn_prefix hlen (.inr rfl) is tail (fun x hx => hall x (List.mem_cons_of_mem _ hx))
+
 /-- `cos`, `exp`, `safe_log`, ... applied to dimensionless, valid, finite arguments are
 accepted with a dimensionless result (the physical rule for transcendental functions). -/
 def units_dimensionless_fn : Prop :=
@@ -25,12 +122,35 @@ def units_dimensionless_fn : Prop :=
     ∀ b ∈ [Builtin.fn k n, Builtin.safeFn k n],
       ∃ r, degnEval (b.toOp sc) ws = .ok r ∧ r.violates = false ∧ r.dim = Dim.one
 
-theorem units_dimensionless_fn_refuted : ¬ units_dimensionless_fn := by
-  intro h
-  obtain ⟨r, hr, hv, _⟩ := h sc1 0 1 [featW Dim.one] rfl (by decide)
-    (by intro w hw; simp at hw; subst hw; exact ⟨rfl, rfl, rfl⟩) (.fn 0 1) (by simp)
-  have : degnEval ((Builtin.fn 0 1).toOp sc1) [featW Dim.one] = .ok WQ.bad := by decide +kernel
-  rw [this] at hr; cases hr; simp [WQ.bad] at hv
+theorem units_dimensionless_fn_holds : units_dimensionless_fn := by
+  intro sc k n ws hlen hpos hok b hb
+  have hb' : b = .fn k n ∨ b = .safeFn k n := by simpa using hb
+  have hfind : ws.find? (·.violates) = none :=
+    List.find?_eq_none.mpr fun w hw => by simp [(hok w hw).1]
+  have hany : ws.any (fun w => !w.val.valid) = false := by
+    simp only [List.any_eq_false, Bool.not_eq_true']
+    intro w hw; simp [(hok w hw).2.1]
+  have hpow : 1 ≤ 2 ^ n := Nat.pow_pos (by decide : 0 < 2)
+  have hrange : List.range (2 ^ ws.length) = List.range (2 ^ n - 1) ++ [2 ^ n - 1] := by
+    conv => lhs; rw [hlen, show 2 ^ n = (2 ^ n - 1) + 1 by omega, List.range_succ]
+  have hlat : lattice (b.toOp sc) ws (List.range (2 ^ ws.length)) =
+      lattice (b.toOp sc) ws [2 ^ n - 1] := by
+    rw [hrange]
+    exact lattice_fn_prefix hlen hb' (List.range (2 ^ n - 1)) [2 ^ n - 1]
+      (fun i hi => List.mem_range.mp hi)
+  have hm : (b.toOp sc).hasMethod (List.replicate ws.length true) = true := by
+    rcases hb' with rfl | rfl <;> simp [Builtin.toOp, Builtin.arity, hlen, List.all_replicate]
+  have hal : allowed (List.replicate ws.length true) ws = true :=
+    allowed_replicate_true_of_dim_one ws (fun w hw => (hok w hw).2.2)
+  have hlast_eq : 2 ^ n - 1 + 1 = 2 ^ ws.length := by rw [hlen]; omega
+  refine ⟨⟨sc b (ws.map WQ.val), Dim.one, false, false⟩, ?_, rfl, rfl⟩
+  unfold degnEval
+  simp only [hfind, hany, Bool.false_eq_true, ite_false, hlat]
+  unfold lattice
+  rw [show pattern ws.length (2 ^ n - 1) = List.replicate ws.length true by
+    rw [← hlen]; exact pattern_last ws.length]
+  simp only [hm, hal, Bool.and_self, ite_true, hlast_eq]
+  simp only [allScalar, Builtin.toOp, mapM_toT_map_t]
 
 /-! ## Dimension-preserving generic operators -/
 
@@ -39,11 +159,15 @@ def units_neg_preserve : Prop :=
   ∀ (sc : Scalars) (w : WQ), w.violates = false → w.val.valid = true → w.wildcard = false →
     ∃ r, degnEval (Builtin.neg.toOp sc) [w] = .ok r ∧ r.violates = false ∧ r.dim = w.dim
 
-theorem units_neg_preserve_refuted : ¬ units_neg_preserve := by
-  intro h
-  obtain ⟨r, hr, hv, _⟩ := h sc1 (featW metre) rfl rfl rfl
-  have : degnEval (Builtin.neg.toOp sc1) [featW metre] = .ok WQ.bad := by decide +kernel
-  rw [this] at hr; cases hr; simp [WQ.bad] at hv
+theorem units_neg_preserve_holds : units_neg_preserve := by
+  intro sc w hv hf _
+  refine ⟨⟨sc .neg [w.val], w.dim, w.wildcard, false⟩, ?_, rfl, rfl⟩
+  apply degn_first (by simp)
+  · intro x hx; simp at hx; subst hx; exact hv
+  · intro x hx; simp at hx; subst hx; exact hf
+  · simp [Builtin.toOp, Builtin.arity]
+  · simp [Builtin.toOp, wop, wUnary, hv, Arg.toT, Arg.toW, List.mapM_cons, bind, Option.bind, pure]
+  · rfl
 
 /-! ## Comparisons -/
 
@@ -54,12 +178,16 @@ def units_compare : Prop :=
     l.val.valid = true → r.val.valid = true → l.dim = r.dim →
     ∃ w, degnEval ((Builtin.cmp k).toOp sc) [l, r] = .ok w ∧ w.violates = false ∧ w.dim = Dim.one
 
-theorem units_compare_refuted : ¬ units_compare := by
-  intro h
-  obtain ⟨w, hw, hv, _⟩ := h sc1 0 (featW metre) (featW metre) rfl rfl rfl rfl rfl
-  have : degnEval ((Builtin.cmp 0).toOp sc1) [featW metre, featW metre] = .ok WQ.bad := by
-    decide +kernel
-  rw [this] at hw; cases hw; simp [WQ.bad] at hv
+theorem units_compare_holds : units_compare := by
+  intro sc k l r hlv hrv hlf hrf hdim
+  refine ⟨⟨sc (.cmp k) [l.val, r.val], Dim.one, false, false⟩, ?_, rfl, rfl⟩
+  apply degn_first (by simp)
+  · intro x hx; simp at hx; rcases hx with rfl | rfl <;> assumption
+  · intro x hx; simp at hx; rcases hx with rfl | rfl <;> assumption
+  · simp [Builtin.toOp, Builtin.arity]
+  · simp [Builtin.toOp, wCmp, hlv, hrv, hdim, Arg.toT, Arg.toW, List.mapM_cons,
+      bind, Option.bind, pure, Except.map]
+  · rfl
 
 /-! ## Exponent truncation in roots -/
 
