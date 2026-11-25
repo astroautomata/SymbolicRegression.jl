@@ -9,8 +9,14 @@ open DynExpr.Expressions.Sampling (RNG greater)
 @[simp] theorem jf_finite_mul (a b : Rat) : JF.fin a * JF.fin b = .fin (a * b) := rfl
 @[simp] theorem jf_finite_add (a b : Rat) : JF.fin a + JF.fin b = .fin (a + b) := rfl
 
-/-- IEEE `<`, used by src/HallOfFame.jl:130,289, via the DE comparison model. -/
+/-- IEEE `<`, used by src/HallOfFame.jl:289, via the DE comparison model. -/
 def less (a b : JF) : Bool := greater b a
+
+/-- IEEE `isless` on `Float64`, used by src/HallOfFame.jl:131: `<` with `NaN` ordered last. -/
+def isless : JF → JF → Bool
+  | .nan, _ => false
+  | _, .nan => true
+  | a, b => less a b
 
 /-- IEEE `>=` in src/HallOfFame.jl:181; equality with NaN is false. -/
 def greaterEqual (a b : JF) : Bool :=
@@ -113,17 +119,19 @@ def copyHof (h : Hof) (fresh : Nat) : Hof × Nat :=
   let (ms, f) := copyMembers (h.slots.map Slot.member) fresh
   (⟨(ms.zip (h.slots.map Slot.exists)).map (fun (m, e) => ⟨m, e⟩)⟩, f)
 
-/-- Scalar `_update_hall_of_fame_unchecked!`, src/HallOfFame.jl:126-134.
-Neither NaN nor ties pass `<`; an absent slot accepts any cost. -/
+/-- Scalar `_update_hall_of_fame_unchecked!`, src/HallOfFame.jl:126-135.
+NaN challengers are rejected; ties keep the incumbent; non-NaN challengers replace
+absent slots or NaN incumbents via `isless`. -/
 def updateUnchecked (h : Hof) (m : Member) (size : Int) (fresh : Nat) : Hof × Nat :=
   if 0 < size ∧ size ≤ (h.slots.length : Int) then
-    match h.slots[size.toNat - 1]? with
-    | none => (h, fresh)
-    | some s =>
-      if !s.exists || less m.cost s.member.cost then
-        let (m', f) := copyMember m fresh
-        (⟨h.slots.set (size.toNat - 1) ⟨m', true⟩⟩, f)
-      else (h, fresh)
+    if m.cost = .nan then (h, fresh)
+    else match h.slots[size.toNat - 1]? with
+      | none => (h, fresh)
+      | some s =>
+        if !s.exists || isless m.cost s.member.cost then
+          let (m', f) := copyMember m fresh
+          (⟨h.slots.set (size.toNat - 1) ⟨m', true⟩⟩, f)
+        else (h, fresh)
   else (h, fresh)
 
 /-- Scalar `update_hall_of_fame!`, src/HallOfFame.jl:117-123. The callback is
@@ -193,8 +201,9 @@ structure UpdateServices where
       (.ok copied, { st with fresh })
   store : Int → Member → UpdateState → Jl Member × UpdateState := fun _ m st => (.ok m, st)
   cost : Member → UpdateState → Jl JF × UpdateState := fun m st => (.ok m.cost, st)
+  isNaN : JF → UpdateState → Jl Bool × UpdateState := fun a st => (.ok (a == .nan), st)
   compare : JF → JF → UpdateState → Jl Bool × UpdateState :=
-    fun a b st => (.ok (less a b), st)
+    fun a b st => (.ok (isless a b), st)
 
 def UpdateState.record (st : UpdateState) (event : UpdateEvent) : UpdateState :=
   { st with events := st.events ++ [event] }
@@ -222,13 +231,14 @@ def compareCosts (s : UpdateServices) (m : Member) (size : Int) (st : UpdateStat
       | (.error e, st) => (.error e, st)
       | (.ok b, st) => s.compare a b (st.record (.compare size))
 
--- Source: src/HallOfFame.jl:126-134
+-- Source: src/HallOfFame.jl:126-135
 /-
 function _update_hall_of_fame_unchecked!(
     hall_of_fame::HallOfFame, member::AbstractPopMember, size::Int
 )
     0 < size <= lastindex(hall_of_fame.exists) || return nothing
-    if !hall_of_fame.exists[size] || member.cost < hall_of_fame.members[size].cost
+    isnan(member.cost) && return nothing
+    if !hall_of_fame.exists[size] || isless(member.cost, hall_of_fame.members[size].cost)
         hall_of_fame.members[size] = copy(member)
         hall_of_fame.exists[size] = true
     end
@@ -238,23 +248,30 @@ end
 def runUnchecked (s : UpdateServices) (m : Member) (size : Int) (st : UpdateState) :
     Jl Unit × UpdateState :=
   if 0 < size ∧ size ≤ (st.hall.slots.length : Int) then
-    match st.hall.slots[size.toNat - 1]? with
-    | none => (.error .boundsError, st)
-    | some slot =>
-      let (accept, st) := if slot.exists then compareCosts s m size st else (.ok true, st)
-      match accept with
-      | .error e => (.error e, st)
-      | .ok false => (.ok (), st)
-      | .ok true =>
-        let st := st.record (.copy m.objectId)
-        match s.copy (st.readMember m) st with
-        | (.error e, st) => (.error e, st)
-        | (.ok copied, st) =>
-          match s.store size copied (st.record (.store size)) with
-          | (.error e, st) => (.error e, st)
-          | (.ok stored, st) =>
-            (.ok (), { (st.record (.mark size)) with
-              hall := ⟨st.hall.slots.set (size.toNat - 1) ⟨stored, true⟩⟩ })
+    match s.cost (st.readMember m) st with
+    | (.error e, st) => (.error e, st)
+    | (.ok c, st) =>
+      match s.isNaN c st with
+      | (.error e, st) => (.error e, st)
+      | (.ok true, st) => (.ok (), st)
+      | (.ok false, st) =>
+        match st.hall.slots[size.toNat - 1]? with
+        | none => (.error .boundsError, st)
+        | some slot =>
+          let (accept, st) := if slot.exists then compareCosts s m size st else (.ok true, st)
+          match accept with
+          | .error e => (.error e, st)
+          | .ok false => (.ok (), st)
+          | .ok true =>
+            let st := st.record (.copy m.objectId)
+            match s.copy (st.readMember m) st with
+            | (.error e, st) => (.error e, st)
+            | (.ok copied, st) =>
+              match s.store size copied (st.record (.store size)) with
+              | (.error e, st) => (.error e, st)
+              | (.ok stored, st) =>
+                (.ok (), { (st.record (.mark size)) with
+                  hall := ⟨st.hall.slots.set (size.toNat - 1) ⟨stored, true⟩⟩ })
   else (.ok (), st)
 
 -- Source: src/PopMember.jl:187-201

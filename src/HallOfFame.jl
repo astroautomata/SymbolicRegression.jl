@@ -127,7 +127,8 @@ function _update_hall_of_fame_unchecked!(
     hall_of_fame::HallOfFame, member::AbstractPopMember, size::Int
 )
     0 < size <= lastindex(hall_of_fame.exists) || return nothing
-    if !hall_of_fame.exists[size] || member.cost < hall_of_fame.members[size].cost
+    isnan(member.cost) && return nothing
+    if !hall_of_fame.exists[size] || isless(member.cost, hall_of_fame.members[size].cost)
         hall_of_fame.members[size] = copy(member)
         hall_of_fame.exists[size] = true
     end

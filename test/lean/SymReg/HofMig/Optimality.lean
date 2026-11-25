@@ -9,11 +9,13 @@ abbrev Payload := JF × JF × Int × Nat × Int × Int × Int
 def slotPayload (h : Hof) (k : Nat) : Option Payload :=
   (h.slots[k]?).bind (fun s => if s.exists then some (payload s.member) else none)
 
-/-- Independent sequential best-seen specification, including exact tie and NaN rules. -/
+/-- Independent sequential best-seen specification: NaN challengers are skipped,
+incumbent ties are kept, and non-NaN challengers compare via `isless`. -/
 def choosePayload (old : Option Payload) (candidate : Payload) : Option Payload :=
-  match old with
-  | none => some candidate
-  | some incumbent => if less candidate.1 incumbent.1 then some candidate else old
+  if candidate.1 = .nan then old
+  else match old with
+    | none => some candidate
+    | some incumbent => if isless candidate.1 incumbent.1 then some candidate else old
 
 /-- Reference per-complexity reduction of an arbitrary population stream. -/
 def bestSeen (k : Nat) (compute : Nat → Int) : Option Payload → List Member → Option Payload
@@ -29,7 +31,9 @@ theorem update_length (h : Hof) (m : Member) (size : Int) (fresh : Nat) :
   split
   · split
     · rfl
-    · split <;> simp [copyMember]
+    · split
+      · rfl
+      · split <;> simp [copyMember]
   · rfl
 
 theorem update_observation (h : Hof) (m : Member) (size : Int) (fresh k : Nat)
@@ -40,16 +44,20 @@ theorem update_observation (h : Hof) (m : Member) (size : Int) (fresh k : Nat)
   by_cases he : size = ((k + 1 : Nat) : Int)
   · subst size
     have hle : (k : Int) + 1 ≤ (h.slots.length : Int) := by omega
-    cases hp : h.slots[k].exists <;> cases hc : less m.cost h.slots[k].member.cost <;>
-      simp [updateUnchecked, hle, hp, hc, slotPayload, choosePayload, payload, copyMember, hk]
+    by_cases hnan : m.cost = .nan
+    · simp [updateUnchecked, hle, hnan, choosePayload, payload]
+    · cases hp : h.slots[k].exists <;> cases hc : isless m.cost h.slots[k].member.cost <;>
+        simp [updateUnchecked, hle, hnan, hp, hc, slotPayload, choosePayload, payload, copyMember, hk]
   · have he' : size ≠ (k : Int) + 1 := by omega
     by_cases hi : 0 < size ∧ size ≤ (h.slots.length : Int)
-    · have hn : size.toNat - 1 ≠ k := by omega
-      cases hs : h.slots[size.toNat - 1]? with
-      | none => simp [updateUnchecked, hi, hs, he']
-      | some s =>
-        cases hc : (!s.exists || less m.cost s.member.cost) <;>
-          simp [updateUnchecked, hi, hs, hc, slotPayload, List.getElem?_set_ne hn, he', copyMember]
+    · by_cases hnan : m.cost = .nan
+      · simp [updateUnchecked, hi, hnan, he']
+      · have hn : size.toNat - 1 ≠ k := by omega
+        cases hs : h.slots[size.toNat - 1]? with
+        | none => simp [updateUnchecked, hi, hnan, hs, he']
+        | some s =>
+          cases hc : (!s.exists || isless m.cost s.member.cost) <;>
+            simp [updateUnchecked, hi, hnan, hs, hc, slotPayload, List.getElem?_set_ne hn, he', copyMember]
     · simp [updateUnchecked, hi, he']
 
 def all_slots_best_seen : Prop :=
@@ -82,30 +90,33 @@ theorem update_frame_holds : update_frame := by
   split
   · split
     · rfl
-    · split <;> simp [copyMember, List.getElem?_set_ne hn]
+    · split
+      · rfl
+      · split <;> simp [copyMember, List.getElem?_set_ne hn]
   · rfl
 
 example : (1 : Nat) ≠ 0 := by decide
 
 def update_copies : Prop := ∀ (h : Hof) (m : Member) (size : Int) (fresh : Nat) (s : Slot),
   (0 < size ∧ size ≤ (h.slots.length : Int)) →
+  m.cost ≠ .nan →
   h.slots[size.toNat - 1]? = some s →
-  (!s.exists || less m.cost s.member.cost) = true → Below fresh m →
+  (!s.exists || isless m.cost s.member.cost) = true → Below fresh m →
   ∃ stored, (updateUnchecked h m size fresh).1.slots[size.toNat - 1]? = some ⟨stored, true⟩ ∧
     payload stored = payload m ∧ stored.objectId ≠ m.objectId ∧ stored.treeId ≠ m.treeId
 
 theorem update_copies_holds : update_copies := by
-  intro h m size fresh s hi hs hc hf
+  intro h m size fresh s hi hnan hs hc hf
   refine ⟨(copyMember m fresh).1, ?_, rfl, ?_⟩
   · have hb : size.toNat - 1 < h.slots.length := by omega
-    simp [updateUnchecked, hi, hs, hc, List.getElem?_set_self hb, copyMember]
+    simp [updateUnchecked, hi, hnan, hs, hc, List.getElem?_set_self hb, copyMember]
   · exact ⟨(member_copy_fresh_holds m fresh hf).1,
       (member_copy_fresh_holds m fresh hf).2.1⟩
 
 example : let m := specimen (.fin 0) (.fin 1)
     let s : Slot := ⟨m, false⟩
-    (0 < (1 : Int) ∧ 1 ≤ (1 : Int)) ∧ ([s] : List Slot)[0]? = some s ∧
-    (!s.exists || less m.cost s.member.cost) = true ∧ Below 2 m := by
+    (0 < (1 : Int) ∧ 1 ≤ (1 : Int)) ∧ m.cost ≠ .nan ∧ ([s] : List Slot)[0]? = some s ∧
+    (!s.exists || isless m.cost s.member.cost) = true ∧ Below 2 m := by
   simp [specimen, Below]
 
 def checked_scalar_step : Prop :=
