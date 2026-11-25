@@ -53,15 +53,23 @@ def maxNF (s : TStructure) : Int :=
   | [] => 0
   | a :: as => as.foldl max a
 
-/-- `get_tree`, `src/TemplateExpression.jl:543-567`: one feature tree per variable up to
-`max(num_features)`, zipped with the inner expressions, then the combiner on the inner
-trees (`combineT` is the user's `combine` on composable expressions, observed on trees). -/
+/-- `sum(values(num_features))`. -/
+def sumNF (s : TStructure) : Int :=
+  s.numFeatures.foldl (· + ·) 0
+
+/-- `get_tree`, `src/TemplateExpression.jl:543-566`: rejects templates with parameters,
+reads `first(values(raw_contents))`, builds `sum(values(num_features))` feature trees
+independently of the number of keys, and passes them to the combiner on the inner trees
+(`combineT` is the user's `combine` on composable expressions, observed on trees). -/
 def getTree {M : Type} (combineT : List (Tree JF) → List (Tree JF) → Jl (Tree JF)) (ex : TExpr M) :
     Jl (Tree JF) :=
-  let vars := (ex.inners.zip (List.range (maxNF ex.s).toNat)).map fun p => Tree.feature (p.2 + 1)
   if ex.s.hasParams then
     throw (.argumentError "`get_tree` is not implemented for TemplateExpression with parameters")
-  else combineT (ex.inners.map (·.tree)) vars
+  else if ex.inners.isEmpty then
+    throw .boundsError
+  else
+    let vars := (List.range (sumNF ex.s).toNat).map fun i => Tree.feature (i + 1)
+    combineT (ex.inners.map (·.tree)) vars
 
 /-- `contains_features_greater_than`, `src/TemplateExpression.jl:1159-1166`. -/
 def containsGreater {T : Type} (m : Int) : Tree T → Bool
@@ -218,13 +226,51 @@ theorem ctorParams_holds : ctorParams := by
 example : buildParams ⟨["f"], ["p"], [1], [2]⟩ (some [("p", .vec [.fin 1])]) =
     .error (.errorException "DimensionMismatch: Expected `parameters.p` to have length 2") := by decide
 
-/-- `get_tree` should succeed for every parameter-free template whose combiner succeeds on
-`max(num_features)` variables. -/
+private theorem foldl_max_le_add : ∀ (xs : List Int) (m s : Int),
+    0 ≤ m → m ≤ s → (∀ x ∈ xs, 0 ≤ x) →
+    xs.foldl max m ≤ xs.foldl (· + ·) s
+  | [], _, _, _, hms, _ => hms
+  | x :: xs, m, s, hm, hms, hnn => by
+    have hx : 0 ≤ x := hnn x List.mem_cons_self
+    have hnext : max m x ≤ s + x := by
+      simp only [max, Int.max_def]
+      split <;> omega
+    have hnonneg : 0 ≤ max m x := by
+      simp only [max, Int.max_def]
+      split <;> omega
+    exact foldl_max_le_add xs (max m x) (s + x) hnonneg hnext
+      (fun y hy => hnn y (List.mem_cons_of_mem _ hy))
+
+/-- Nonnegative feature counts satisfy `max(num_features) ≤ sum(num_features)`. -/
+theorem maxNF_le_sumNF (s : TStructure) (h : ∀ n ∈ s.numFeatures, 0 ≤ n) :
+    (maxNF s).toNat ≤ (sumNF s).toNat := by
+  unfold maxNF sumNF
+  cases hnf : s.numFeatures with
+  | nil => simp
+  | cons a as =>
+    rw [hnf] at h
+    have ha : 0 ≤ a := h a List.mem_cons_self
+    have hle := foldl_max_le_add as a a ha (Int.le_refl a)
+      (fun y hy => h y (List.mem_cons_of_mem _ hy))
+    simp only [List.foldl_cons, Int.zero_add]
+    omega
+
+/-- `get_tree` succeeds for every nonempty parameter-free template whose combiner succeeds
+on `sum(num_features)` variables. -/
 def getTreeTotal : Prop :=
   ∀ (M : Type) (ex : TExpr M) (combineT : List (Tree JF) → List (Tree JF) → Jl (Tree JF)),
-    ex.s.hasParams = false →
-    (∀ vs, vs.length = (maxNF ex.s).toNat → ∃ t, combineT (ex.inners.map (·.tree)) vs = .ok t) →
+    ex.s.hasParams = false → ex.inners ≠ [] →
+    (∀ vs, vs.length = (sumNF ex.s).toNat → ∃ t, combineT (ex.inners.map (·.tree)) vs = .ok t) →
     ∃ t, getTree combineT ex = .ok t
+
+theorem getTreeTotal_holds : getTreeTotal := by
+  intro M ex combineT hp hne hcomb
+  have hne' : ex.inners.isEmpty = false := by
+    cases hi : ex.inners with
+    | nil => exact absurd hi hne
+    | cons _ _ => rfl
+  simp only [getTree, hp, hne', Bool.false_eq_true, ↓reduceIte]
+  exact hcomb ((List.range (sumNF ex.s).toNat).map fun i => Tree.feature (i + 1)) (by simp)
 
 /-- `TemplateStructure{(:f,)}(((; f), (a, b)) -> f(a, b))`, so `num_features = (f=2,)`. -/
 def sF2 : TStructure := ⟨["f"], [], [2], []⟩
@@ -239,13 +285,7 @@ def callF2 (ts vs : List (Tree JF)) : Jl (Tree JF) :=
 def exF2 : TExpr (Settings JF) :=
   ⟨sF2, [⟨.feature 1, ⟨some DynExpr.Eval.Ex.ops, none, true⟩⟩], []⟩
 
-theorem getTreeTotal_refuted : ¬ getTreeTotal := by
-  intro h
-  obtain ⟨t, ht⟩ := h _ exF2 callF2 rfl (fun vs hvs => by
-    match vs, hvs with
-    | [a, b], _ => exact ⟨a, by simp [callF2, exF2, compose]⟩)
-  change (Except.error .boundsError : Jl (Tree JF)) = .ok t at ht
-  cases ht
+example : getTree callF2 exF2 = .ok (.feature 1) := rfl
 
 theorem containsGreater_iff {T : Type} (m : Int) (hm : 0 ≤ m) :
     ∀ t : Tree T, containsGreater m t = decide ((maxFeature t : Int) > m) := by
