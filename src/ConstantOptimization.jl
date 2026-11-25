@@ -17,12 +17,12 @@ using DynamicExpressions:
     get_tree,
     get_child,
     get_operators,
-    is_constant,
     preserve_sharing,
     is_valid_array,
     get_scalar_constants,
     set_scalar_constants!,
     extract_gradient
+using DynamicExpressions.NodeUtilsModule: is_constant
 using DynamicExpressions.EvaluateModule:
     _eval_tree_array, apply_op_array, reset_index!, get_array
 using DispatchDoctor: @unstable
