@@ -181,10 +181,9 @@ def entries : List Entry := [
     "Repeated, unknown or positional arguments, missing or non-tuple expressions, bad parameter entries and non-do-block bodies are rejected." "None." ``macroErrors ``macroErrors_holds,
   pe "tmpl-parse-checks" TE ["parse_expression"]
     "Guesses with unknown names, missing expressions, or parameters given both flat and by keyword are rejected; without parameters a parse has none." "None." ``parseChecks ``parseChecks_holds,
-  re "tmpl-parse-accepts" TE ["parse_expression"]
+  pe "tmpl-parse-accepts" TE ["parse_expression"]
     "parse_expression accepts every guess supplying one expression string per key." "None."
-    "Inner strings are parsed separately: (f=\"#1 + 1.0\", g=\"sin(#1)\") gives Node{Float64} and Node{Float32}, and the constructor throws MethodError."
-    ``parseAccepts ``parseAccepts_refuted,
+    ``parseAccepts ``parseAccepts_holds,
   pe "tmpl-parameter-key-order" TE ["get_parameter_keys"]
     "Constructed templates expose their declared parameter keys in declaration order." "Construction succeeds." ``parameterKeyOrder ``parameterKeyOrder_holds,
   pe "tmpl-variable-names-priority" TE ["get_variable_names"]

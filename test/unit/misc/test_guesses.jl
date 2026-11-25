@@ -93,6 +93,26 @@ end
     @test all(m -> m.tree isa TemplateExpression, parsed_multiple[1])
 end
 
+@testitem "parse_expression for templates promotes mixed literal types" begin
+    using SymbolicRegression
+    using DynamicExpressions: DynamicExpressions as DE, OperatorEnum
+
+    operators = OperatorEnum(1 => (sin,), 2 => (+, *))
+    spec = @template_spec(expressions = (f, g)) do x, y
+        f(x) + g(y)
+    end
+
+    ex = DE.parse_expression((; f="#1 + 1.0", g="sin(#1)"); expression_spec=spec, operators)
+    @test ex isa TemplateExpression{Float64}
+    @test ex([2.0; 0.0;;]) ≈ [3.0]
+
+    ex_mixed = DE.parse_expression(
+        (; f="#1 + 1.0f0", g="#1 * 2.0"); expression_spec=spec, operators
+    )
+    @test ex_mixed isa TemplateExpression{Float64}
+    @test ex_mixed([2.0; 3.0;;]) ≈ [9.0]
+end
+
 @testitem "parse_guesses with NamedTuple and parameters" begin
     using SymbolicRegression
     using SymbolicRegression: parse_guesses, Dataset, PopMember

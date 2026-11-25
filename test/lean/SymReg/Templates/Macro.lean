@@ -169,6 +169,16 @@ def sameType : List FTy → Bool
   | [] => true
   | t :: ts => ts.all (· = t)
 
+/-- `promote_type` on `Float32`/`Float64` (`src/TemplateExpression.jl:1417`). -/
+def promoteFTy : FTy → FTy → FTy
+  | .f64, _ | _, .f64 => .f64
+  | .f32, .f32 => .f32
+
+/-- Common promoted element type of parsed component trees. -/
+def commonFTy : List FTy → FTy
+  | [] => .f32
+  | t :: ts => ts.foldl promoteFTy t
+
 /-- Every guess name is an expression or parameter name. -/
 def namesOk (fkeys pkeys : List String) (ex : List (String × GVal)) : Bool :=
   (ex.map Prod.fst).all (· ∈ fkeys ++ pkeys)
@@ -182,9 +192,9 @@ def flatKeys (pkeys : List String) (ex : List (String × GVal)) : List String :=
   pkeys.filter (· ∈ ex.map Prod.fst)
 
 /-- `parse_expression(ex::NamedTuple; expression_spec, parameters)`,
-`src/TemplateExpression.jl:1346-1435`. Each inner string is parsed on its own by DE's
-`parse_expression`, whose element type comes from its literals (`Float32` without any); the
-template constructor needs one inner expression type (`NTuple{<:Any,E}`). -/
+`src/TemplateExpression.jl:1346-1440`. Each inner string is parsed on its own by DE's
+`parse_expression`, then all parsed trees are converted to `promote_type(map(eltype, ...)...)`
+so the template constructor receives a uniform inner expression type. -/
 def parseNT (fkeys pkeys : List String) (ex : List (String × GVal))
     (kwParams : Option (List (String × GVal))) : Jl Parsed :=
   if !namesOk fkeys pkeys ex then
@@ -197,7 +207,8 @@ def parseNT (fkeys pkeys : List String) (ex : List (String × GVal))
     let params ← paramsOf (if (flatKeys pkeys ex).isEmpty then kwParams
       else some ((flatKeys pkeys ex).filterMap fun k => (ex.lookup k).map (k, ·)))
     let types ← fkeys.mapM (typeOf ex)
-    if sameType types then pure ⟨types, params⟩
+    let promoted := types.map fun _ => commonFTy types
+    if sameType promoted then pure ⟨promoted, params⟩
     else throw (.methodError "no method matching TemplateExpression(::NamedTuple{...})")
 
 /-- Guess validation: names outside the expression and parameter keys, a missing expression,
@@ -243,21 +254,60 @@ theorem parseChecks_holds : parseChecks := by
           · cases h; rfl
           · cases h
 
-/-- `parse_expression` should accept every guess that supplies one expression string per
+private theorem sameType_map_const (ts : List FTy) (c : FTy) :
+    sameType (ts.map fun _ => c) = true := by
+  cases ts with
+  | nil => rfl
+  | cons _ rest => simp [sameType]
+
+private theorem lookup_mem_of_mem_map_fst (ex : List (String × GVal)) (k : String)
+    (h : k ∈ ex.map Prod.fst) : ∃ v, ex.lookup k = some v ∧ (k, v) ∈ ex := by
+  induction ex with
+  | nil => simp at h
+  | cons p ps ih =>
+    obtain ⟨a, b⟩ := p
+    by_cases hk : k = a
+    · subst hk; exact ⟨b, by simp [List.lookup], by simp⟩
+    · simp only [List.map_cons, List.mem_cons, hk, false_or] at h
+      obtain ⟨v, hl, hm⟩ := ih h
+      have hne : (k == a) = false := by simp [hk]
+      exact ⟨v, by simp [List.lookup, hne, hl], List.mem_cons_of_mem _ hm⟩
+
+private theorem mapM_typeOf_ok (ex : List (String × GVal))
+    (hstr : ∀ q ∈ ex, ∃ m l, q.2 = .str m l) :
+    ∀ ks : List String, (∀ k ∈ ks, k ∈ ex.map Prod.fst) →
+      ∃ ts, ks.mapM (typeOf ex) = .ok ts
+  | [], _ => ⟨[], rfl⟩
+  | k :: ks, hmem => by
+    obtain ⟨v, hlook, hq⟩ := lookup_mem_of_mem_map_fst ex k (hmem k List.mem_cons_self)
+    obtain ⟨m, l, hv⟩ := hstr (k, v) hq
+    simp only at hv
+    have htk : typeOf ex k = .ok (l.getD .f32) := by simp [typeOf, hlook, hv]
+    obtain ⟨ts, hts⟩ := mapM_typeOf_ok ex hstr ks (fun k' hk' => hmem k' (List.mem_cons_of_mem _ hk'))
+    exact ⟨l.getD .f32 :: ts, by simp [List.mapM_cons, htk, hts]⟩
+
+/-- `parse_expression` accepts every guess that supplies one expression string per
 expression key and the parameters by keyword. -/
 def parseAccepts : Prop :=
   ∀ (fkeys : List String) (ex : List (String × GVal)),
     ex.map Prod.fst = fkeys → (∀ q ∈ ex, ∃ m l, q.2 = .str m l) →
     ∃ p, parseNT fkeys [] ex none = .ok p
 
-theorem parseAccepts_refuted : ¬ parseAccepts := by
-  intro h
-  obtain ⟨p, hp⟩ := h ["f", "g"] [("f", .str 1 (some .f64)), ("g", .str 2 none)] rfl (by
-    intro q hq
-    simp only [List.mem_cons, List.mem_nil_iff, or_false] at hq
-    rcases hq with rfl | rfl
-    · exact ⟨1, some .f64, rfl⟩
-    · exact ⟨2, none, rfl⟩)
-  simp [parseNT, namesOk, exprsOk, flatKeys, typeOf, sameType, paramsOf, List.lookup] at hp
+theorem parseAccepts_holds : parseAccepts := by
+  intro fkeys ex hkeys hstr
+  have hnames : namesOk fkeys [] ex = true := by
+    simp [namesOk, hkeys]
+  have hexprs : exprsOk fkeys ex = true := by
+    simp [exprsOk, hkeys]
+  have hflat : flatKeys [] ex = [] := rfl
+  obtain ⟨ts, hts⟩ := mapM_typeOf_ok ex hstr fkeys (fun k hk => by rw [hkeys]; exact hk)
+  refine ⟨⟨ts.map fun _ => commonFTy ts, none⟩, ?_⟩
+  unfold parseNT
+  simp only [hnames, hexprs, hflat, List.isEmpty_nil, Option.isNone_none, Bool.or_true,
+    Bool.not_true, Bool.false_eq_true, ↓reduceIte, paramsOf, pureOk, okBind, hts,
+    sameType_map_const]
+
+example : parseNT ["f", "g"] [] [("f", .str 1 (some .f64)), ("g", .str 2 none)] none =
+    .ok ⟨[.f64, .f64], none⟩ := rfl
 
 end SymReg.Templates
