@@ -79,6 +79,7 @@ end
         ConstantMutation(; probability_flip_sign=0.75)
     @test (@test_deprecated ConstantMutation(; probability_flip_sign=0.75).probability_negate) ==
         0.25
+    @test (@test_deprecated new.probability_negate_constant) == 0.25
 
     @test_throws ArgumentError Options(;
         probability_negate_constant=0.25, probability_flip_constant_sign=0.75

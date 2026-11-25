@@ -265,6 +265,17 @@ struct Options{
     plugins::PT
 end
 
+function Base.getproperty(options::Options, k::Symbol)
+    if k === :probability_negate_constant
+        Base.depwarn(
+            "`probability_negate_constant` is deprecated. Use `1 - probability_flip_constant_sign` instead.",
+            :getproperty,
+        )
+        return 1 - getfield(options, :probability_flip_constant_sign)
+    end
+    return getfield(options, k)
+end
+
 @inline function use_batching(options::AbstractOptions, dataset::Dataset)
     return options.batching === true || (
         options.batching === :auto &&
