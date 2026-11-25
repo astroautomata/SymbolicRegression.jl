@@ -199,9 +199,13 @@ function _best_of_sample(
         p == 1.0 ? 1 : StatsBase.sample(get_tournament_selection_weights(options))
     chosen_idx = if tournament_winner == 1
         best_i, best_cost = 1, adjusted_cost(1)
+        best_is_nan = isnan(best_cost)
         for i in 2:n
             cost = adjusted_cost(i)
-            isless(cost, best_cost) && ((best_i, best_cost) = (i, cost))
+            if cost < best_cost || (best_is_nan && !isnan(cost))
+                best_i, best_cost = i, cost
+                best_is_nan = false
+            end
         end
         best_i
     else

@@ -1,6 +1,6 @@
 @testitem "Test utils" begin
     using SymbolicRegression
-    using SymbolicRegression.UtilsModule: findmin_fast, bottomk_fast, is_anonymous_function
+    using SymbolicRegression.UtilsModule: bottomk_fast, is_anonymous_function
     using Random
 
     function simple_bottomk(x, k)
@@ -13,12 +13,6 @@
         n in (1, 5, 20, 50, 100, 1000), seed in 1:10, T in (Float32, Float64, Int)
     ]
 
-    @testset "findmin_fast" begin
-        for opt in array_options
-            x = rand(MersenneTwister(opt.seed), opt.T, opt.n) .* 2 .- 1
-            @test findmin_fast(x) == findmin(x)
-        end
-    end
     @testset "bottomk_fast" begin
         for opt in array_options, k in (1, 2, 3, 5, 10, 20, 50, 100)
             k > opt.n && continue
@@ -40,6 +34,10 @@ end
         [5.0, NaN],
         [NaN, Inf, 5.0],
         [NaN, NaN],
+        [0.0, -0.0],
+        [-0.0, 0.0],
+        [0.0, -0.0, -0.0],
+        [NaN, 0.0, -0.0],
         Float32[2.0f0, Inf32, NaN32],
         [typemax(Int), 1, typemax(Int)],
     )

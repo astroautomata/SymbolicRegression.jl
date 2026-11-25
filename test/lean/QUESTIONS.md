@@ -841,12 +841,12 @@ Modelled as written. `pre-invalid-mode-diagnostic` refutes Reading A with `do_pr
 
 ## Q73. NaNs and sentinel values in fast selection
 
-`src/Utils.jl:106-143`.
+`src/Utils.jl:106-150`.
 
 - Reading A: fast selection is intended only for finite losses strictly below typemax(T).
-- Reading B: the documented bottom-k and findmin operations should retain Base ordering and return actual input indices for every legal floating input, including NaN and Inf.
+- Reading B: the documented bottom-k operation should retain `isless` ordering and return distinct actual input indices for every legal floating input, including NaN and Inf.
 
-Modelled as written, with Reading B's total selection contract refuted: findmin_fast([1.0,NaN,0.0]) returns (0.0,3) instead of Base's (NaN,2), and bottomk_fast([0.0,Inf],2) returns indices [1,1] for values [0.0,Inf]. Neither public function documents a finite-only precondition.
+Modelled as written (`bottomk_fast` tracks filled slots explicitly and orders by `isless`, while unused `findmin_fast` was removed), proving `util-bottomk-sentinel` under Reading B.
 
 ## Q74. Tiny positive Poisson rates
 

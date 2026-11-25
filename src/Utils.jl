@@ -103,16 +103,37 @@ function bottomk_fast(x::AbstractVector{T}, k) where {T}
     )
 end
 
+@inline _is_isless_special(x) = isnan(x) || (x isa AbstractFloat && x === zero(x))
+
 function _bottomk_dispatch(x::AbstractVector{T}, ::Val{k}) where {T,k}
     if k == 1
         i1 = firstindex(x)
         indmin = i1
         minval = x[i1]
-        @inbounds for i in Iterators.drop(eachindex(x), 1)
+        if isnan(minval)
+            @inbounds for i in (i1 + 1):lastindex(x)
+                xi = x[i]
+                if !isnan(xi)
+                    minval = xi
+                    indmin = i
+                    break
+                end
+            end
+        end
+        @inbounds @simd for i in eachindex(x)
             xi = x[i]
-            if isless(xi, minval)
-                minval = xi
-                indmin = i
+            newmin = xi < minval
+            minval = ifelse(newmin, xi, minval)
+            indmin = ifelse(newmin, i, indmin)
+        end
+        if T <: AbstractFloat && minval === zero(T)
+            @inbounds for i in eachindex(x)
+                xi = x[i]
+                if isless(xi, minval)
+                    minval = xi
+                    indmin = i
+                    break
+                end
             end
         end
         return [minval], [indmin]
@@ -122,15 +143,14 @@ function _bottomk_dispatch(x::AbstractVector{T}, ::Val{k}) where {T,k}
     _bottomk!(x, minval, indmin)
     return _to_vec(minval), _to_vec(indmin)
 end
-function _bottomk!(x, minval, indmin)
+function _bottomk_isless!(x, minval, indmin, filled, istart, ilast)
     k = lastindex(minval)
-    filled = 0
-    @inbounds for i in eachindex(x)
+    @inbounds for i in istart:ilast
         xi = x[i]
         if filled < k
             filled += 1
             pos = filled
-        elseif isless(xi, minval[end])
+        elseif isless(xi, minval[k])
             pos = k
         else
             continue
@@ -148,18 +168,50 @@ function _bottomk!(x, minval, indmin)
     end
     return nothing
 end
-
-# Thanks Chris Elrod
-# https://discourse.julialang.org/t/why-is-minimum-so-much-faster-than-argmin/66814/9
-function findmin_fast(x::AbstractVector{T}) where {T}
-    indmin = 1
-    minval = typemax(T)
-    @inbounds @simd for i in eachindex(x)
-        newmin = x[i] < minval
-        minval = newmin ? x[i] : minval
-        indmin = newmin ? i : indmin
+function _bottomk!(x, minval, indmin)
+    k = lastindex(minval)
+    i1 = firstindex(x)
+    ilast = lastindex(x)
+    split = min(i1 + k - 1, ilast)
+    filled = 0
+    @inbounds for i in i1:split
+        xi = x[i]
+        if _is_isless_special(xi)
+            return _bottomk_isless!(x, minval, indmin, filled, i, ilast)
+        end
+        filled += 1
+        minval[filled] = xi
+        indmin[filled] = i
+        for ki in filled:-1:(firstindex(minval) + 1)
+            if minval[ki] < minval[ki - 1]
+                minval[ki], minval[ki - 1] = minval[ki - 1], minval[ki]
+                indmin[ki], indmin[ki - 1] = indmin[ki - 1], indmin[ki]
+            else
+                break
+            end
+        end
     end
-    return minval, indmin
+    top = @inbounds minval[k]
+    @inbounds for i in (split + 1):ilast
+        xi = x[i]
+        if xi < top
+            if _is_isless_special(xi)
+                return _bottomk_isless!(x, minval, indmin, k, i, ilast)
+            end
+            minval[k] = xi
+            indmin[k] = i
+            for ki in k:-1:(firstindex(minval) + 1)
+                if minval[ki] < minval[ki - 1]
+                    minval[ki], minval[ki - 1] = minval[ki - 1], minval[ki]
+                    indmin[ki], indmin[ki - 1] = indmin[ki - 1], indmin[ki]
+                else
+                    break
+                end
+            end
+            top = minval[k]
+        end
+    end
+    return nothing
 end
 
 function poisson_sample(rng::AbstractRNG, λ::T) where {T}
