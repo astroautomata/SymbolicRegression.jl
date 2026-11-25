@@ -427,6 +427,7 @@ using .SearchUtilsModule:
     check_for_loss_threshold,
     check_for_timeout,
     check_max_evals,
+    external_stop,
     check_external_stop,
     latch_external_stop!,
     drain_external_stop!,
