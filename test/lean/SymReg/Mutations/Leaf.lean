@@ -112,8 +112,8 @@ def maxChange (pert temperature : Rat) : Rat := pert * temperature + 1 + 1 / 10
 /-- `mutate_value(rng, val, temperature, m)` returns `val * mutate_factor(typeof(val),
 temperature, m, rng)`, consuming exactly the three draws of `mutate_factor`; for a power
 `T(maxChange^r)` in `[1, maxChange]` (`r = rand(rng, T)` in `[0, 1)`), the factor's magnitude lies
-in `[1/maxChange, maxChange]`, and the factor is negative exactly when the sign draw exceeds
-the Float64 threshold `1 - probability_flip_sign`. -/
+in `[1/maxChange, maxChange]`, and the factor is negative exactly when the sign draw is below
+`probability_flip_sign`. -/
 def mutate_value_spec : Prop :=
   ∀ (T : Type) (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (v : T)
     (s : St T),
@@ -129,7 +129,7 @@ def mutate_value_spec : Prop :=
         -factorAt pw pert temperature pflip s.rng s.rng.cursor ≤ maxChange pert temperature ∧
         1 ≤ maxChange pert temperature * -factorAt pw pert temperature pflip s.rng s.rng.cursor)) ∧
     (factorAt pw pert temperature pflip s.rng s.rng.cursor < 0 ↔
-      drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) pflip = true)
+      drawBelowFlipProbability (s.rng.draws (s.rng.cursor + 2)) pflip = true)
 
 /-! ## Sampling -/
 
@@ -377,7 +377,7 @@ theorem mutate_value_spec_holds : mutate_value_spec := by
   simp only [hfac']
   generalize ((s.rng.indexDraws 1 (s.rng.cursor + 1)).val = 1 : Bool) = b
   obtain ⟨h1, h2, h3⟩ := hmag b
-  by_cases hneg : drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) pflip = true
+  by_cases hneg : drawBelowFlipProbability (s.rng.draws (s.rng.cursor + 2)) pflip = true
   · rw [if_pos hneg]
     refine ⟨Or.inr ⟨by grind, by rw [Rat.neg_neg]; exact h2, by rw [Rat.neg_neg]; exact h3⟩,
       ⟨fun _ => hneg, fun _ => by grind⟩⟩
@@ -404,7 +404,7 @@ theorem mutate_factor_negate_holds : mutate_factor_negate := by
   simp only [hfac]
   generalize ((s.rng.indexDraws 1 (s.rng.cursor + 1)).val = 1 : Bool) = b
   have h1 := hmag b
-  by_cases hneg : drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true
+  by_cases hneg : drawBelowFlipProbability (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true
   · rw [ite_eq_left hneg]
     exact ⟨fun _ => hneg, fun _ => by grind⟩
   · rw [ite_eq_right hneg]

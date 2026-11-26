@@ -106,7 +106,7 @@ def factorAt (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (r
   let fac := pw (pert * temperature + 1 + 1 / 10) (rng.draws c)
   let bigger : Bool := (rng.indexDraws 1 (c + 1)).val = 1
   let fac := if bigger then fac else 1 / fac
-  if drawAboveFlipThreshold (rng.draws (c + 2)) pflip then -fac else fac
+  if drawBelowFlipProbability (rng.draws (c + 2)) pflip then -fac else fac
 
 /-- A constant leaf with its value multiplied by `f`. -/
 def scaleConst (mul : T → Rat → T) (f : Rat) : Tree T → Tree T
@@ -131,15 +131,15 @@ def mutate_constant_spec : Prop :=
             (scaleConst mul (factorAt pw pert temperature pflip rng (rng.cursor + 1)))) ∧
         rng'.cursor = rng.cursor + 4)
 
-/-- `mutate_factor` gives a negative factor exactly when the sign draw exceeds the Float64
-threshold `1 - probability_flip_sign` (`src/MutationFunctions.jl:181-183`). -/
+/-- `mutate_factor` gives a negative factor exactly when the sign draw is below
+`probability_flip_sign` (`src/MutationFunctions.jl:181-183`). -/
 def mutate_factor_negate : Prop :=
   ∀ (T : Type) (pw : Rat → Rat → Rat) (pert temperature pflip : Rat) (s : St T),
     (∀ b r, 0 < b → 0 < pw b r) → 0 ≤ pert → 0 ≤ temperature → 0 ≤ pflip → pflip ≤ 1 →
     SymReg.Loss.LossPrecision.round .float64 (.fin pflip) = .fin pflip →
     (∀ i, 0 ≤ s.rng.draws i ∧ s.rng.draws i < 1) →
     ∃ f s', mutateFactor pw pert temperature (.fin pflip) s = .ok (f, s') ∧
-      (f < 0 ↔ drawAboveFlipThreshold (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true)
+      (f < 0 ↔ drawBelowFlipProbability (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true)
 
 /-! ## `mutate_feature` -/
 

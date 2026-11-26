@@ -46,12 +46,12 @@ def entries : List Entry := [
   { id := "mut-mutate-factor-negate"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_factor", "mutate_value", "ConstantMutation"]
-    statement := "For draws in [0, 1) and a positive magnitude, mutate_factor returns a negative factor exactly when the sign draw is strictly greater than the Float64 result of 1 - m.probability_flip_sign."
+    statement := "For draws in [0, 1) and a positive magnitude, mutate_factor returns a negative factor exactly when the sign draw is strictly less than m.probability_flip_sign."
     preconditions := "perturbation_factor, temperature >= 0; probability_flip_sign a Float64 in [0, 1]; maxChange^r > 0 for maxChange > 0; real draws in [0, 1)."
     status := .proven
     prop := ``mutate_factor_negate
     thm := some ``mutate_factor_negate_holds
-    notes := "The documented flip probability is probability_flip_sign in the continuous uniform idealization. Julia uses a discrete draw and a rounded threshold; equality with the threshold leaves the sign unchanged." },
+    notes := "The documented flip probability is probability_flip_sign in the continuous uniform idealization; a draw equal to probability_flip_sign leaves the sign unchanged." },
   { id := "mut-mutate-feature"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_feature"]
@@ -208,7 +208,7 @@ def entries : List Entry := [
   { id := "mut-mutate-value"
     juliaFile := "src/MutationFunctions.jl"
     juliaFns := ["mutate_value", "mutate_factor"]
-    statement := "mutate_value(rng, val, temperature, m) returns val * mutate_factor(typeof(val), temperature, m, rng), consuming exactly the three draws of mutate_factor; the factor's magnitude lies in [1/maxChange, maxChange] with maxChange = m.perturbation_factor * temperature + 1.1, and the factor is negative exactly when the sign draw exceeds the Float64 result of 1 - m.probability_flip_sign."
+    statement := "mutate_value(rng, val, temperature, m) returns val * mutate_factor(typeof(val), temperature, m, rng), consuming exactly the three draws of mutate_factor; the factor's magnitude lies in [1/maxChange, maxChange] with maxChange = m.perturbation_factor * temperature + 1.1, and the factor is negative exactly when the sign draw is less than m.probability_flip_sign."
     preconditions := "perturbation_factor >= 0, temperature >= 0; the power T(maxChange^r) lies in [1, maxChange] for r in [0, 1) (exact real powers; Float rounding not modelled); the exponent draw rand(rng, T) in [0, 1); val * factor an arbitrary function."
     status := .todo
     prop := ``mutate_value_spec

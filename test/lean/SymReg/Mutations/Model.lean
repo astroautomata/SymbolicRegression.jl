@@ -14,8 +14,7 @@ A mutation runs in `M T`, a state monad over the heap and the RNG stream, on top
 `DynExpr.Expressions.Sampling.RNG`: index draws (`rand(rng, 1:n)`, `rand(rng, xs)`,
 `rand(rng, Bool)`, `rand(rng, NodeSampler(...))`) read `indexDraws`, real draws (`rand(rng)`,
 `rand(rng, T)`, `randn(rng, T)`) read `draws`, representing their values as exact rationals.
-The sign threshold in `mutate_factor` is rounded to Float64; rounding of the factor's
-magnitude and of `rand(rng) * total` is outside this model.
+Rounding of the factor's magnitude and of `rand(rng) * total` is outside this model.
 
 Nodes are plain `Node{T,D}` objects unless a function takes `isGraph` (`GraphNode`, whose
 `NodeSampler` and `length` see each object once). `D` is the maximum degree of the node type
@@ -193,16 +192,12 @@ def mutateOperator (fuel : Nat) (nops : List Nat) (tree : Addr)
     setOpM node o
     pure tree
 
-/-- `1 - m.probability_flip_sign` is a Float64 subtraction (`src/MutationFunctions.jl:181`). -/
-def flipThreshold64 (pflip : JF) : JF :=
-  SymReg.Loss.LossPrecision.round .float64 (JF.fin 1 - pflip)
-
-/-- Julia's strict `>` comparing a finite draw with the Float64 sign threshold. -/
-def drawAboveFlipThreshold (draw : Rat) (pflip : JF) : Bool :=
-  match flipThreshold64 pflip with
-  | .fin threshold => decide (draw > threshold)
-  | .negInf => true
-  | .posInf | .nan => false
+/-- Julia's strict `rand(rng) < m.probability_flip_sign` (`src/MutationFunctions.jl:181`). -/
+def drawBelowFlipProbability (draw : Rat) (pflip : JF) : Bool :=
+  match pflip with
+  | .fin p => decide (draw < p)
+  | .posInf => true
+  | .negInf | .nan => false
 
 /-- `mutate_factor(T, temperature, m, rng)` (`src/MutationFunctions.jl:173-185`), with
 `m.perturbation_factor = pert`, `m.probability_flip_sign = pflip`, and `pw b r` the value of
@@ -215,7 +210,7 @@ def mutateFactor (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF
   let makeConstBigger ← randBool
   let factor := if makeConstBigger then factor else 1 / factor
   let u ← randU
-  pure (if drawAboveFlipThreshold u pflip then -factor else factor)
+  pure (if drawBelowFlipProbability u pflip then -factor else factor)
 
 /-- `mutate_value(rng, val::Number, temperature, m)` (`src/MutationFunctions.jl:167-171`);
 `mul v f` is `val * f`. -/
