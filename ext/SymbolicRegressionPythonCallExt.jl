@@ -133,9 +133,6 @@ function pysr_shaped_workload(
         ),
         precompile_serialization=true,
     )
-    # Also precompile file-saving (`save_frontier_if_changed!` + raw `string_tree`)
-    # and batched `SubDataset` evaluation used by PySR's default `save_to_file=true`
-    # and `batching=true` / `N>1000` runs.
     @compile_workload begin
         mktempdir() do tmpdir
             X = randn(Float32, 3, 30)
