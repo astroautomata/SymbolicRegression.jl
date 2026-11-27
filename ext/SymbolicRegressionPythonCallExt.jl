@@ -22,14 +22,8 @@ for T in (
         Tuple{typeof(PythonCall.JlWrap.pyjlany_call),Type{T},PythonCall.Py,PythonCall.Py}
     )
 end
-for f in (
-    isa,
-    copy,
-    take!,
-    Serialization.serialize,
-    PythonCall.pybytes,
-    PythonCall.pyconvert,
-)
+for f in
+    (isa, copy, take!, Serialization.serialize, PythonCall.pybytes, PythonCall.pyconvert)
     precompile(
         Tuple{typeof(PythonCall.JlWrap.pyjlany_call),typeof(f),PythonCall.Py,PythonCall.Py}
     )
@@ -84,7 +78,9 @@ if isdefined(PythonCall.Convert, :pyconvert_get_rules)
         Tuple,
         NamedTuple,
     )
-        precompile(Tuple{typeof(PythonCall.Convert.pyconvert_get_rules),Type{T},PythonCall.Py})
+        precompile(
+            Tuple{typeof(PythonCall.Convert.pyconvert_get_rules),Type{T},PythonCall.Py}
+        )
         if isdefined(PythonCall.Convert, :_pyconvert_get_rules)
             precompile(
                 Tuple{typeof(PythonCall.Convert._pyconvert_get_rules),Type{T},PythonCall.Py}
@@ -107,7 +103,12 @@ end
 precompile(Tuple{typeof(ProgressMeter.printover),Base.IOStream,String,Symbol})
 if isdefined(Base, :AnnotatedString)
     precompile(
-        Tuple{typeof(ProgressMeter.printover),Base.IOStream,Base.AnnotatedString{String},Symbol}
+        Tuple{
+            typeof(ProgressMeter.printover),
+            Base.IOStream,
+            Base.AnnotatedString{String},
+            Symbol,
+        },
     )
 end
 
