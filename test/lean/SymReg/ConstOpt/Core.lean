@@ -639,7 +639,7 @@ def optimizeRaw {H R : Type} (hooks : EntryHooks H R) (inner : Prepared H R)
   let count ← invokePrepared inner args x0 refs
   pure (args.member, count)
 
--- Source: src/ConstantOptimization.jl:141-178
+-- Source: src/ConstantOptimization.jl:141-174
 -- @unstable function optimize_constants(...)
 --     ...
 --     opt_options =

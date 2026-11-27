@@ -148,10 +148,6 @@ end
     x0, refs = get_optimizable_parameters(member.tree, options)
     nconst = length(x0)
     nconst == 0 && return (member, 0.0)
-    # Only specialize `options` on concrete operator types when an AD backend
-    # (such as Enzyme) requires avoiding dynamic dispatch; otherwise keep the
-    # precompiled erased-operator `Options` to prevent per-operator-set
-    # recompilation of Optim/LineSearches/FiniteDiff across worker threads.
     opt_options =
         options.autodiff_backend === nothing ? options : specialized_options(options)
     if nconst == 1 && !(T <: Complex)

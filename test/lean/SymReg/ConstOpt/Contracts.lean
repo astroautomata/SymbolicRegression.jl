@@ -123,7 +123,7 @@ theorem algorithmDispatch_holds : algorithmDispatch := by
 
 /-- When `options.autodiff_backend === nothing`, `optimize_constants` skips
 `specialized_options(options)` entirely and forwards the original `options`
-while keeping identical algorithm selection (`src/ConstantOptimization.jl:155-178`). -/
+while keeping identical algorithm selection (`src/ConstantOptimization.jl:151-174`). -/
 def skipSpecializedWithoutAD : Prop :=
   ∀ (H R : Type) (hooks : EntryHooks H R) element args
     (s eligible selected measured : EntryStore H R) x0 refs n,
