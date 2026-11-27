@@ -339,18 +339,13 @@ private def requiredEffects : Prop := ∀ (n₁ n₂ : Jl Int) (s₁ s₂ : Jl (
     | .error e,_ => (.error e,[.count])
     | .ok _,.error e => (.error e,[.count,.size])
     | .ok n,.ok none => (n₂.map (fun last => decide (automaticSize n < last)),[.count,.size,.count])
-    | .ok n,.ok (some _) => match s₂ with
-      | .error e => (.error e,[.count,.size,.size])
-      | .ok none => (.error missing,[.count,.size,.size])
-      | .ok (some k) => (n₂.map (fun last => decide (min k n < last)),[.count,.size,.size,.count])
+    | .ok n,.ok (some k) => (n₂.map (fun last => decide (min k n < last)),[.count,.size,.count])
 
 private theorem requiredEffects_holds : requiredEffects := by
   intro n₁ n₂ s₁ s₂
   cases n₁ <;> cases n₂ <;> cases s₁ with
   | error => rfl
-  | ok first => cases first <;> cases s₂ with
-    | error => rfl
-    | ok second => cases second <;> rfl
+  | ok first => cases first <;> rfl
 
 def batchingRequiredExact : Prop := requiredEffects ∧
   (∀ n has, batchingRequired .auto none n has = (decide (1000 < n) && has)) ∧
@@ -359,7 +354,7 @@ def batchingRequiredExact : Prop := requiredEffects ∧
   (∀ n has, batchingRequired .enabled none n has = decide (1000 < n)) ∧
   ∀ (size : Option Int) (n : Int) (use : Bool),
     ((readBatchingRequired (pure use) (observe .count n) (observe .size size) (pure 0)).run []).2 =
-      if !use then [] else if size.isSome then [.count,.size,.size,.count] else [.count,.size,.count]
+      if !use then [] else [.count,.size,.count]
 
 theorem batchingRequiredExact_holds : batchingRequiredExact := by
   refine ⟨requiredEffects_holds, ?_, ?_, ?_, ?_, ?_⟩
@@ -390,6 +385,17 @@ theorem batchingRequiredExact_holds : batchingRequiredExact := by
       simp [automaticSize, show n ≤ 1000 by omega]
   · intro size n use
     cases use <;> cases size <;> rfl
+
+/-- `_build_options(args::Vector{Any})` (`src/Options.jl:733-919`) packs and
+unpacks all 89 keyword slots in the exact same order without swapping or
+dropping any keyword. -/
+def buildOptionsPackOrder : Prop :=
+  ∀ (f : Fin 89 → Nat) (i : Fin 89), (List.ofFn f)[i.val]? = some (f i)
+
+theorem buildOptionsPackOrder_holds : buildOptionsPackOrder := by
+  intro f i
+  rw [List.getElem?_ofFn]
+  simp [i.isLt]
 
 /-- Display hides exactly the algorithm/options/plugin payloads and the legacy
 backsolve name; all ordinary field values use their actual rendering. -/

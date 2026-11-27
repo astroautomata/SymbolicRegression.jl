@@ -730,6 +730,193 @@ $(OPTION_DESCRIPTIONS)
     kws...,
     #########################################
 )
+    return _build_options(
+        Any[
+            defaults,
+            operators,
+            maxsize,
+            maxdepth,
+            expression_spec,
+            populations,
+            population_size,
+            ncycles_per_iteration,
+            elementwise_loss,
+            loss_function,
+            loss_function_expression,
+            dimensional_constraint_penalty,
+            parsimony,
+            constraints,
+            nested_constraints,
+            complexity_of_operators,
+            complexity_of_constants,
+            complexity_of_variables,
+            warmup_maxsize_by,
+            adaptive_parsimony_scaling,
+            operator_enum_constructor,
+            mutation_weights,
+            default_mutations,
+            mutations,
+            default_crossovers,
+            crossovers,
+            crossover_probability,
+            annealing,
+            alpha,
+            tournament_selection_n,
+            tournament_selection_p,
+            early_stop_condition,
+            dimensionless_constants_only,
+            loss_scale,
+            complexity_mapping,
+            use_frequency,
+            use_frequency_in_tournament,
+            should_simplify,
+            perturbation_factor,
+            probability_negate_constant,
+            skip_mutation_failures,
+            optimizer_algorithm,
+            optimizer_nrestarts,
+            optimizer_probability,
+            optimizer_iterations,
+            optimizer_f_calls_limit,
+            optimizer_options,
+            should_optimize_constants,
+            migration,
+            hof_migration,
+            fraction_replaced,
+            fraction_replaced_hof,
+            fraction_replaced_guesses,
+            topn,
+            timeout_in_seconds,
+            max_evals,
+            input_stream,
+            batching,
+            batch_size,
+            turbo,
+            bumper,
+            autodiff_backend,
+            deterministic,
+            seed,
+            verbosity,
+            print_precision,
+            progress,
+            output_directory,
+            save_to_file,
+            bin_constraints,
+            una_constraints,
+            terminal_width,
+            use_tracing,
+            tracing_file,
+            popmember_type,
+            plugins,
+            default_plugins,
+            define_helper_functions,
+            expression_type,
+            expression_options,
+            node_type,
+            output_file,
+            fast_cycle,
+            npopulations,
+            npop,
+            deprecated_return_state,
+            unary_operators,
+            binary_operators,
+            kws,
+        ],
+    )
+end
+
+@noinline @unstable function _build_options(args::Vector{Any})
+    @inbounds begin
+        defaults = args[1]
+        operators = args[2]
+        maxsize = args[3]
+        maxdepth = args[4]
+        expression_spec = args[5]
+        populations = args[6]
+        population_size = args[7]
+        ncycles_per_iteration = args[8]
+        elementwise_loss = args[9]
+        loss_function = args[10]
+        loss_function_expression = args[11]
+        dimensional_constraint_penalty = args[12]
+        parsimony = args[13]
+        constraints = args[14]
+        nested_constraints = args[15]
+        complexity_of_operators = args[16]
+        complexity_of_constants = args[17]
+        complexity_of_variables = args[18]
+        warmup_maxsize_by = args[19]
+        adaptive_parsimony_scaling = args[20]
+        operator_enum_constructor = args[21]
+        mutation_weights = args[22]
+        default_mutations = args[23]
+        mutations = args[24]
+        default_crossovers = args[25]
+        crossovers = args[26]
+        crossover_probability = args[27]
+        annealing = args[28]
+        alpha = args[29]
+        tournament_selection_n = args[30]
+        tournament_selection_p = args[31]
+        early_stop_condition = args[32]
+        dimensionless_constants_only = args[33]
+        loss_scale = args[34]
+        complexity_mapping = args[35]
+        use_frequency = args[36]
+        use_frequency_in_tournament = args[37]
+        should_simplify = args[38]
+        perturbation_factor = args[39]
+        probability_negate_constant = args[40]
+        skip_mutation_failures = args[41]
+        optimizer_algorithm = args[42]
+        optimizer_nrestarts = args[43]
+        optimizer_probability = args[44]
+        optimizer_iterations = args[45]
+        optimizer_f_calls_limit = args[46]
+        optimizer_options = args[47]
+        should_optimize_constants = args[48]
+        migration = args[49]
+        hof_migration = args[50]
+        fraction_replaced = args[51]
+        fraction_replaced_hof = args[52]
+        fraction_replaced_guesses = args[53]
+        topn = args[54]
+        timeout_in_seconds = args[55]
+        max_evals = args[56]
+        input_stream = args[57]
+        batching = args[58]
+        batch_size = args[59]
+        turbo = args[60]
+        bumper = args[61]
+        autodiff_backend = args[62]
+        deterministic = args[63]
+        seed = args[64]
+        verbosity = args[65]
+        print_precision = args[66]
+        progress = args[67]
+        output_directory = args[68]
+        save_to_file = args[69]
+        bin_constraints = args[70]
+        una_constraints = args[71]
+        terminal_width = args[72]
+        use_tracing = args[73]
+        tracing_file = args[74]
+        popmember_type = args[75]
+        plugins = args[76]
+        default_plugins = args[77]
+        define_helper_functions = args[78]
+        expression_type = args[79]
+        expression_options = args[80]
+        node_type = args[81]
+        output_file = args[82]
+        fast_cycle = args[83]
+        npopulations = args[84]
+        npop = args[85]
+        deprecated_return_state = args[86]
+        unary_operators = args[87]
+        binary_operators = args[88]
+        kws = args[89]
+    end
     for k in keys(kws)
         !haskey(deprecated_options_mapping, k) && error("Unknown keyword argument: $k")
         new_key = deprecated_options_mapping[k]
@@ -1195,8 +1382,6 @@ $(OPTION_DESCRIPTIONS)
         typeof(_autodiff_backend),
         print_precision,
         use_tracing,
-        typeof(batching),
-        typeof(batch_size),
     }(
         operators,
         op_constraints,

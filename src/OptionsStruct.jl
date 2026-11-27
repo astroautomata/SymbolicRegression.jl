@@ -192,8 +192,6 @@ struct Options{
     AD,
     print_precision,
     _use_tracing,
-    B<:Union{Bool,Symbol},
-    BS<:Union{Nothing,Int},
 } <: AbstractOptions
     operators::OP
     op_constraints::OP_CONSTRAINTS
@@ -215,8 +213,8 @@ struct Options{
     output_directory::Union{String,Nothing}
     populations::Int
     perturbation_factor::Float64
-    batching::B
-    batch_size::BS
+    batching::Union{Bool,Symbol}
+    batch_size::Union{Nothing,Int}
     mutations::Vector{Pair{AbstractMutation,Float64}}
     crossovers::Vector{Pair{AbstractCrossover,Float64}}
     crossover_probability::Float64
@@ -274,7 +272,8 @@ end
 end
 
 @inline function get_batch_size(options::AbstractOptions, n::Integer)
-    options.batch_size !== nothing && return min(options.batch_size, n)
+    bs = options.batch_size
+    bs !== nothing && return min(bs, n)
     n <= 1000 && return n
     n < 5000 && return 128
     n < 50000 && return 256

@@ -18,18 +18,17 @@ def readBatching {m : Type → Type} [Monad m] (mode : m BatchMode) (n : m Int)
 def useBatching (mode : BatchMode) (n : Int) (hasBatch : Bool) : Bool :=
   mode == .enabled || (mode == .auto && n > 1000 && hasBatch)
 
--- Source: src/OptionsStruct.jl:276-282
--- options.batch_size !== nothing && return min(options.batch_size, n)
+-- Source: src/OptionsStruct.jl:274-282
+-- bs = options.batch_size
+-- bs !== nothing && return min(bs, n)
 def automaticSize (n : Int) : Int :=
   if n <= 1000 then n else if n < 5000 then 128 else if n < 50000 then 256 else 512
 
 def readBatchSize {m : Type → Type} [Monad m] (size : m (Option Int)) (n : Int)
-    (minNothing : m Int) : m Int := do
-  if (← size).isSome then
-    match ← size with
-    | some k => return min k n
-    | none => minNothing
-  else return automaticSize n
+    (_minNothing : m Int) : m Int := do
+  match ← size with
+  | some k => return min k n
+  | none => return automaticSize n
 
 def getBatchSize (size : Option Int) (n : Int) : Int :=
   match size with
