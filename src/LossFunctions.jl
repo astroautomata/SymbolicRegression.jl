@@ -1,6 +1,6 @@
 module LossFunctionsModule
 
-using DispatchDoctor: @stable
+using DispatchDoctor: @stable, @unstable
 using DynamicExpressions:
     AbstractExpression,
     AbstractExpressionNode,
@@ -18,6 +18,7 @@ using ..CoreModule:
     DATA_TYPE,
     LOSS_TYPE,
     is_weighted,
+    has_units,
     get_indices,
     get_full_dataset,
     init_value
@@ -26,14 +27,67 @@ using ..DimensionalAnalysisModule: violates_dimensional_constraints
 using ..InterfaceDynamicExpressionsModule:
     expected_array_type, takes_eval_context, _process_eval_options
 
-function create_eval_context(dataset::Dataset, options::AbstractOptions, num_arrays::Int)
+_eval_vector_type(::Matrix{T}) where {T} = Vector{T}
+_eval_vector_type(::SubArray{T,2,Matrix{T}}) where {T} = Vector{T}
+_eval_vector_type(X::AbstractMatrix) = typeof(similar(X, 0))
+
+@unstable function create_eval_context(
+    dataset::Dataset, options::AbstractOptions, num_arrays::Int
+)
     if options.bumper isa Val{true} || !takes_eval_context(options.operators)
         return nothing
     end
-    array = similar(dataset.X, axes(dataset.X, 2))
-    arrays = [similar(array) for _ in 1:num_arrays]
+    if num_arrays <= 0
+        A = _eval_vector_type(dataset.X)
+        arrays = Vector{A}()
+        return EvalContext(; turbo=options.turbo, buffer=ArrayBuffer(arrays, Ref(0)))
+    end
+    ax = axes(dataset.X, 2)
+    first_array = similar(dataset.X, ax)
+    arrays = Vector{typeof(first_array)}(undef, num_arrays)
+    arrays[1] = first_array
+    for i in 2:num_arrays
+        arrays[i] = similar(first_array)
+    end
     return EvalContext(; turbo=options.turbo, buffer=ArrayBuffer(arrays, Ref(0)))
 end
+
+struct EvalContextPool{C}
+    lock::ReentrantLock
+    items::Vector{C}
+end
+EvalContextPool(::Type{C}) where {C} = EvalContextPool{C}(ReentrantLock(), C[])
+@unstable function EvalContextPool(dataset::Dataset, options::AbstractOptions)
+    sample_ctx = create_eval_context(dataset, options, 0)
+    C = typeof(sample_ctx)
+    return EvalContextPool{C}(ReentrantLock(), C[sample_ctx])
+end
+function acquire_eval_context(
+    pool::EvalContextPool{C}, dataset::Dataset, options::AbstractOptions
+)::C where {C}
+    lock(pool.lock)
+    try
+        if !isempty(pool.items)
+            return pop!(pool.items)
+        end
+    finally
+        unlock(pool.lock)
+    end
+    return create_eval_context(dataset, options, 0)::C
+end
+@unstable acquire_eval_context(::Nothing, dataset::Dataset, options::AbstractOptions) = create_eval_context(
+    dataset, options, 0
+)
+function release_eval_context!(pool::EvalContextPool{C}, ctx::C) where {C}
+    lock(pool.lock)
+    try
+        push!(pool.items, ctx)
+    finally
+        unlock(pool.lock)
+    end
+    return nothing
+end
+release_eval_context!(::Nothing, _) = nothing
 
 function _loss(
     ::AbstractArray{T1}, ::AbstractArray{T2}, ::LT
@@ -276,7 +330,7 @@ function dimensional_regularization(
     dataset::Dataset{T,L},
     options::AbstractOptions,
 ) where {T<:DATA_TYPE,L<:LOSS_TYPE}
-    if !violates_dimensional_constraints(tree, dataset, options)
+    if !has_units(dataset) || !violates_dimensional_constraints(tree, dataset, options)
         return zero(L)
     end
     return convert(L, something(options.dimensional_constraint_penalty, 1000))

@@ -413,5 +413,49 @@ theorem batchingFraction_holds : batchingFraction := by
   exact ⟨rfl, fun e after h => by simp [datasetFraction, h],
     fun n after h => by simp [datasetFraction, h]⟩
 
+/-- When `autodiff_backend === nothing` and a pooled `eval_context` is supplied,
+`_optimize_constants` reuses it without calling `create_eval_context`; when
+`supplied` is `none`, it allocates via `create_eval_context`; with AD present it
+passes `none` (`src/ConstantOptimization.jl:199-207`). -/
+def contextReusePooled : Prop :=
+  ∀ (S : Type) (ctx : SymReg.Loss.Context) (ad : Nat)
+    (create : Int → Effect S (Option SymReg.Loss.Context)) (s : S),
+    initialContextPooled none (some ctx) create s = (.ok (some ctx), s) ∧
+    initialContextPooled none none create s = create 0 s ∧
+    initialContextPooled (some ad) (some ctx) create s = (.ok none, s)
+
+theorem contextReusePooled_holds : contextReusePooled := by
+  intro S ctx ad create s
+  exact ⟨rfl, rfl, rfl⟩
+
+/-- When `!has_units(dataset)` and no custom loss function is supplied, accepting
+an improved optimum sets `member.loss = result.minimum` directly without an extra
+regularized evaluation or an extra `eval_fraction` increment; otherwise it behaves
+identically to `finish` (`src/ConstantOptimization.jl:251-267`). -/
+def skipRedundantFinalEval : Prop :=
+  ∀ (C H R : Type) (e : Evaluator C H R) svc x0 baseline best evals fraction member
+    (s : EvalState C H),
+    finishFast e svc false x0 baseline best evals fraction member s =
+      finish e svc x0 baseline best evals fraction member s ∧
+    (∀ current read written assignedLoss score scored assignedCost birth born final,
+      less best.minimum baseline = true →
+      svc.tree member s = (.ok current, read) →
+      writeParameters {e with tree := current} best.minimizer read = (.ok (), written) →
+      svc.assignLoss member best.minimum written = (.ok (), assignedLoss) →
+      svc.cost member assignedLoss = (.ok score, scored) →
+      svc.assignCost member score scored = (.ok (), assignedCost) →
+      svc.birth assignedCost = (.ok birth, born) →
+      svc.assignBirth member birth born = (.ok (), final) →
+      finishFast e svc true x0 baseline best evals fraction member s = (.ok evals, final))
+
+theorem skipRedundantFinalEval_holds : skipRedundantFinalEval := by
+  intro C H R e svc x0 baseline best evals fraction member s
+  constructor
+  · cases hc : less best.minimum baseline <;> simp [finishFast, finish, hc]
+  · intro current read written assignedLoss score scored assignedCost birth born final
+      himp htree hwr hloss hcost hacost hbirth habirth
+    simp [finishFast, himp, htree, hwr, hloss, hcost, hacost, hbirth, habirth]
+
+example : less (.fin 1) (.fin 2) = true := by decide
 
 end SymReg.ConstOpt

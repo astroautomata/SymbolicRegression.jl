@@ -31,6 +31,7 @@ function s_r_cycle(
     options::AbstractOptions,
     trace::MaybeTrace,
     plugin_states::Tuple,
+    eval_context=nothing,
 )::Tuple{
     P,HallOfFame{T,L,N},Float64
 } where {T,L,D<:Dataset{T,L},N<:AbstractExpression{T},P<:Population{T,L,N}}
@@ -42,7 +43,11 @@ function s_r_cycle(
     else
         dataset
     end
-    eval_context = create_eval_context(batched_dataset, options, curmaxsize)
+    _eval_context = if isnothing(eval_context)
+        create_eval_context(batched_dataset, options, curmaxsize)
+    else
+        eval_context
+    end
 
     for cycle_idx in 1:ncycles
         _on_cycle_start!(plugin_states, cycle_idx, ncycles, options)
@@ -54,7 +59,7 @@ function s_r_cycle(
             trace;
             plugin_states,
             best_seen=best_examples_seen,
-            eval_context,
+            eval_context=_eval_context,
         )
         num_evals += tmp_num_evals
         _update_hall_of_fame_unchecked!(best_examples_seen, pop.members, options)
@@ -80,7 +85,13 @@ function _on_cycle_end!(plugin_states, pop, dataset, best_examples_seen, options
 end
 
 function optimize_and_simplify_population(
-    dataset::D, pop::P, options::AbstractOptions, curmaxsize::Int, trace::MaybeTrace
+    dataset::D,
+    pop::P,
+    options::AbstractOptions,
+    curmaxsize::Int,
+    trace::MaybeTrace;
+    eval_context=nothing,
+    full_eval_context=nothing,
 )::Tuple{P,Float64} where {T,L,D<:Dataset{T,L},P<:Population{T,L}}
     array_num_evals = zeros(Float64, pop.n)
     do_optimization = rand(pop.n) .< options.optimizer_probability
@@ -90,6 +101,18 @@ function optimize_and_simplify_population(
     else
         dataset
     end
+    opt_eval_context =
+        if options.should_optimize_constants &&
+            options.autodiff_backend === nothing &&
+            any(do_optimization)
+            if isnothing(eval_context)
+                create_eval_context(batched_dataset, options, 0)
+            else
+                eval_context
+            end
+        else
+            nothing
+        end
 
     for j in 1:(pop.n)
         if options.should_simplify
@@ -101,12 +124,14 @@ function optimize_and_simplify_population(
         if options.should_optimize_constants && do_optimization[j]
             # TODO: Might want to do full batch optimization here?
             pop.members[j], array_num_evals[j] = optimize_constants(
-                batched_dataset, pop.members[j], options
+                batched_dataset, pop.members[j], options; eval_context=opt_eval_context
             )
         end
     end
     num_evals = sum(array_num_evals)
-    pop, tmp_num_evals = finalize_costs(dataset, pop, options)
+    pop, tmp_num_evals = finalize_costs(
+        dataset, pop, options; eval_context=full_eval_context
+    )
     num_evals += tmp_num_evals
 
     # Now, we create new references for every member.

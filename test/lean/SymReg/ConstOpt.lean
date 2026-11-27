@@ -233,7 +233,17 @@ def entries : List Entry := [
     juliaFns := ["optimize_constants", "_optimize_constants", "_optimize_constants_inner"],
     statement := "A successful public optimization returns the same member allocation it was passed.",
     preconditions := "The public call returns successfully. All Optim, preparation and scalar integration services arbitrary.",
-    status := .proven, prop := ``completeIdentity, thm := some ``completeIdentity_holds }
+    status := .proven, prop := ``completeIdentity, thm := some ``completeIdentity_holds },
+  { id := "copt-context-reuse-pooled", juliaFile := "src/ConstantOptimization.jl",
+    juliaFns := ["_optimize_constants"],
+    statement := "Without AD, _optimize_constants reuses a caller-supplied pooled eval_context without calling create_eval_context, and falls back to create_eval_context when none is supplied; with AD it passes nothing.",
+    preconditions := "None.",
+    status := .proven, prop := ``contextReusePooled, thm := some ``contextReusePooled_holds },
+  { id := "copt-skip-redundant-final-eval", juliaFile := "src/ConstantOptimization.jl",
+    juliaFns := ["_optimize_constants_inner"],
+    statement := "When !has_units(dataset) and neither custom loss hook is set, accepting an improved optimum writes result.minimum directly to member.loss without a redundant regularized evaluation or extra eval_fraction increment.",
+    preconditions := "Strict improvement and successful finishing hooks for the fast path; unconditional agreement with finish otherwise.",
+    status := .proven, prop := ``skipRedundantFinalEval, thm := some ``skipRedundantFinalEval_holds }
 ]
 
 end SymReg.ConstOpt

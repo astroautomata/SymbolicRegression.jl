@@ -14,7 +14,13 @@ using DynamicExpressions:
     extract_gradient
 using DispatchDoctor: @unstable
 using ..CoreModule:
-    AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, specialized_options, dataset_fraction
+    AbstractOptions,
+    Dataset,
+    DATA_TYPE,
+    LOSS_TYPE,
+    specialized_options,
+    dataset_fraction,
+    has_units
 using ..UtilsModule: get_birth_order, PerTaskCache, stable_get!
 using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost
 using ..PopMemberModule: AbstractPopMember, PopMember
@@ -143,6 +149,7 @@ end
     member::P,
     options::AbstractOptions;
     rng::AbstractRNG=default_rng(),
+    eval_context=nothing,
 )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
     can_optimize(member.tree, options) || return (member, 0.0)
     x0, refs = get_optimizable_parameters(member.tree, options)
@@ -161,6 +168,7 @@ end
             algorithm,
             options.optimizer_options,
             rng,
+            eval_context,
         )
     end
     return _optimize_constants(
@@ -172,19 +180,32 @@ end
         options.optimizer_algorithm,
         options.optimizer_options,
         rng,
+        eval_context,
     )
 end
 
 function _optimize_constants(
-    dataset, member::P, x0, refs, options, algorithm, optimizer_options, rng
+    dataset,
+    member::P,
+    x0,
+    refs,
+    options,
+    algorithm,
+    optimizer_options,
+    rng,
+    eval_context=nothing,
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     tree = member.tree
-    eval_context = if options.autodiff_backend === nothing
-        create_eval_context(dataset, options, 0)
+    _eval_context = if options.autodiff_backend === nothing
+        if isnothing(eval_context)
+            create_eval_context(dataset, options, 0)
+        else
+            eval_context
+        end
     else
         nothing
     end
-    ctx = EvaluatorContext(dataset, options, eval_context)
+    ctx = EvaluatorContext(dataset, options, _eval_context)
     f = Evaluator(tree, refs, ctx)
     fg! = GradEvaluator(f, options.autodiff_backend)
     return _optimize_constants_inner(
@@ -192,11 +213,11 @@ function _optimize_constants(
     )
 end
 function _optimize_constants(
-    dataset, member::P, options, algorithm, optimizer_options, rng
+    dataset, member::P, options, algorithm, optimizer_options, rng, eval_context=nothing
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     x0, refs = get_optimizable_parameters(member.tree, options)
     return _optimize_constants(
-        dataset, member, x0, refs, options, algorithm, optimizer_options, rng
+        dataset, member, x0, refs, options, algorithm, optimizer_options, rng, eval_context
     )
 end
 function _optimize_constants_inner(
@@ -229,12 +250,18 @@ function _optimize_constants_inner(
 
     if result.minimum < baseline
         set_optimizable_parameters!(member.tree, result.minimizer, refs)
-        member.loss = f(result.minimizer; regularization=true)
+        if !has_units(dataset) &&
+            isnothing(options.loss_function) &&
+            isnothing(options.loss_function_expression)
+            member.loss = convert(L, result.minimum)
+        else
+            member.loss = f(result.minimizer; regularization=true)
+            num_evals += eval_fraction
+        end
         member.cost = loss_to_cost(
             member.loss, dataset.use_baseline, dataset.baseline_loss, member, options
         )
         member.birth = get_birth_order(; deterministic=options.deterministic)
-        num_evals += eval_fraction
     else
         # Reset to original state
         set_optimizable_parameters!(member.tree, x0, refs)

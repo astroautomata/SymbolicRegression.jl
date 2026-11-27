@@ -145,9 +145,14 @@ def entries : List Entry := [
     notes := "The supplementary missing_template_infinity theorem follows the installed invalid-feature template path." },
   { id := "loss-dimension-no-units", juliaFile := "src/LossFunctions.jl"
     juliaFns := ["dimensional_regularization"]
-    statement := "Without units, node regularization propagates data access errors, raises BoundsError for zero sample columns, and otherwise returns zero of the loss type. Generic wrappers extract their tree first, and TemplateExpression returns typed zero without reading the columns."
-    preconditions := "Neither input nor target units; stock node, generic wrapper or TemplateExpression dispatch."
+    statement := "Without units, dimensional_regularization short-circuits via !has_units(dataset) and immediately returns zero of the loss type without reading dataset columns."
+    preconditions := "Neither input nor target units."
     status := .proven, prop := ``dimension_no_units, thm := some ``dimension_no_units_holds },
+  { id := "loss-eval-context-pool", juliaFile := "src/LossFunctions.jl"
+    juliaFns := ["EvalContextPool", "acquire_eval_context", "release_eval_context!"]
+    statement := "EvalContextPool returns pooled contexts in LIFO order without reallocation, falls back to create_eval_context when empty or nothing, and ignores release into nothing."
+    preconditions := "None."
+    status := .proven, prop := ``eval_context_pool, thm := some ``eval_context_pool_holds },
   { id := "loss-dimension-penalty", juliaFile := "src/LossFunctions.jl"
     juliaFns := ["dimensional_regularization"]
     statement := "On nonempty data, a node with no valid dimensional assignment returns the configured penalty, defaulting to 1000, rounded to the loss type."
@@ -271,7 +276,7 @@ def entries : List Entry := [
     status := .proven, prop := ``evaluation_error, thm := some ``evaluation_error_holds },
   { id := "loss-dimension-empty", juliaFile := "src/LossFunctions.jl"
     juliaFns := ["dimensional_regularization"]
-    statement := "Node regularization on data with zero sample columns raises BoundsError at the first-column check. TemplateExpression ignores sample columns, returning zero of the loss type without units and raising its assertion with units."
+    statement := "On data with zero sample columns, dimensional_regularization returns zero when has_units is false and raises BoundsError (or the TemplateExpression assertion) when has_units is true."
     preconditions := "The node case has zero selected sample columns; the template case has no restriction on columns."
     status := .proven, prop := ``dimension_empty, thm := some ``dimension_empty_holds },
   { id := "loss-baseline-average", juliaFile := "src/LossFunctions.jl"
