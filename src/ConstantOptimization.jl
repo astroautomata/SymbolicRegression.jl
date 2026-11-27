@@ -148,6 +148,8 @@ end
     x0, refs = get_optimizable_parameters(member.tree, options)
     nconst = length(x0)
     nconst == 0 && return (member, 0.0)
+    opt_options =
+        options.autodiff_backend === nothing ? options : specialized_options(options)
     if nconst == 1 && !(T <: Complex)
         algorithm = Optim.Newton(; linesearch=LineSearches.BackTracking())
         return _optimize_constants(
@@ -155,7 +157,7 @@ end
             member,
             x0,
             refs,
-            specialized_options(options),
+            opt_options,
             algorithm,
             options.optimizer_options,
             rng,
@@ -166,9 +168,7 @@ end
         member,
         x0,
         refs,
-        specialized_options(options),
-        # We use specialized options here due to Enzyme being
-        # more particular about dynamic dispatch
+        opt_options,
         options.optimizer_algorithm,
         options.optimizer_options,
         rng,

@@ -73,7 +73,7 @@ theorem rawParameterForwarding_holds : rawParameterForwarding := by
 
 def algorithmDispatch : Prop :=
   ∀ (H R : Type) (hooks : EntryHooks H R) element args
-    (s eligible selected measured specialized : EntryStore H R) x0 refs n options,
+    (s eligible selected measured specialized : EntryStore H R) x0 refs n options ad,
     let first := hooks.memberTree args.member s.heap
     let current := hooks.memberTree args.member eligible.heap
     hooks.eligible first args.options
@@ -83,6 +83,7 @@ def algorithmDispatch : Prop :=
         (.ok (x0, refs), selected) →
     hooks.length x0 {selected with events := selected.events ++ [.length x0]} = (.ok n, measured) →
     n ≠ 0 →
+    hooks.autodiffBackend args.options = some ad →
     hooks.specialize args.options
       {measured with events := measured.events ++ [.specializedOptions args.options]} =
         (.ok options, specialized) →
@@ -105,20 +106,72 @@ def algorithmDispatch : Prop :=
         [.prepared {args with options := options, algorithm := algorithm, optimizerOptions := found} x0 refs])
 
 theorem algorithmDispatch_holds : algorithmDispatch := by
-  intro H R hooks element args s eligible selected measured specialized x0 refs n options
+  intro H R hooks element args s eligible selected measured specialized x0 refs n options ad
   dsimp only
-  intro hc hg hl hn ho
+  intro hc hg hl hn had ho
   constructor
   · rintro typeId found checked rfl rfl hopt
     simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
-      hc, hg, hl, ho, hopt]
+      hc, hg, hl, had, ho, hopt]
   · intro branch algorithm configured found checked halg hopt
     rcases branch with hn' | ⟨typeId, rfl⟩
     · cases element <;>
         simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
-          hc, hg, hl, hn, hn', ho, halg, hopt]
+          hc, hg, hl, hn, hn', had, ho, halg, hopt]
     · simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
-        hc, hg, hl, hn, ho, halg, hopt]
+        hc, hg, hl, hn, had, ho, halg, hopt]
+
+/-- When `options.autodiff_backend === nothing`, `optimize_constants` skips
+`specialized_options(options)` entirely and forwards the original `options`
+while keeping identical algorithm selection (`src/ConstantOptimization.jl:151-174`). -/
+def skipSpecializedWithoutAD : Prop :=
+  ∀ (H R : Type) (hooks : EntryHooks H R) element args
+    (s eligible selected measured : EntryStore H R) x0 refs n,
+    let first := hooks.memberTree args.member s.heap
+    let current := hooks.memberTree args.member eligible.heap
+    hooks.eligible first args.options
+      {s with events := s.events ++ [.eligibility first args.options]} = (.ok true, eligible) →
+    hooks.getter current args.options
+      {eligible with events := eligible.events ++ [.getter current args.options]} =
+        (.ok (x0, refs), selected) →
+    hooks.length x0 {selected with events := selected.events ++ [.length x0]} = (.ok n, measured) →
+    n ≠ 0 →
+    hooks.autodiffBackend args.options = none →
+    let run := optimizeConstants hooks element (fun _ _ _ st => (.ok (.fin 0), st)) args s
+    (∀ typeId found checked, element = .noncomplex typeId → n = 1 →
+      hooks.optimizerOptions args.options
+        {measured with events := measured.events ++ [.optimizerOptions args.options]} =
+          (.ok found, checked) →
+      run.2.events = checked.events ++
+        [.prepared {args with options := args.options, algorithm := .newton, optimizerOptions := found} x0 refs]) ∧
+    ((n ≠ 1 ∨ (∃ typeId, element = .complex typeId)) →
+      ∀ algorithm configured found checked,
+      hooks.configuredAlgorithm args.options
+        {measured with events := measured.events ++ [.configuredAlgorithm args.options]} =
+          (.ok algorithm, configured) →
+      hooks.optimizerOptions args.options
+        {configured with events := configured.events ++ [.optimizerOptions args.options]} =
+          (.ok found, checked) →
+      run.2.events = checked.events ++
+        [.prepared {args with options := args.options, algorithm := algorithm, optimizerOptions := found} x0 refs])
+
+theorem skipSpecializedWithoutAD_holds : skipSpecializedWithoutAD := by
+  intro H R hooks element args s eligible selected measured x0 refs n
+  dsimp only
+  intro hc hg hl hn had
+  constructor
+  · rintro typeId found checked rfl rfl hopt
+    simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
+      hc, hg, hl, had, hopt]
+  · intro branch algorithm configured found checked halg hopt
+    rcases branch with hn' | ⟨typeId, rfl⟩
+    · cases element <;>
+        simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
+          hc, hg, hl, hn, hn', had, halg, hopt]
+    · simp [optimizeConstants, optimizeCount, getSelection, readMemberTree, traceEntry, invokePrepared,
+        hc, hg, hl, hn, had, halg, hopt]
+
+example : (fun (_ : Nat) => (none : Option Nat)) 0 = none := rfl
 
 def objectiveDispatch : Prop :=
   ∀ algorithm backend,

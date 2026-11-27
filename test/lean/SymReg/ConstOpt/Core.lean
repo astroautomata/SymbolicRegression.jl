@@ -602,6 +602,7 @@ structure EntryHooks (H R : Type) where
   eligible : Nat → Nat → Effect (EntryStore H R) Bool
   getter : Nat → Nat → Effect (EntryStore H R) (Nat × R)
   length : Nat → Effect (EntryStore H R) Int
+  autodiffBackend : Nat → Option Nat
   specialize : Nat → Effect (EntryStore H R) Nat
   configuredAlgorithm : Nat → Effect (EntryStore H R) Algorithm
   optimizerOptions : Nat → Effect (EntryStore H R) Nat
@@ -638,43 +639,12 @@ def optimizeRaw {H R : Type} (hooks : EntryHooks H R) (inner : Prepared H R)
   let count ← invokePrepared inner args x0 refs
   pure (args.member, count)
 
--- Source: src/ConstantOptimization.jl:141-176
--- @unstable function optimize_constants(
---     dataset::Dataset{T,L},
---     member::P,
---     options::AbstractOptions;
---     rng::AbstractRNG=default_rng(),
--- )::Tuple{P,Float64} where {T<:DATA_TYPE,L<:LOSS_TYPE,N,P<:AbstractPopMember{T,L,N}}
---     can_optimize(member.tree, options) || return (member, 0.0)
---     x0, refs = get_optimizable_parameters(member.tree, options)
---     nconst = length(x0)
---     nconst == 0 && return (member, 0.0)
---     if nconst == 1 && !(T <: Complex)
---         algorithm = Optim.Newton(; linesearch=LineSearches.BackTracking())
---         return _optimize_constants(
---             dataset,
---             member,
---             x0,
---             refs,
---             specialized_options(options),
---             algorithm,
---             options.optimizer_options,
---             rng,
---         )
---     end
---     return _optimize_constants(
---         dataset,
---         member,
---         x0,
---         refs,
---         specialized_options(options),
---         # We use specialized options here due to Enzyme being
---         # more particular about dynamic dispatch
---         options.optimizer_algorithm,
---         options.optimizer_options,
---         rng,
---     )
--- end
+-- Source: src/ConstantOptimization.jl:141-174
+-- @unstable function optimize_constants(...)
+--     ...
+--     opt_options =
+--         options.autodiff_backend === nothing ? options : specialized_options(options)
+--     ...
 def optimizeCount {H R : Type} (hooks : EntryHooks H R) (element : DatasetElement)
     (inner : Prepared H R) (args : Invocation) : Effect (EntryStore H R) JF := do
   let tree ← readMemberTree hooks args.member
@@ -685,8 +655,11 @@ def optimizeCount {H R : Type} (hooks : EntryHooks H R) (element : DatasetElemen
   let n ← hooks.length x0
   if n = 0 then return .fin 0
   let useNewton := n == 1 && (match element with | .noncomplex _ => true | .complex _ => false)
-  traceEntry (.specializedOptions args.options)
-  let options ← hooks.specialize args.options
+  let options ← match hooks.autodiffBackend args.options with
+    | none => pure args.options
+    | some _ => do
+      traceEntry (.specializedOptions args.options)
+      hooks.specialize args.options
   let algorithm ← if useNewton then pure .newton else do
     traceEntry (.configuredAlgorithm args.options)
     hooks.configuredAlgorithm args.options
