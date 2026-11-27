@@ -293,7 +293,7 @@ def unitReply (_ _ : Nat) : Reply := ⟨[], ⟨[]⟩, 0, .fin 1, 0⟩
 
 /-! ## Event-driven `done_ch` completion channel and single-copy population handoff -/
 
-/-- Event-driven head-loop state (`src/SymbolicRegression.jl:1092-1296`):
+/-- Event-driven head-loop state (`src/SymbolicRegression.jl:1092-1297`):
 extends `OutputState` with a completion channel `doneCh` carrying `(population, taskOk)`
 events posted by async listener tasks, and a per-population `posted` flag tracking whether
 the currently running listener has already posted its event. -/
@@ -324,7 +324,7 @@ def postDone (es : EventState) (p : Nat) (taskOk : Bool) : EventState :=
       posted := fun i => if i = p then true else es.posted i }
   else es
 
-/-- Head loop consumes one event from `done_ch` (`src/SymbolicRegression.jl:1134-1148`).
+/-- Head loop consumes one event from `done_ch` (`src/SymbolicRegression.jl:1135-1149`).
 `none` represents propagating a failed task (`!task_ok || istaskfailed`). -/
 def consumeDone (es : EventState) (externalStop : Bool) (work : Nat → Nat → Reply) :
     Option EventState :=
@@ -492,7 +492,7 @@ theorem event_channel_sound_holds : event_channel_sound := by
   · intro populations total es externalStop work hinv hbud hrec hbal
     exact consumeDone_preserves populations total es externalStop work hinv hbud hrec hbal
 
-/-- Single-copy population handoff (`src/SymbolicRegression.jl:1175-1245`):
+/-- Single-copy population handoff (`src/SymbolicRegression.jl:1176-1246`):
 `saved_pop = copy(cur_pop)` allocates fresh member IDs disjoint from `cur_pop`;
 `best_sub_pop(saved_pop)` selects a subset of `saved_pop`'s member IDs;
 reusing `in_pop = cur_pop` for the next worker shares zero member IDs with either

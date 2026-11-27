@@ -1090,28 +1090,29 @@ function _main_search_loop!(
     print_every_n_seconds = 5
     equation_speed = Float32[]
 
-    done_ch = if ropt.parallelism in (:multiprocessing, :multithreading) &&
-        sum(state.cycles_remaining) > 0
-        ch = Channel{Tuple{Int,Int,Bool}}(options.populations * nout + 1)
-        for j in 1:nout, i in 1:(options.populations)
-            # Start listening for each population to finish:
-            t = let j = j, i = i, ch = ch
-                @filtered_async begin
-                    try
-                        put!(state.channels[j][i], fetch(state.worker_output[j][i]))
-                        put!(ch, (j, i, true))
-                    catch ex
-                        put!(ch, (j, i, false))
-                        rethrow(ex)
+    done_ch =
+        if ropt.parallelism in (:multiprocessing, :multithreading) &&
+            sum(state.cycles_remaining) > 0
+            ch = Channel{Tuple{Int,Int,Bool}}(options.populations * nout + 1)
+            for j in 1:nout, i in 1:(options.populations)
+                # Start listening for each population to finish:
+                t = let j = j, i = i, ch = ch
+                    @filtered_async begin
+                        try
+                            put!(state.channels[j][i], fetch(state.worker_output[j][i]))
+                            put!(ch, (j, i, true))
+                        catch ex
+                            put!(ch, (j, i, false))
+                            rethrow(ex)
+                        end
                     end
                 end
+                push!(state.tasks[j], t)
             end
-            push!(state.tasks[j], t)
+            ch
+        else
+            nothing
         end
-        ch
-    else
-        nothing
-    end
     kappa = 0
     head_node_occupation = 0.0
     need_poll =
