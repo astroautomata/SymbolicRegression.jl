@@ -293,6 +293,14 @@ def entries : List Entry := [
     preconditions := "No conflicting supplied options; date formatting and random run-id suffix are external inputs."
     status := .todo, prop := ``runtime_conditions
     notes := "Needs environment timeout parsing and the explicit-ID branch bypassing timestamp and RNG services." },
+  { id := "search-event-channel", juliaFile := "src/SymbolicRegression.jl", juliaFns := ["_main_search_loop!"]
+    statement := "The event-driven done_ch completion channel stays bounded by populations (never blocking capacity populations*nout+1), preserves cycle budget, receipt uniqueness, and one-in-flight balance on healthy completions, and propagates failed-task events."
+    preconditions := "Each running listener posts at most once per launch for a population index in 0..populations-1."
+    status := .proven, prop := ``event_channel_sound, thm := some ``event_channel_sound_holds },
+  { id := "search-single-copy-handoff", juliaFile := "src/SymbolicRegression.jl", juliaFns := ["_main_search_loop!"]
+    statement := "Saving saved_pop = copy(cur_pop) for last_pops and best_sub_pops while passing cur_pop directly as in_pop leaves zero shared member identities between the worker input and either saved population."
+    preconditions := "copy allocates fresh member identities disjoint from cur_pop, and best_sub_pop selects a subset of saved_pop's members."
+    status := .proven, prop := ``single_copy_handoff, thm := some ``single_copy_handoff_holds },
   { id := "search-frontier-cache", juliaFile := "src/SearchUtils.jl", juliaFns := ["FrontierSaveState", "save_frontier_if_changed!", "logging_callback!"]
     statement := "Saving the same frontier twice never writes it again; identity, cost, loss or complexity changes invalidate the cache."
     preconditions := "Successful CSV write; entry comparison models isequal, including NaN; logging remains an arbitrary extension callback."
