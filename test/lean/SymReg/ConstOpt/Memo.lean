@@ -106,7 +106,7 @@ theorem bit64_getLsbD (idx i : Nat) (hi : i < 64) :
     · have hsub : i - idx ≠ 0 := by omega
       simp [heq, hsub]
 
-/-- Memoization tree mirroring `MemoNode{T,NT}` (`src/ConstantOptimization.jl:191-197`). -/
+/-- Memoization tree mirroring `MemoNode{T,NT}` (`src/ConstantOptimization.jl:192-198`). -/
 inductive MemoTree (T : Type) where
   | node (tree : Tree T) (mask : BitVec 64) (slot : Nat) (hasSlots : Bool) (children : List (MemoTree T))
 
@@ -125,7 +125,7 @@ def MemoTree.hasSlots {T : Type} : MemoTree T → Bool
 def MemoTree.children {T : Type} : MemoTree T → List (MemoTree T)
   | .node _ _ _ _ cs => cs
 
--- `_consume_const_mask!(node, const_idx)` (`src/ConstantOptimization.jl:243-260`).
+-- `_consume_const_mask!(node, const_idx)` (`src/ConstantOptimization.jl:244-261`).
 mutual
   def consumeConstMask {T : Type} : Tree T → Nat → BitVec 64 × Nat
     | .const _, idx => (bit64 idx, idx + 1)
@@ -152,7 +152,7 @@ mutual
     | c :: cs => isConstantTree c && isConstantTreeF cs
 end
 
--- `_build_memo_masks(node, const_idx)` (`src/ConstantOptimization.jl:214-241`).
+-- `_build_memo_masks(node, const_idx)` (`src/ConstantOptimization.jl:215-242`).
 mutual
   def buildMemoMasks {T : Type} : Tree T → Nat → MemoTree T × Nat
     | .const v, idx => (.node (.const v) (bit64 idx) 0 false [], idx + 1)
@@ -316,7 +316,7 @@ structure EvalRes (V : Type) where
   ok : Bool
   deriving DecidableEq
 
-/-- `_check_memo_ok(res, eval_context)` (`src/ConstantOptimization.jl:339-349`):
+/-- `_check_memo_ok(res, eval_context)` (`src/ConstantOptimization.jl:345-355`):
 enforces `is_valid_array(res.x)` when `early_exit = Val(true)`. -/
 def checkMemoOk {V : Type} (validCheck : V → Bool) (r : EvalRes V) : EvalRes V :=
   if !r.ok then r
@@ -350,7 +350,7 @@ mutual
         | .ok vs => .ok (r.val :: vs)
 end
 
--- `_eval_memo_read` (`src/ConstantOptimization.jl:394-452`):
+-- `_eval_memo_read` (`src/ConstantOptimization.jl:408-471`):
 -- reuses `cache[slot]` whenever `(mnode.mask & diff_mask) == 0 && mnode.slot > 0`,
 -- and otherwise evaluates recursively with `_check_memo_ok`.
 mutual
@@ -405,7 +405,7 @@ mutual
       CacheValidF evalLeaf applyOp validCheck baseX cache mcs (idx + countConsts mc.tree)
 end
 
-/-- `diff_mask` computed in `_eval_with_memo` (`src/ConstantOptimization.jl:460-466`):
+/-- `diff_mask` computed in `_eval_with_memo` (`src/ConstantOptimization.jl:479-485`):
 bit `i < nconst` is set iff `newX i ≠ baseX i`. -/
 def DiffMaskSpec {T : Type} (nconst : Nat) (baseX newX : Nat → T) (diff : BitVec 64) : Prop :=
   ∀ i, i < nconst → i < 64 → diff.getLsbD i = false → newX i = baseX i
@@ -545,7 +545,7 @@ mutual
       MemoAlignedF.cons _ c _ cs idx (assignSlots_aligned chooseSlot hc) (assignSlotsF_aligned chooseSlot hcs)
 end
 
-/-- End-to-end MemoPlan soundness (`src/ConstantOptimization.jl:214-506`):
+/-- End-to-end MemoPlan soundness (`src/ConstantOptimization.jl:215-523`):
 1. Building masks via `_build_memo_masks` and assigning arbitrary slots via `_assign_memo_slots`
    preserves `MemoAligned` and exact constant count (`nconst ≤ 64`).
 2. Whenever `base_valid = true` (`CacheValid`) and `diff` reflects all changed constants

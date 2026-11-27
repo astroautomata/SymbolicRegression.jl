@@ -900,14 +900,14 @@ def evalCost (d : Dataset) (member : Member) (o : Options) (complexity : Option 
     d.full.lossPrecision
   pure ((cost, loss), context')
 
-/-- Fast positional `eval_tree_dispatch` (`src/LossFunctions.jl:83-107`):
+/-- Fast positional `eval_tree_dispatch` (`src/LossFunctions.jl:83-109`):
 when `tree` is an `Expression`, `turbo = false`, and `ops` is an `OperatorEnum`, calls
 `_eval_tree_array_fast` directly instead of keyword `eval_tree_array`. -/
 def evalDispatchFast {R : Type} (isExpr turbo isOpEnum : Bool)
     (fastEval slowEval : Jl (Option R × Bool)) : Jl (Option R × Bool) :=
   if isExpr && !turbo && isOpEnum then fastEval else slowEval
 
-/-- Direct `_eval_loss` shortcut in `eval_cost` (`src/LossFunctions.jl:265-271`):
+/-- Direct `_eval_loss` shortcut in `eval_cost` (`src/LossFunctions.jl:267-273`):
 bypasses `eval_loss` keyword processing when neither custom loss function is configured. -/
 def evalCostFast (d : Dataset) (member : Member) (o : Options) (complexity : Option Int := none)
     (context deprecated : Option Context := none) (unknownKeywords : List String := [])

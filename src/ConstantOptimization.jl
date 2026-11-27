@@ -30,7 +30,8 @@ using ..CoreModule:
     AbstractOptions, Dataset, DATA_TYPE, LOSS_TYPE, specialized_options, dataset_fraction
 using ..CoreModule.DatasetModule: has_units
 using ..UtilsModule: get_birth_order, PerTaskCache, stable_get!
-using ..LossFunctionsModule: create_eval_context, eval_loss, loss_to_cost, _loss, _weighted_loss
+using ..LossFunctionsModule:
+    create_eval_context, eval_loss, loss_to_cost, _loss, _weighted_loss
 using ..PopMemberModule: AbstractPopMember, PopMember
 
 function can_optimize(::AbstractExpression{T}, options) where {T}
@@ -261,18 +262,18 @@ function _consume_const_mask!(
 end
 
 function _assign_memo_slots(
-    mnode::MemoNode{T,NT},
-    parent_mask::UInt64,
-    cache_vecs::Vector{Vector{T}},
-    n::Int,
+    mnode::MemoNode{T,NT}, parent_mask::UInt64, cache_vecs::Vector{Vector{T}}, n::Int
 )::MemoNode{T,NT} where {T,NT<:AbstractExpressionNode{T}}
-    slot = if mnode.node.degree > 0 && !isempty(mnode.children) &&
-        mnode.mask != UInt64(0) && mnode.mask != parent_mask
-        push!(cache_vecs, Vector{T}(undef, n))
-        length(cache_vecs)
-    else
-        0
-    end
+    slot =
+        if mnode.node.degree > 0 &&
+            !isempty(mnode.children) &&
+            mnode.mask != UInt64(0) &&
+            mnode.mask != parent_mask
+            push!(cache_vecs, Vector{T}(undef, n))
+            length(cache_vecs)
+        else
+            0
+        end
     if isempty(mnode.children)
         return MemoNode{T,NT}(mnode.node, mnode.mask, slot, false, mnode.children)
     end
@@ -292,7 +293,11 @@ end
     options::AbstractOptions,
     nconst::Int,
     eval_context,
-) where {T<:Union{AbstractFloat,Complex{<:AbstractFloat}},L<:LOSS_TYPE,NT<:AbstractExpressionNode{T}}
+) where {
+    T<:Union{AbstractFloat,Complex{<:AbstractFloat}},
+    L<:LOSS_TYPE,
+    NT<:AbstractExpressionNode{T},
+}
     (2 <= nconst <= 64) || return nothing
     preserve_sharing(NT) && return nothing
     ops = get_operators(ex, options)
@@ -302,7 +307,8 @@ end
     has_units(dataset) && return nothing
     isnothing(options.loss_function) || return nothing
     isnothing(options.loss_function_expression) || return nothing
-    eval_context isa EvalContext{false,<:Any,true,<:ArrayBuffer{Vector{Vector{T}}}} || return nothing
+    eval_context isa EvalContext{false,<:Any,true,<:ArrayBuffer{Vector{Vector{T}}}} ||
+        return nothing
     cX = dataset.X
     cX isa Union{Matrix{T},SubArray{T,2,Matrix{T}}} || return nothing
     dataset.n >= 512 || return nothing
@@ -366,16 +372,24 @@ function _eval_memo_record(
         raw = if deg == 1
             r1 = _eval_memo_record(mnode.children[1], cache_vecs, cX, operators, eval_context)
             r1.ok || return r1
-            apply_op_array((r1.x,), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+            apply_op_array(
+                (r1.x,), mnode.node.op, operators, eval_context
+            )::ResultOk{Vector{T}}
         elseif deg == 2
             r1 = _eval_memo_record(mnode.children[1], cache_vecs, cX, operators, eval_context)
             r1.ok || return r1
-            r2 = _eval_memo_record(mnode.children[2], cache_vecs, cX, operators, eval_context)
+            r2 = _eval_memo_record(
+                mnode.children[2], cache_vecs, cX, operators, eval_context
+            )
             r2.ok || return r2
-            apply_op_array((r1.x, r2.x), mnode.node.op, operators, eval_context)::ResultOk{Vector{T}}
+            apply_op_array(
+                (r1.x, r2.x), mnode.node.op, operators, eval_context
+            )::ResultOk{Vector{T}}
         else
             rs = ntuple(
-                i -> _eval_memo_record(mnode.children[i], cache_vecs, cX, operators, eval_context),
+                i -> _eval_memo_record(
+                    mnode.children[i], cache_vecs, cX, operators, eval_context
+                ),
                 deg,
             )
             for r in rs
@@ -439,7 +453,12 @@ function _eval_memo_read(
     else
         rs = ntuple(
             i -> _eval_memo_read(
-                mnode.children[i], diff_mask, cache_vecs, cX, operators, eval_context
+                mnode.children[i],
+                diff_mask,
+                cache_vecs,
+                cX,
+                operators,
+                eval_context,
             ),
             deg,
         )
@@ -478,9 +497,7 @@ function _eval_with_memo(
     ops = memo.operators
 
     if memo.base_valid && count_ones(diff_mask) == 1
-        res = _eval_memo_read(
-            memo.tree, diff_mask, memo.cache_vecs, cX, ops, eval_context
-        )
+        res = _eval_memo_read(memo.tree, diff_mask, memo.cache_vecs, cX, ops, eval_context)
         res.ok || return L(Inf)
         return if memo.weights !== nothing
             _weighted_loss(res.x, memo.y, memo.weights, memo.loss_fn)
@@ -593,7 +610,9 @@ struct Evaluator{N<:AbstractExpression,R,C<:EvaluatorContext} <: Function
     ctx::C
     memo::Any
 end
-Evaluator(tree::N, refs::R, ctx::C) where {N,R,C} = Evaluator{N,R,C}(tree, refs, ctx, nothing)
+function Evaluator(tree::N, refs::R, ctx::C) where {N,R,C}
+    Evaluator{N,R,C}(tree, refs, ctx, nothing)
+end
 function (e::Evaluator{N,R,EvaluatorContext{D,O,E}})(
     x::AbstractVector; regularization=false
 )::L where {T,L,D<:Dataset{T,L},N,R,O,E}

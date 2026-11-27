@@ -91,7 +91,9 @@ end
                 if ops isa OperatorEnum
                     X = dataset.X
                     A = expected_array_type(X, typeof(tree))
-                    out, complete = _eval_tree_array_fast(get_tree(tree), X, ops, eval_context)
+                    out, complete = _eval_tree_array_fast(
+                        get_tree(tree), X, ops, eval_context
+                    )
                     return out::A, complete::Bool
                 end
             end
@@ -263,12 +265,12 @@ function eval_cost(
     kws = Base.structdiff((; kws...), (; eval_options=nothing))
     isempty(kws) || Base.kwerr(kws, eval_cost, dataset, member, options)
     tree = get_tree_from_member(member)
-    result_loss = if isnothing(options.loss_function) &&
-        isnothing(options.loss_function_expression)
-        _eval_loss(tree, dataset, options, true, eval_context)
-    else
-        eval_loss(tree, dataset, options; eval_context)
-    end
+    result_loss =
+        if isnothing(options.loss_function) && isnothing(options.loss_function_expression)
+            _eval_loss(tree, dataset, options, true, eval_context)
+        else
+            eval_loss(tree, dataset, options; eval_context)
+        end
     cost = loss_to_cost(
         result_loss,
         dataset.use_baseline,
