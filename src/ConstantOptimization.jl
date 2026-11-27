@@ -228,7 +228,6 @@ function _build_memo_masks(
     # Keep constant-only subtrees intact so Evaluate.jl evaluates them in scalar.
     if is_constant(node)
         m = UInt64(0)
-        # Advance const_idx for every constant leaf in DFS order.
         m = _consume_const_mask!(node, const_idx)
         return MemoNode{T,NT}(node, m, 0, false, MemoNode{T,NT}[])
     end
