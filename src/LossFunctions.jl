@@ -4,11 +4,14 @@ using DispatchDoctor: @stable
 using DynamicExpressions:
     AbstractExpression,
     AbstractExpressionNode,
+    Expression,
+    OperatorEnum,
     ArrayBuffer,
     EvalContext,
     get_tree,
+    get_operators,
     eval_tree_array
-using DynamicExpressions.EvaluateModule: reset_index!
+using DynamicExpressions.EvaluateModule: reset_index!, _eval_tree_array_fast
 using LossFunctions: LossFunctions
 using LossFunctions: SupervisedLoss
 using ..CoreModule:
@@ -77,6 +80,33 @@ end
     default_mode = "disable",
     default_union_limit = 2,
     begin
+        function eval_tree_dispatch(
+            tree::Expression{T},
+            dataset::Dataset{T},
+            options::AbstractOptions,
+            eval_context::EvalContext{false},
+        ) where {T}
+            if options.turbo isa Val{false}
+                ops = get_operators(tree, options)
+                if ops isa OperatorEnum
+                    X = dataset.X
+                    A = expected_array_type(X, typeof(tree))
+                    out, complete = _eval_tree_array_fast(
+                        get_tree(tree), X, ops, eval_context
+                    )
+                    return out::A, complete::Bool
+                end
+            end
+            A = expected_array_type(dataset.X, typeof(tree))
+            out, complete = eval_tree_array(
+                tree, dataset.X, options; eval_context=eval_context
+            )
+            if isnothing(out)
+                return out, false
+            else
+                return out::A, complete::Bool
+            end
+        end
         function eval_tree_dispatch(
             tree::AbstractExpression,
             dataset::Dataset,
@@ -234,7 +264,13 @@ function eval_cost(
     eval_context = _process_eval_options(eval_context, kws, :eval_cost)
     kws = Base.structdiff((; kws...), (; eval_options=nothing))
     isempty(kws) || Base.kwerr(kws, eval_cost, dataset, member, options)
-    result_loss = eval_loss(get_tree_from_member(member), dataset, options; eval_context)
+    tree = get_tree_from_member(member)
+    result_loss =
+        if isnothing(options.loss_function) && isnothing(options.loss_function_expression)
+            _eval_loss(tree, dataset, options, true, eval_context)
+        else
+            eval_loss(tree, dataset, options; eval_context)
+        end
     cost = loss_to_cost(
         result_loss,
         dataset.use_baseline,

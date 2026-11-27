@@ -1057,4 +1057,31 @@ theorem score_deprecated_when_warned (d : Dataset) (member : Member) (o : Option
 example : ({ squaredOptions with bumper := true }.bumper ||
     !{ squaredOptions with bumper := true }.takesContext) = true := rfl
 
+/-- Fast positional `eval_tree_dispatch` agrees with `eval_tree_array` whenever `_eval_tree_array_fast`
+agrees with `eval_tree_array`; direct `_eval_loss` in `eval_cost` agrees identically with `eval_loss`. -/
+def fast_dispatch_and_cost_agree : Prop :=
+  (∀ (R : Type) (isExpr turbo isOpEnum : Bool) (fastEval slowEval : Jl (Option R × Bool)),
+    (isExpr = true → turbo = false → isOpEnum = true → fastEval = slowEval) →
+    evalDispatchFast isExpr turbo isOpEnum fastEval slowEval = slowEval) ∧
+  (∀ (d : Dataset) (member : Member) (o : Options) (complexity : Option Int)
+    (context deprecated : Option Context) (unknownKeywords : List String)
+    (depwarn : String → String → Jl Unit),
+    evalCostFast d member o complexity context deprecated unknownKeywords depwarn =
+      evalCost d member o complexity context deprecated unknownKeywords depwarn)
+
+theorem fast_dispatch_and_cost_agree_holds : fast_dispatch_and_cost_agree := by
+  refine ⟨?_, ?_⟩
+  · intro R isExpr turbo isOpEnum fastEval slowEval heq
+    unfold evalDispatchFast
+    cases isExpr <;> cases turbo <;> cases isOpEnum <;> simp_all
+  · intro d member o complexity context deprecated unknownKeywords depwarn
+    unfold evalCostFast evalCost
+    congr 1
+    funext ctx
+    by_cases hkw : !unknownKeywords.isEmpty
+    · simp [hkw, throw, throwThe, MonadExceptOf.throw, bind, Except.bind]
+    · simp only [hkw, Bool.false_eq_true, ↓reduceIte]
+      cases hlf : o.lossFunction <;> cases hlfe : o.lossFunctionExpression <;>
+        simp [evalLoss, processContext, hlf, hlfe]
+
 end SymReg.Loss
