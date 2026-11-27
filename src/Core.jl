@@ -20,6 +20,7 @@ using .DatasetModule:
     Dataset,
     BasicDataset,
     SubDataset,
+    eval_X,
     is_weighted,
     has_units,
     max_features,

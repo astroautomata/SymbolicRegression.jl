@@ -6,6 +6,7 @@ using DynamicExpressions:
     AbstractExpressionNode,
     ArrayBuffer,
     EvalContext,
+    FeatureMajorMatrix,
     get_tree,
     eval_tree_array
 using DynamicExpressions.EvaluateModule: reset_index!
@@ -17,6 +18,7 @@ using ..CoreModule:
     create_expression,
     DATA_TYPE,
     LOSS_TYPE,
+    eval_X,
     is_weighted,
     get_indices,
     get_full_dataset,
@@ -83,10 +85,9 @@ end
             options::AbstractOptions,
             eval_context,
         )
-            A = expected_array_type(dataset.X, typeof(tree))
-            out, complete = eval_tree_array(
-                tree, dataset.X, options; eval_context=eval_context
-            )
+            X = options.turbo isa Val{true} ? dataset.X : eval_X(dataset)
+            A = expected_array_type(X, typeof(tree))
+            out, complete = eval_tree_array(tree, X, options; eval_context=eval_context)
             if isnothing(out)
                 return out, false
             else
@@ -99,10 +100,9 @@ end
             options::AbstractOptions,
             eval_context,
         )
-            A = expected_array_type(dataset.X, typeof(tree))
-            out, complete = eval_tree_array(
-                tree, dataset.X, options; eval_context=eval_context
-            )
+            X = options.turbo isa Val{true} ? dataset.X : eval_X(dataset)
+            A = expected_array_type(X, typeof(tree))
+            out, complete = eval_tree_array(tree, X, options; eval_context=eval_context)
             if isnothing(out)
                 return out, false
             else
