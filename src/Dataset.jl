@@ -351,8 +351,11 @@ Create a batched dataset by randomly sampling from the original dataset.
 - `batch_size::Int`: The size of the batch to create
 """
 function batch(dataset::BasicDataset{T,L}, indices::AbstractVector{Int}) where {T,L}
-    X_eval = dataset.X isa Matrix ? feature_major_batch(dataset.X, indices) :
+    X_eval = if dataset.X isa Matrix
+        feature_major_batch(dataset.X, indices)
+    else
         view(dataset.X, :, indices)
+    end
     return SubDataset{T,L,typeof(dataset),typeof(indices),typeof(X_eval)}(
         dataset, indices, X_eval
     )

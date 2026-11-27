@@ -358,9 +358,7 @@ function _optimize_constants(
     else
         nothing
     end
-    hoisted = _try_hoist_for_optimization(
-        tree, dataset, options, eval_context, length(x0)
-    )
+    hoisted = _try_hoist_for_optimization(tree, dataset, options, eval_context, length(x0))
     if hoisted !== nothing
         opt_tree, opt_refs, opt_dataset = hoisted
         ctx = EvaluatorContext(opt_dataset, options, eval_context)
