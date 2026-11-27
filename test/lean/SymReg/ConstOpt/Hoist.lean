@@ -47,7 +47,7 @@ instance {T : Type} [DecidableEq T] : DecidableEq (Tree T) := fun a b =>
   if h : treeEq a b = true then isTrue ((treeEq_iff a b).mp h)
   else isFalse (fun heq => h ((treeEq_iff a b).mpr heq))
 
--- `_has_any_constant(node)` (`src/ConstantOptimization.jl:225-232`).
+-- `_has_any_constant(node)` (`src/ConstantOptimization.jl:224-231`).
 mutual
   def hasAnyConstant {T : Type} : Tree T → Bool
     | .const _ => true
@@ -187,7 +187,7 @@ theorem mem_pushUnique_of_mem {α : Type} [DecidableEq α] {xs : List α} {a x :
   unfold pushUnique
   by_cases h : x ∈ xs <;> simp [h, ha]
 
--- `_collect_hoist_inputs!(node, orig_features, hoisted_nodes)` (`src/ConstantOptimization.jl:191-223`).
+-- `_collect_hoist_inputs!(node, orig_features, hoisted_nodes)` (`src/ConstantOptimization.jl:191-222`).
 mutual
   def collectHoistInputs {T : Type} [DecidableEq T]
       (t : Tree T) (orig : List Nat) (hoisted : List (Tree T)) :
@@ -325,7 +325,7 @@ mutual
 end
 
 -- `_build_hoisted_node(node, orig_features, hoisted_nodes, m_orig, opt_refs)`
--- (`src/ConstantOptimization.jl:234-278`).
+-- (`src/ConstantOptimization.jl:233-277`).
 mutual
   def buildHoistedNode {T : Type} [DecidableEq T]
       (orig : List Nat) (hoisted : List (Tree T)) : Tree T → Tree T
@@ -344,7 +344,7 @@ mutual
 end
 
 /-- Hoisted feature table `X_hoisted` constructed in `_try_hoist_for_optimization`
-(`src/ConstantOptimization.jl:308-324`): first `m_orig` rows copy `X_base[orig[i], :]`,
+(`src/ConstantOptimization.jl:307-323`): first `m_orig` rows copy `X_base[orig[i], :]`,
 next `k` rows store `eval_tree_array(hoisted[m], X_base, ops)`. -/
 def hoistedEnv {T : Type} (opEval : Nat → List T → T) (env : Nat → T)
     (orig : List Nat) (hoisted : List (Tree T)) (defaultVal : T) (idx : Nat) : T :=
@@ -418,7 +418,7 @@ mutual
       simp only [evalTreeF, heval1, heval2]
 end
 
-/-- End-to-end hoisting soundness (`src/ConstantOptimization.jl:178-328`):
+/-- End-to-end hoisting soundness (`src/ConstantOptimization.jl:178-327`):
 for any non-leaf tree `t` with at least one constant and one hoisted subtree (`planHoist`),
 `_collect_hoist_inputs!` + `_build_hoisted_node` + `X_hoisted` preserves constant-parameter
 order and evaluates identically to the original tree for every parameter vector `xs` and

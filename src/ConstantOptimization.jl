@@ -214,7 +214,6 @@ function _collect_hoist_inputs!(
     if deg == 0
         return node.constant
     end
-    # Check whether any child contains a constant before deciding whether to hoist this node
     has_c = false
     for i in 1:deg
         if _has_any_constant(get_child(node, i))
