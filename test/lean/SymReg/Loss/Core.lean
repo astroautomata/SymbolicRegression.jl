@@ -652,7 +652,7 @@ def resetContext : Option Context → Option Context
   | none => none
   | some c => some { c with buffer := resetBuffer c.buffer }
 
--- Source: src/LossFunctions.jl:53-87
+-- Source: src/LossFunctions.jl:55-90
 -- EvalContextPool acquire_eval_context / release_eval_context!
 def acquirePool {C : Type} (pool : Option (List C)) (create : Unit → Jl C) :
     Jl (C × Option (List C)) :=
@@ -666,7 +666,7 @@ def releasePool {C : Type} (pool : Option (List C)) (c : C) : Option (List C) :=
   | none => none
   | some items => some (c :: items)
 
--- Source: src/LossFunctions.jl:325-333
+-- Source: src/LossFunctions.jl:328-336
 -- if !has_units(dataset) || !violates_dimensional_constraints(tree, dataset, options)
 --     return zero(L)
 -- end
@@ -708,7 +708,7 @@ def expressionDimensionalCheck {E : Type} (getTree : E → Jl (Tree JF)) (e : E)
   nodeDimensionalCheck (columns ()) xUnits yUnits (check tree)
 
 /-- Value projection for the node check and the default IEEE zero, with the
-`!has_units(dataset)` fast guard (`src/LossFunctions.jl:330`). -/
+`!has_units(dataset)` fast guard (`src/LossFunctions.jl:333`). -/
 def dimensionalRegularization (tree : Expr) (d : Dataset) (o : Options) : Jl JF :=
   dimensionalRegularizationGuarded (d.full.xUnits || d.full.yUnits) (fun _ =>
     nodeDimensionalCheck (getX d) d.full.xUnits d.full.yUnits (fun _ => o.dimensionalCheck tree d))

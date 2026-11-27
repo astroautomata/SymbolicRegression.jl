@@ -31,7 +31,9 @@ _eval_vector_type(::Matrix{T}) where {T} = Vector{T}
 _eval_vector_type(::SubArray{T,2,Matrix{T}}) where {T} = Vector{T}
 _eval_vector_type(X::AbstractMatrix) = typeof(similar(X, 0))
 
-@unstable function create_eval_context(dataset::Dataset, options::AbstractOptions, num_arrays::Int)
+@unstable function create_eval_context(
+    dataset::Dataset, options::AbstractOptions, num_arrays::Int
+)
     if options.bumper isa Val{true} || !takes_eval_context(options.operators)
         return nothing
     end
@@ -73,8 +75,9 @@ function acquire_eval_context(
     end
     return create_eval_context(dataset, options, 0)::C
 end
-@unstable acquire_eval_context(::Nothing, dataset::Dataset, options::AbstractOptions) =
-    create_eval_context(dataset, options, 0)
+@unstable acquire_eval_context(::Nothing, dataset::Dataset, options::AbstractOptions) = create_eval_context(
+    dataset, options, 0
+)
 function release_eval_context!(pool::EvalContextPool{C}, ctx::C) where {C}
     lock(pool.lock)
     try

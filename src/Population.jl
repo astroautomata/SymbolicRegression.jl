@@ -234,17 +234,16 @@ const CACHED_WEIGHTS =
 end
 
 function finalize_costs(
-    dataset::Dataset{T,L},
-    pop::P,
-    options::AbstractOptions;
-    eval_context=nothing,
+    dataset::Dataset{T,L}, pop::P, options::AbstractOptions; eval_context=nothing
 )::Tuple{P,Float64} where {T,L,P<:Population{T,L}}
     need_recalculate = use_batching(options, dataset)
     num_evals = 0.0
     if need_recalculate
-        ctx =
-            isnothing(eval_context) ? create_eval_context(dataset, options, 0) :
+        ctx = if isnothing(eval_context)
+            create_eval_context(dataset, options, 0)
+        else
             eval_context
+        end
         for member in 1:(pop.n)
             cost, loss = eval_cost(dataset, pop.members[member], options; eval_context=ctx)
             pop.members[member].cost = cost

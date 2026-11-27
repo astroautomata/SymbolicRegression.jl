@@ -197,7 +197,11 @@ function _optimize_constants(
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     tree = member.tree
     _eval_context = if options.autodiff_backend === nothing
-        isnothing(eval_context) ? create_eval_context(dataset, options, 0) : eval_context
+        if isnothing(eval_context)
+            create_eval_context(dataset, options, 0)
+        else
+            eval_context
+        end
     else
         nothing
     end
@@ -209,25 +213,11 @@ function _optimize_constants(
     )
 end
 function _optimize_constants(
-    dataset,
-    member::P,
-    options,
-    algorithm,
-    optimizer_options,
-    rng,
-    eval_context=nothing,
+    dataset, member::P, options, algorithm, optimizer_options, rng, eval_context=nothing
 )::Tuple{P,Float64} where {T,L,N,P<:AbstractPopMember{T,L,N}}
     x0, refs = get_optimizable_parameters(member.tree, options)
     return _optimize_constants(
-        dataset,
-        member,
-        x0,
-        refs,
-        options,
-        algorithm,
-        optimizer_options,
-        rng,
-        eval_context,
+        dataset, member, x0, refs, options, algorithm, optimizer_options, rng, eval_context
     )
 end
 function _optimize_constants_inner(

@@ -156,7 +156,7 @@ def evaluate {C H R : Type} (e : Evaluator C H R) (regularization : Bool) (x : L
   writeParameters e x
   callContext e regularization
 
-/-- Context construction in `_optimize_constants`, `src/ConstantOptimization.jl:199-203`:
+/-- Context construction in `_optimize_constants`, `src/ConstantOptimization.jl:199-207`:
 when `autodiff_backend === nothing`, reuses caller-supplied `eval_context` if present,
 otherwise calls `create_eval_context(dataset, options, 0)`. -/
 def initialContext {S : Type} (backend : Option Nat)
@@ -517,7 +517,7 @@ def stockFinishServices {C H : Type}
 --     set_optimizable_parameters!(member.tree, x0, refs)
 -- end
 -- return member, num_evals
--- Source: src/ConstantOptimization.jl:261-277
+-- Source: src/ConstantOptimization.jl:251-267
 -- When `!has_units(dataset) && isnothing(options.loss_function) && isnothing(options.loss_function_expression)`,
 -- reuses `convert(L, result.minimum)` without re-evaluating `f(result.minimizer; regularization=true)`.
 def finishFast {C H R : Type} (e : Evaluator C H R) (svc : FinishServices C H)

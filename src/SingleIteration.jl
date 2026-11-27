@@ -43,9 +43,11 @@ function s_r_cycle(
     else
         dataset
     end
-    _eval_context =
-        isnothing(eval_context) ? create_eval_context(batched_dataset, options, curmaxsize) :
+    _eval_context = if isnothing(eval_context)
+        create_eval_context(batched_dataset, options, curmaxsize)
+    else
         eval_context
+    end
 
     for cycle_idx in 1:ncycles
         _on_cycle_start!(plugin_states, cycle_idx, ncycles, options)
@@ -99,14 +101,18 @@ function optimize_and_simplify_population(
     else
         dataset
     end
-    opt_eval_context = if options.should_optimize_constants &&
-        options.autodiff_backend === nothing &&
-        any(do_optimization)
-        isnothing(eval_context) ? create_eval_context(batched_dataset, options, 0) :
-        eval_context
-    else
-        nothing
-    end
+    opt_eval_context =
+        if options.should_optimize_constants &&
+            options.autodiff_backend === nothing &&
+            any(do_optimization)
+            if isnothing(eval_context)
+                create_eval_context(batched_dataset, options, 0)
+            else
+                eval_context
+            end
+        else
+            nothing
+        end
 
     for j in 1:(pop.n)
         if options.should_simplify

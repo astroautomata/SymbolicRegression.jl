@@ -674,7 +674,7 @@ theorem dimension_empty_holds : dimension_empty := by
 
 /-- `EvalContextPool` reuses released contexts without reallocating, falls back
 to `create_eval_context` when empty or `nothing`, and treats `release(nothing, _)`
-as a no-op (`src/LossFunctions.jl:53-87`). -/
+as a no-op (`src/LossFunctions.jl:55-90`). -/
 def eval_context_pool : Prop :=
   ∀ (C : Type) (items : List C) (c : C) (create : Unit → Jl C),
     acquirePool (some (c :: items)) create = .ok (c, some items) ∧

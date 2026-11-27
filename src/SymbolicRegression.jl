@@ -1103,8 +1103,11 @@ function _main_search_loop!(
     end
     batch_pools = if ropt.parallelism in (:serial, :multithreading)
         [
-            use_batching(options, datasets[j]) ?
-            EvalContextPool(eltype(full_pools[j].items)) : nothing for j in 1:nout
+            if use_batching(options, datasets[j])
+                EvalContextPool(eltype(full_pools[j].items))
+            else
+                nothing
+            end for j in 1:nout
         ]
     else
         nothing

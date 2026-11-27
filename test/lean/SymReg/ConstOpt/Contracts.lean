@@ -363,7 +363,7 @@ theorem batchingFraction_holds : batchingFraction := by
 /-- When `autodiff_backend === nothing` and a pooled `eval_context` is supplied,
 `_optimize_constants` reuses it without calling `create_eval_context`; when
 `supplied` is `none`, it allocates via `create_eval_context`; with AD present it
-passes `none` (`src/ConstantOptimization.jl:199-203`). -/
+passes `none` (`src/ConstantOptimization.jl:199-207`). -/
 def contextReusePooled : Prop :=
   ∀ (S : Type) (ctx : SymReg.Loss.Context) (ad : Nat)
     (create : Int → Effect S (Option SymReg.Loss.Context)) (s : S),
@@ -378,7 +378,7 @@ theorem contextReusePooled_holds : contextReusePooled := by
 /-- When `!has_units(dataset)` and no custom loss function is supplied, accepting
 an improved optimum sets `member.loss = result.minimum` directly without an extra
 regularized evaluation or an extra `eval_fraction` increment; otherwise it behaves
-identically to `finish` (`src/ConstantOptimization.jl:261-277`). -/
+identically to `finish` (`src/ConstantOptimization.jl:251-267`). -/
 def skipRedundantFinalEval : Prop :=
   ∀ (C H R : Type) (e : Evaluator C H R) svc x0 baseline best evals fraction member
     (s : EvalState C H),
