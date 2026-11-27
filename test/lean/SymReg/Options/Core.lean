@@ -4,7 +4,7 @@ import SymReg.SimpCons.Builders
 import SymReg.Complexity
 
 /-!
-Constructor normalization for `src/Options.jl:181-281,733-817,849-875,1274-1378`.
+Constructor normalization for `src/Options.jl:181-281,735-831,863-889,1288-1392`.
 -/
 namespace SymReg.Options
 open DynExpr
@@ -15,7 +15,7 @@ def inverseOpmap (op : Nat) : Nat :=
     if op = 105 then 5 else op - 99
   else op
 
-/-- Operator lookup lists are mapped by degree, `src/Options.jl:906-917`. -/
+/-- Operator lookup lists are mapped by degree, `src/Options.jl:920-931`. -/
 def mapOperators (ops : List (List Nat)) : List (List Nat) := ops.map (List.map opmap)
 
 /-- `deprecated_options_mapping`, `src/Options.jl:257-281`. -/
@@ -48,11 +48,11 @@ inductive Value where
 
 abbrev Keywords := String → Value
 
-/-- Assignment to the new keyword, `src/Options.jl:748-771`. -/
+/-- Assignment to the new keyword, `src/Options.jl:750-773`. -/
 def setKey (kws : Keywords) (key : String) (value : Value) : Keywords :=
   fun name => if name = key then value else kws name
 
--- Source: src/Options.jl:772-787; src/MutationWeights.jl:64-80
+-- Source: src/Options.jl:774-789; src/MutationWeights.jl:64-80
 -- if length(_mutation_weights) < n_fields
 --     _mutation_weights = vcat(_mutation_weights, zeros(n_fields - length(_mutation_weights)))
 -- end
@@ -72,7 +72,7 @@ def legacyWeights (xs : List JF) (cv : LegacyConversions := {}) : Jl Value := do
   let ws ← padded.mapM cv.field
   pure (.weights (← SymReg.MutateGen.MutationWeights.ofList ws))
 
--- Source: src/Options.jl:748-771
+-- Source: src/Options.jl:750-773
 -- k == :hofMigration && (hof_migration = kws[k]; true) && continue
 private def assignmentTarget : String → Option String
   | "hofMigration" => some "hof_migration"
@@ -98,7 +98,7 @@ private def assignmentTarget : String → Option String
   | "recorder_file" => some "tracing_file"
   | _ => none
 
-/-- One iteration of the deprecated keyword loop, `src/Options.jl:733-793`.
+/-- One iteration of the deprecated keyword loop, `src/Options.jl:735-795`.
 A throwing deprecation warning aborts before assignment. -/
 def applyAlias (kws : Keywords) (key : String) (value : Value)
     (warn : String → String → Jl Unit := fun _ _ => pure ()) (cv : LegacyConversions := {}) : Jl Keywords := do
@@ -113,19 +113,44 @@ def applyAlias (kws : Keywords) (key : String) (value : Value)
   let some target := assignmentTarget key | throw (.errorException ("Unknown deprecated keyword argument: " ++ key))
   return setKey kws target value
 
-/-- All deprecated keywords are processed in call order, `src/Options.jl:733`.
+/-- All deprecated keywords are processed in call order, `src/Options.jl:735`.
 Two aliases for return_state therefore use the last value. -/
 def applyAliases (kws : Keywords) (xs : List (String × Value))
     (warn : String → String → Jl Unit := fun _ _ => pure ()) : Jl Keywords :=
   xs.foldlM (fun current p => applyAlias current p.1 p.2 warn) kws
 
 /-- Explicit older population-size names always overwrite modern names,
-`src/Options.jl:795-802`. -/
+`src/Options.jl:797-804`. -/
 def populationAliases (size populations npop npopulations : Option Int) : Option Int × Option Int :=
   (npop.or size, npopulations.or populations)
 
+/-- `ArgumentError` message for passing both sign-flip keywords, `src/Options.jl:806-810`. -/
+def flipConflictMessage : String :=
+  "Pass only one of `probability_flip_constant_sign` and the deprecated `probability_negate_constant`."
+
+-- Source: src/Options.jl:805-814
+-- if probability_negate_constant !== nothing
+--     probability_flip_constant_sign !== nothing && throw(ArgumentError("Pass only one of ..."))
+--     Base.depwarn("`probability_negate_constant` is deprecated. ...", :Options)
+/-- The deprecated keyword, also the target of the `probNegate` alias, conflicts with
+the modern keyword before its deprecation warning runs. -/
+def checkFlipProbability (warn : Jl Unit) (flip negate : Option JF) : Jl Unit := do
+  if negate.isSome then
+    if flip.isSome then throw (.argumentError flipConflictMessage)
+    warn
+
+-- Source: src/Options.jl:815
+-- probability_flip_constant_sign = 1 - probability_negate_constant
+/-- The keyword value after the deprecated complement is applied. `1 - p` is exact in
+`JF`; the later `Float64` conversions round it once, as Julia does for Float64 and
+exact real inputs. -/
+def flipProbabilityInput (flip negate : Option JF) : Option JF :=
+  match negate with
+  | some p => some (JF.sub (.fin 1) p)
+  | none => flip
+
 /-- Version components relevant to the two comparisons in `default_options`,
-`src/Options.jl:1274-1276,1372`. `prerelease` includes Julia's minimal '-' version. -/
+`src/Options.jl:1288-1290,1386`. `prerelease` includes Julia's minimal '-' version. -/
 structure Version where
   major : Nat
   minor : Nat := 0
@@ -142,7 +167,7 @@ inductive BatchMode where
   | disabled | enabled | auto | invalid (name : String)
   deriving DecidableEq, Repr
 
-/-- Tables returned by `default_options`, `src/Options.jl:1277-1378`.
+/-- Tables returned by `default_options`, `src/Options.jl:1291-1392`.
 Decimal constants follow the shared exact-finite `JF` convention. -/
 def literal64 (q : Rat) : JF := SymReg.Loss.LossPrecision.round .float64 (.fin q)
 
@@ -166,7 +191,7 @@ structure Defaults where
   annealing : Bool := true
   alpha : JF := literal64 (317 / 100)
   perturbation : JF := literal64 (129 / 1000)
-  negateProbability : JF := literal64 (743 / 100000)
+  flipProbability : JF := literal64 (99257 / 100000)
   tournamentN : Int := 15
   tournamentP : JF := literal64 (982 / 1000)
   fraction : JF := literal64 (36 / 100000)
@@ -177,7 +202,7 @@ structure Defaults where
   batchSize : Option Int := some 50
   deriving DecidableEq, Repr
 
-/-- The version < 1 table, `src/Options.jl:1277-1321`; omitted feature/backsolve
+/-- The version < 1 table, `src/Options.jl:1291-1335`; omitted feature/backsolve
 weights are supplied by the existing `_mutation_weights` mirror. -/
 def legacyDefaults : Defaults :=
   { maxsize := 20, populations := 15, populationSize := 33, cycles := 550,
@@ -189,17 +214,17 @@ def legacyDefaults : Defaults :=
       ("randomize", literal64 (23 / 100000)), ("do_nothing", literal64 (21 / 100)),
       ("optimize", literal64 0), ("form_connection", literal64 (1 / 2)), ("break_connection", literal64 (1 / 10))],
     crossoverProbability := literal64 (66 / 1000), annealing := false, alpha := literal64 (1 / 10),
-    perturbation := literal64 (76 / 1000), negateProbability := literal64 (1 / 100),
+    perturbation := literal64 (76 / 1000), flipProbability := literal64 (99 / 100),
     tournamentN := 12, tournamentP := literal64 (86 / 100), fractionHof := literal64 (35 / 1000) }
 
-/-- `default_options`, `src/Options.jl:1274-1378`. -/
+/-- `default_options`, `src/Options.jl:1288-1392`. -/
 def defaultOptions (version : Option Version) : Defaults :=
   if version.any Version.beforeOne then legacyDefaults
   else if version.isNone || version.any Version.fromTwo then
     { ({} : Defaults) with crossoverProbability := literal64 (1 / 5), batching := .auto, batchSize := none }
   else {}
 
--- Source: src/Options.jl:235-236,857,1072
+-- Source: src/Options.jl:235-236,871,1086
 -- create_mutation_weights(w::MutationWeights) = w
 -- create_mutation_weights(w::NamedTuple) = _mutation_weights(; w...)
 structure WeightObject where
@@ -238,7 +263,7 @@ def withMaxDegree (degree : Option Nat) (provided : Bool) (ops : List (List Nat)
 /-- Default recommendation method, `src/Options.jl:233`. -/
 def recommendExpressionLoss (_expressionType : Option Nat) : Bool := false
 
--- Source: src/Options.jl:803-813
+-- Source: src/Options.jl:817-827
 -- optimizer_algorithm = if optimizer_algorithm == "NelderMead"
 --     Optim.NelderMead(; linesearch=LineSearches.BackTracking())
 -- else

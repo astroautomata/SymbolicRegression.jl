@@ -3,7 +3,7 @@ import SymReg.Plugins.Dispatch
 import SymReg.PopMember.Core
 
 /-!
-`Options` constructor phases (`src/Options.jl:814-1271`) and complexity construction
+`Options` constructor phases (`src/Options.jl:828-1285`) and complexity construction
 (`src/OptionsStruct.jl:31-111`). Input unions are represented by typed fields;
 integer fields range over the Julia Int domain when instantiated in Julia.
 External constructors, plugin hooks, type promotion and ADTypes dispatch are supplied
@@ -112,14 +112,14 @@ inductive ComplexitySpec where
   | function (identity : Nat)
 
 /-- An operator enum carries its function identities and whether it is the concrete
-DynamicExpressions OperatorEnum, `src/Options.jl:915-917`. -/
+DynamicExpressions OperatorEnum, `src/Options.jl:929-931`. -/
 structure Operators where
   ops : List (List Nat)
   standard : Bool := true
   typeId : Nat := 0
   deriving DecidableEq, Repr
 
--- Source: src/Options.jl:906-917,1017-1032; DE src/OperatorEnum.jl:8-28
+-- Source: src/Options.jl:920-931,1031-1046; DE src/OperatorEnum.jl:8-28
 -- operators = OperatorEnum(operators_by_degree)
 inductive EnumType where
   | standard (tupleType : List (List Nat))
@@ -130,7 +130,7 @@ def Operators.runtimeType (o : Operators) : EnumType :=
   if o.standard then .standard o.ops else .generic o.typeId
 
 /-- Concrete OperatorEnum is rebuilt with safe operators; generic enums retain
-their operators and only their lookup lists are mapped, `src/Options.jl:906-917,1017-1032`. -/
+their operators and only their lookup lists are mapped, `src/Options.jl:920-931,1031-1046`. -/
 def resolveOperators (constructor : Option Nat → List (List Nat) → Jl Operators)
     (provided : Option Operators) (custom : Option Nat) (lookupOps : List (List Nat)) : Jl Operators :=
   match provided with
@@ -138,7 +138,7 @@ def resolveOperators (constructor : Option Nat → List (List Nat) → Jl Operat
   | none => constructor custom lookupOps
 
 /-- Expression-spec metadata, read via DE's expression-spec accessors at
-`src/Options.jl:966-991`. Type identities and arbitrary metadata stay opaque. -/
+`src/Options.jl:980-1005`. Type identities and arbitrary metadata stay opaque. -/
 structure ExpressionContext where
   expressionType : Nat := 0
   expressionOptions : Nat := 0
@@ -151,40 +151,47 @@ inductive OptimizerInput where
   | keywords (values : List (String × Value))
   | existing (identity : Nat)
 
-/-- `optimizer_algorithm` input, `src/Options.jl:669-671,803-813`.
+/-- `optimizer_algorithm` input, `src/Options.jl:670-672,817-827`.
 Existing identity 0 denotes the default BFGS with BackTracking. -/
 inductive AlgorithmInput where
   | existing (identity : Nat)
   | legacyName (name : String)
   deriving DecidableEq, Repr
 
-/-- Mutation instance fields that Options constructs, `src/Options.jl:1081-1088`.
-Other mutation payloads remain arbitrary identities. -/
+/-- Mutation instance fields that Options constructs, `src/Options.jl:1095-1102`.
+Other mutation payloads remain arbitrary identities. `constantParameters` holds
+`(perturbation_factor, probability_flip_sign)`. -/
 structure MutationInstance where
   kind : SymReg.MutateGen.Kind
   payload : Nat := 0
   constantParameters : Option (JF × JF) := none
   deriving DecidableEq, Repr
 
+-- Source: src/Options.jl:1095-1105
+-- MutationsModule.ConstantMutation(;
+--     perturbation_factor=Float64(perturbation_factor),
+--     probability_flip_sign=Float64(probability_flip_constant_sign),
+-- ) => base[i].second
 /-- Legacy weight conversion reuses the existing mirror, then installs the
-resolved ConstantMutation parameters, `src/Options.jl:1081-1091`. -/
+resolved ConstantMutation parameters converted to Float64. -/
 def mutationBase (weights : SymReg.MutateGen.MutationWeights) (d : Defaults) :
     Jl (List (MutationInstance × JF)) := do
   let pairs ← SymReg.MutateGen.mutationsFromWeights weights
   pure (pairs.map fun (kind, weight) =>
     ({ kind, constantParameters := if kind = .constant then
-        some (d.perturbation, d.negateProbability) else none }, weight))
+        some (SymReg.Loss.LossPrecision.round .float64 d.perturbation,
+          SymReg.Loss.LossPrecision.round .float64 d.flipProbability) else none }, weight))
 
-/-- Typed constructor inputs, `src/Options.jl:560-730`. `unchanged` retains the
+/-- Typed constructor inputs, `src/Options.jl:561-732`. `unchanged` retains the
 fields forwarded without any branch (migration, losses, seed, I/O, tracing, etc.). -/
--- Source: src/Options.jl:238,713
+-- Source: src/Options.jl:238,714
 -- function default_popmember_type end
 -- popmember_type::Type=default_popmember_type(),
 def selectPopmemberType (requested : Option (Sum SymReg.PopMember.MemberType Nat)) :
     Sum SymReg.PopMember.MemberType Nat :=
   requested.getD (.inl SymReg.PopMember.defaultPopmemberType)
 
--- Source: src/Options.jl:733-747,765-766,1194,1259
+-- Source: src/Options.jl:735-749,767-768,1208,1273
 inductive StateAlias | stateReturn | return_state
 
 def stateAliasKey : StateAlias → String
@@ -219,6 +226,10 @@ structure Args where
   annealing : Option Bool := none
   alpha : Option JF := none
   perturbation : Option JF := none
+  /-- `probability_flip_constant_sign`, `src/Options.jl:666`. -/
+  flipProbability : Option JF := none
+  /-- Deprecated `probability_negate_constant`, also assigned by the `probNegate`
+  alias, `src/Options.jl:728,763`. -/
   negateProbability : Option JF := none
   tournamentN : Option Int := none
   tournamentP : Option JF := none
@@ -299,7 +310,7 @@ structure Args where
   skipFailures : Bool := true
   useTracing : Bool := false
 
-/-- Resolved versioned defaults before the assertions, `src/Options.jl:849-875`. -/
+/-- Resolved versioned defaults before the assertions, `src/Options.jl:815,863-889`. -/
 def supplyDefaults (a : Args) : Defaults :=
   let d := defaultOptions a.version
   let populations := populationAliases a.populationSize a.populations a.npop a.npopulations
@@ -312,7 +323,7 @@ def supplyDefaults (a : Args) : Defaults :=
     crossoverProbability := a.crossoverProbability.getD d.crossoverProbability,
     annealing := a.annealing.getD d.annealing, alpha := a.alpha.getD d.alpha,
     perturbation := a.perturbation.getD d.perturbation,
-    negateProbability := a.negateProbability.getD d.negateProbability,
+    flipProbability := (flipProbabilityInput a.flipProbability a.negateProbability).getD d.flipProbability,
     tournamentN := a.tournamentN.getD d.tournamentN,
     tournamentP := a.tournamentP.getD d.tournamentP,
     fraction := a.fraction.getD d.fraction, fractionHof := a.fractionHof.getD d.fractionHof,
@@ -320,7 +331,7 @@ def supplyDefaults (a : Args) : Defaults :=
     topn := a.topn.getD d.topn, batching := a.batching.getD d.batching,
     batchSize := a.batchSize.or d.batchSize }
 
-/-- Constructor assertion order, `src/Options.jl:814-844`. -/
+/-- Constructor assertion order, `src/Options.jl:828-858`. -/
 -- if !isnothing(loss_function) && recommend_loss_function_expression(expression_type)
 --     @warn(
 --         "You are using `loss_function` with `$(expression_type)`. " *
@@ -342,7 +353,7 @@ def validateInitial (a : Args)
   if a.complexity.isSome && (a.opWeights.isSome || a.variableWeight.isSome || a.constantWeight.isSome) then
     throw (.assertionError "Complexity mapping conflicts with individual complexities")
 
-/-- Assertions on supplied version defaults, `src/Options.jl:889-892`.
+/-- Assertions on supplied version defaults, `src/Options.jl:903-906`.
 `0 <= warmup` follows Julia's unordered NaN comparison. -/
 def nonnegative : JF → Bool
   | .fin x => decide (0 <= x)
@@ -355,12 +366,12 @@ def validateScalars (d : Defaults) (lossScale : String) : Jl Unit := do
   if d.tournamentN >= d.populationSize then throw (.assertionError "tournament_selection_n < population_size")
   if lossScale != "log" && lossScale != "linear" then throw (.assertionError "loss_scale must be log or linear")
 
-/-- Simplification defaults, `src/Options.jl:878-887`. -/
+/-- Simplification defaults, `src/Options.jl:892-901`. -/
 def resolveSimplify (a : Args) : Bool :=
   a.shouldSimplify.getD (a.lossFunction.isNone && a.expressionLoss.isNone &&
     a.nested.isNone && a.constraintSequence.isNone && a.constraints.isNone && a.binaryConstraints.isNone && a.unaryConstraints.isNone)
 
-/-- Constraint routing and its additional assertions, `src/Options.jl:924-964`.
+/-- Constraint routing and its additional assertions, `src/Options.jl:938-978`.
 Building the tables is delayed until after expression-spec validation. -/
 def routeConstraints (a : Args) (ops actualOps : List (List Nat)) :
     Jl (Option SymReg.SimpCons.ConstraintInput ×
@@ -393,7 +404,7 @@ structure SpecAccess where
   getOptions : ExpressionContext → Jl Nat := fun c => pure c.expressionOptions
   getNode : ExpressionContext → Jl (Nat × Option Nat) := fun c => pure (c.nodeType,c.maxDegree)
 
-/-- Expression metadata and max-degree resolution, `src/Options.jl:966-991`. -/
+/-- Expression metadata and max-degree resolution, `src/Options.jl:980-1005`. -/
 def resolveExpression (a : Args) (defaultNode : Nat → Nat) (ops : List (List Nat))
     (access : SpecAccess := {}) :
     Jl (ExpressionContext × Nat) := do
@@ -412,7 +423,7 @@ def resolveExpression (a : Args) (defaultNode : Nat → Nat) (ops : List (List N
       nodeType := a.nodeType.getD (defaultNode expressionType), maxDegree := a.explicitDegree }
   pure (ctx, withMaxDegree ctx.maxDegree a.operators.isSome ops)
 
-/-- Complexity routing, `src/Options.jl:1005-1013`; supplied custom functions or
+/-- Complexity routing, `src/Options.jl:1019-1027`; supplied custom functions or
 mappings are preserved, and operator keys use the shared dictionary normalizer. -/
 def resolveComplexity (a : Args) (ops : List (List Nat)) : Jl ComplexitySpec := do
   if let some c := a.complexity then return c
@@ -422,7 +433,7 @@ def resolveComplexity (a : Args) (ops : List (List Nat)) : Jl ComplexitySpec := 
   return .mapping (← complexityMapping pairs a.variableWeight a.constantWeight ops
     (if a.operatorWeightValueTypeAny then .any else a.operatorWeightType) a.variableWeightType a.constantWeightType)
 
-/-- Optim.Options parsing, `src/Options.jl:1042-1055`. Keywords are appended
+/-- Optim.Options parsing, `src/Options.jl:1056-1069`. Keywords are appended
 last, so a value inside optimizer_options takes precedence over separate keywords. -/
 def resolveOptimizer (a : Args) : Jl (OptimizerInput × Int × Int) := do
   match a.optimizer with
@@ -433,14 +444,14 @@ def resolveOptimizer (a : Args) : Jl (OptimizerInput × Int × Int) := do
   | input => pure (input, a.optimizerIterations.getD 8, a.optimizerCalls.getD 10000)
 
 /-- Merge explicit, plugin, default weighted instances by concrete type,
-`src/Options.jl:1108-1121,1141-1156`. `sameType` compares concrete Julia types;
+`src/Options.jl:1122-1135,1155-1170`. `sameType` compares concrete Julia types;
 instance fields are retained unchanged. Plugin/default lists can repeat types. -/
 def mergeWeighted {I : Type} (sameType : I → I → Bool)
     (explicit plugin defaults : List (I × JF)) : List (I × JF) :=
   let withPlugin := plugin ++ defaults.filter (fun d => !plugin.any (fun p => sameType p.1 d.1))
   explicit ++ withPlugin.filter (fun d => !explicit.any (fun p => sameType p.1 d.1))
 
--- Source: src/Options.jl:1093-1121,1125-1156
+-- Source: src/Options.jl:1107-1135,1139-1170
 -- p.first => Float64(p.second) for p in something(mutations, ())
 -- p.first => Float64(p.second) for plugin in plugin_tuple for p in plugin_mutations(plugin)
 def convertEntries {m : Type → Type} [Monad m] {I : Type} (convert : JF → m JF)
@@ -460,13 +471,13 @@ def resolveWeighted {m : Type → Type} [Monad m] {I : Type} (sameType : I → I
   pure (mergeWeighted sameType es ps ds)
 
 /-- Legacy mutation weights conflict with explicit default_mutations,
-`src/Options.jl:1073-1079`; mutations itself remains compatible with both. -/
+`src/Options.jl:1087-1093`; mutations itself remains compatible with both. -/
 def validateMutationDefaults (weightsProvided defaultsProvided : Bool) : Jl Unit :=
   if weightsProvided && defaultsProvided then
     throw (.argumentError "`mutation_weights` and `default_mutations` cannot be used together.")
   else pure ()
 
--- Source: src/Options.jl:1072-1079
+-- Source: src/Options.jl:1086-1093
 -- set_mutation_weights = create_mutation_weights(mutation_weights)
 -- if mutation_weights_were_provided && default_mutations !== nothing
 --     throw(ArgumentError("`mutation_weights` and `default_mutations` cannot be used together."))
@@ -476,7 +487,7 @@ def mutationStage (a : Args) : Jl SymReg.MutateGen.MutationWeights := do
   validateMutationDefaults a.weights.isSome a.defaultMutations.isSome
   return weights
 
--- Source: src/Options.jl:1158-1178; Julia base/gmp.jl:396-405
+-- Source: src/Options.jl:1172-1192; Julia base/gmp.jl:396-405
 -- batch_size = batch_size === nothing ? nothing : Int(batch_size)
 def fitsInt (n : Int) : Bool := decide (-9223372036854775808 ≤ n ∧ n ≤ 9223372036854775807)
 
@@ -493,7 +504,7 @@ def validateFinal (precision : Int) (batching : BatchMode) (batchSize : Option I
   let size ← batchSize.mapM toMachineInt
   pure (backend, dir, size)
 
--- Source: src/Options.jl:1034-1040,1258
+-- Source: src/Options.jl:1048-1054,1272
 -- stopping_point = Float64(early_stop_condition)
 -- Base.Fix2(<, stopping_point) ∘ first ∘ tuple
 inductive StopCondition where
@@ -511,8 +522,8 @@ def installStop {m : Type → Type} [Monad m] (threshold : Option JF) (fn : Opti
   if let some t := threshold then return .below (← convert t)
   return fn.elim .absent .function
 
-/-- External constructor calls imported by Options, `src/Options.jl:894-904,
-1017-1032,1047-1052,1060-1070,1160-1172`. A service is a result including errors;
+/-- External constructor calls imported by Options, `src/Options.jl:908-918,
+1031-1046,1061-1066,1074-1084,1174-1186`. A service is a result including errors;
 its opaque successful output is retained. -/
 structure Services where
   threshold64 : JF → Jl JF := fun x => pure (SymReg.Loss.LossPrecision.round .float64 x)
@@ -535,14 +546,14 @@ structure Services where
   recommendLoss : Option Nat → Jl Bool := fun t => pure (recommendExpressionLoss t)
   lossWarning : Option Nat → Jl Unit := fun _ => pure ()
 
-/-- Output directory resolution, `src/Options.jl:1166-1172`. -/
+/-- Output directory resolution, `src/Options.jl:1180-1186`. -/
 def resolveDirectory (directory : Option String) (testing : Bool)
     (temporaryDirectory : Jl String) : Jl (Option String) := do
   if directory.isNone && testing then pure (some (← temporaryDirectory))
   else pure directory
 
 /-- Locals computed before the generated Options struct constructor,
-`src/Options.jl:1180-1182`. -/
+`src/Options.jl:1194-1196`. -/
 structure Parts where
   defaults : Defaults
   operators : Operators
@@ -563,7 +574,7 @@ structure Parts where
   autodiff : Nat
   outputDirectory : Option String
 
-/-- The generated Options struct constructor, `src/Options.jl:1182-1269`.
+/-- The generated Options struct constructor, `src/Options.jl:1196-1283`.
 `source` supplies the untouched fields; constructor-only inputs such as fast_cycle
 have no corresponding output field. -/
 structure ValField (α : Type) where
@@ -641,13 +652,14 @@ def assemble (a : Args) (parts : Parts) : Result :=
     shouldSimplify := resolveSimplify a, elementwiseLoss := a.elementwiseLoss.getD 0,
     popmemberType := selectPopmemberType a.popmemberType }
 
-/-- `Options`, `src/Options.jl:803-1271`, after deprecated-keyword normalization.
+/-- `Options`, `src/Options.jl:805-1285`, after deprecated-keyword normalization.
 Imported methods are supplied as services; no deterministic/parallelism check occurs.
 Numeric type conversion is represented after successful exact Int/Float64 conversion. -/
 def constructParts (s : Services) (a : Args) : Jl Parts := do
   let normalizedState ← resolveReturnState a.returnState a.stateAliases s.depwarn
   if a.npop.isSome then s.depwarn "npop"
   if a.npopulations.isSome then s.depwarn "npopulations"
+  checkFlipProbability (s.depwarn "probability_negate_constant") a.flipProbability a.negateProbability
   let optimizerAlgorithm ← match a.algorithm with
     | .existing identity => pure identity
     | .legacyName name => optimizerFromString (s.depwarn "optimizer_algorithm") s.makeAlgorithm name
@@ -698,13 +710,13 @@ def constructParts (s : Services) (a : Args) : Jl Parts := do
     fraction := SymReg.Loss.LossPrecision.round .float64 d.fraction,
     fractionHof := SymReg.Loss.LossPrecision.round .float64 d.fractionHof,
     fractionGuesses := SymReg.Loss.LossPrecision.round .float64 d.fractionGuesses,
-    negateProbability := SymReg.Loss.LossPrecision.round .float64 d.negateProbability }
+    flipProbability := SymReg.Loss.LossPrecision.round .float64 d.flipProbability }
   pure {
     defaults := stored, operators, lookupOps, constraints, nested, complexity, expression, maxDegree, weights,
     mutations, crossovers,
     optimizer, optimizerAlgorithm, normalizedState, stopCondition, plugins, autodiff, outputDirectory }
 
-/-- `Options`, `src/Options.jl:1182-1271`: construct the final immutable struct only
+/-- `Options`, `src/Options.jl:1196-1285`: construct the final immutable struct only
 after every preceding computation succeeds. -/
 def construct (s : Services) (a : Args) : Jl Result :=
   (constructParts s a).map (assemble a)

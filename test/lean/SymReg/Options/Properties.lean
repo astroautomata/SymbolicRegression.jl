@@ -66,7 +66,7 @@ theorem inverseNormalized_holds : inverseNormalized := by
     unfold opmap inverseOpmap
     repeat' first | omega | split
 
-/-- Source: assignments at src/Options.jl:748-771, independently of the warning table. -/
+/-- Source: assignments at src/Options.jl:750-773, independently of the warning table. -/
 private def ordinaryAliases : List (String × String) :=
   [("hofMigration", "hof_migration"),
    ("shouldOptimizeConstants", "should_optimize_constants"),
@@ -147,6 +147,47 @@ theorem returnStateAliasOrder_holds : returnStateAliasOrder := by
   intro declared a b
   exact ⟨rfl,rfl,rfl,rfl,rfl⟩
 
+/-- The deprecated sign keyword, which the `probNegate` alias assigns, warns and
+then installs its complement as `probability_flip_constant_sign`. The modern keyword
+alone passes through without a warning. -/
+def negateConstantLegacy : Prop := ∀ (kws : Keywords) (v : Value) (warn : Jl Unit)
+    (flip : Option JF) (p : JF) (e : JlError) (a : Args),
+  applyAlias kws "probNegate" v = .ok (setKey kws "probability_negate_constant" v) ∧
+  checkFlipProbability warn flip none = .ok () ∧
+  checkFlipProbability warn none (some p) = warn ∧
+  flipProbabilityInput flip none = flip ∧
+  flipProbabilityInput none (some p) = some (JF.sub (.fin 1) p) ∧
+  construct { depwarn := fun _ => .error e }
+      { a with
+        stateAliases := [], npop := none, npopulations := none
+        flipProbability := none, negateProbability := some p } = .error e ∧
+  (construct {} { negateProbability := some p }).map (fun o =>
+      (o.defaults.flipProbability, o.mutations.head?.map (·.1.constantParameters))) =
+    .ok (SymReg.Loss.LossPrecision.round .float64 (JF.sub (.fin 1) p),
+      some (some (SymReg.Loss.LossPrecision.round .float64 (defaultOptions none).perturbation,
+        SymReg.Loss.LossPrecision.round .float64 (JF.sub (.fin 1) p))))
+
+theorem negateConstantLegacy_holds : negateConstantLegacy := by
+  intro kws v warn flip p e a
+  exact ⟨rfl, rfl, rfl, rfl, rfl, rfl, rfl⟩
+
+example : ∃ o, construct {} { negateProbability := some (.fin (1 / 100)) } = .ok o := ⟨_, rfl⟩
+
+/-- Supplying both sign keywords raises the exact ArgumentError before the
+deprecation warning, for any values and services. -/
+def flipConstantConflict : Prop := ∀ (warn : Jl Unit) (flip p : JF) (s : Services) (a : Args),
+  checkFlipProbability warn (some flip) (some p) = .error (.argumentError flipConflictMessage) ∧
+  flipConflictMessage =
+    "Pass only one of `probability_flip_constant_sign` and the deprecated `probability_negate_constant`." ∧
+  construct s { a with
+    stateAliases := [], npop := none, npopulations := none
+    flipProbability := some flip, negateProbability := some p } =
+    .error (.argumentError flipConflictMessage)
+
+theorem flipConstantConflict_holds : flipConstantConflict := by
+  intro warn flip p s a
+  exact ⟨rfl, rfl, rfl⟩
+
 def weightCreation : Prop := ∀ (w : SymReg.MutateGen.MutationWeights) kws (keywords : Keywords) identity (e : JlError),
   createMutationWeights (.existing identity w) = .ok ⟨some identity,w⟩ ∧
   createMutationWeights (.named kws) = (SymReg.MutateGen.mutationWeights kws).map (fun x => ⟨none,x⟩) ∧
@@ -179,7 +220,7 @@ private def expectedLegacy : Defaults := {
     annealing := false,
     alpha := literal64 (1 / 10),
     perturbation := literal64 (19 / 250),
-    negateProbability := literal64 (1 / 100),
+    flipProbability := literal64 (99 / 100),
     tournamentN := 12,
     tournamentP := literal64 (43 / 50),
     fraction := literal64 (9 / 25000),
@@ -215,7 +256,7 @@ private def expectedOne : Defaults := {
     annealing := true,
     alpha := literal64 (317 / 100),
     perturbation := literal64 (129 / 1000),
-    negateProbability := literal64 (743 / 100000),
+    flipProbability := literal64 (99257 / 100000),
     tournamentN := 15,
     tournamentP := literal64 (491 / 500),
     fraction := literal64 (9 / 25000),
@@ -574,7 +615,7 @@ theorem documentedMutationDefaults_refuted : ¬ documentedMutationDefaults := by
   change (Except.ok (SymReg.Loss.LossPrecision.round .float64 (literal64 (346 / 10000))) : Jl JF) = .ok (.fin (353 / 10000)) at hconstant
   exact (by decide +kernel : SymReg.Loss.LossPrecision.round .float64 (literal64 (346 / 10000)) ≠ .fin (353 / 10000)) (Except.ok.inj hconstant)
 
--- Source: src/Options.jl:830-835
+-- Source: src/Options.jl:844-849
 -- if !isnothing(loss_function) && recommend_loss_function_expression(expression_type)
 --     @warn "The expression type you are using recommends using `loss_function_expression` instead of `loss_function`."
 -- end

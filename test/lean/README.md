@@ -2,7 +2,7 @@
 
 This Lean 4 project models the Julia code at commit `103f5d4299222fa4af70110f4886ced4f3fdac1b`. It reuses the DynamicExpressions.jl Lean model at commit [`097eaa54`](https://github.com/SymbolicML/DynamicExpressions.jl/tree/097eaa548dcf7525dd1f9aa4d1504beb2795f467/test/lean).
 
-The [property registry](registry.tsv) lists 807 properties: 517 proven about the model under their stated assumptions, 90 refuted by counterexamples, and 200 open. The [bug reports](bugs/) and [Julia reproducers](repro/) describe and demonstrate the corresponding behaviour in the Julia package.
+The [property registry](registry.tsv) lists 813 properties: 524 proven about the model under their stated assumptions, 89 refuted by counterexamples, and 200 open. The [bug reports](bugs/) and [Julia reproducers](repro/) describe and demonstrate the corresponding behaviour in the Julia package.
 
 The Lean model is maintained separately from the Julia implementation. A Julia source change does not rebuild or recheck the model. Update the matching Lean definitions and proofs when changing modelled behaviour.
 

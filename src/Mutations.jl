@@ -32,17 +32,46 @@ Pass `default_mutations=()` to disable every automatic default.
 abstract type AbstractMutation end
 
 """
-    ConstantMutation(; perturbation_factor=0.086, probability_negate=0.01)
+    ConstantMutation(; perturbation_factor=0.086, probability_flip_sign=0.99)
 
 Perturb a random constant. `perturbation_factor` scales the magnitude;
-`probability_negate` is the chance of flipping the constant's sign.
+`probability_flip_sign` is the probability of flipping the constant's sign.
+The deprecated keyword `probability_negate` sets `probability_flip_sign` to
+`1 - probability_negate`.
 
 Plugins can scale the perturbation magnitude per call by mutating
 [`ConstantMutationContext`](@ref) inside `condition_mutation!`.
 """
-Base.@kwdef struct ConstantMutation <: AbstractMutation
-    perturbation_factor::Float64 = 0.086
-    probability_negate::Float64 = 0.01
+struct ConstantMutation <: AbstractMutation
+    perturbation_factor::Float64
+    probability_flip_sign::Float64
+end
+function ConstantMutation(;
+    perturbation_factor=0.086, probability_flip_sign=nothing, probability_negate=nothing
+)
+    if probability_negate !== nothing
+        probability_flip_sign !== nothing && throw(
+            ArgumentError(
+                "Pass only one of `probability_flip_sign` and the deprecated `probability_negate`.",
+            ),
+        )
+        Base.depwarn(
+            "`probability_negate` is deprecated. Use `probability_flip_sign = 1 - probability_negate` instead.",
+            :ConstantMutation,
+        )
+        probability_flip_sign = 1 - probability_negate
+    end
+    return ConstantMutation(perturbation_factor, something(probability_flip_sign, 0.99))
+end
+function Base.getproperty(m::ConstantMutation, k::Symbol)
+    if k === :probability_negate
+        Base.depwarn(
+            "`probability_negate` is deprecated. Use `1 - probability_flip_sign` instead.",
+            :getproperty,
+        )
+        return 1 - getfield(m, :probability_flip_sign)
+    end
+    return getfield(m, k)
 end
 
 """

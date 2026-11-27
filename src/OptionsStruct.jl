@@ -233,7 +233,7 @@ struct Options{
     verbosity::Union{Int,Nothing}
     v_print_precision::Val{print_precision}
     save_to_file::Bool
-    probability_negate_constant::Float64
+    probability_flip_constant_sign::Float64
     nops::NOPS
     seed::Union{Int,Nothing}
     elementwise_loss::Union{SupervisedLoss,Function}
@@ -263,6 +263,17 @@ struct Options{
     use_tracing::Val{_use_tracing}
     popmember_type::Type{PM}
     plugins::PT
+end
+
+function Base.getproperty(options::Options, k::Symbol)
+    if k === :probability_negate_constant
+        Base.depwarn(
+            "`probability_negate_constant` is deprecated. Use `1 - probability_flip_constant_sign` instead.",
+            :getproperty,
+        )
+        return 1 - getfield(options, :probability_flip_constant_sign)
+    end
+    return getfield(options, k)
 end
 
 @inline function use_batching(options::AbstractOptions, dataset::Dataset)

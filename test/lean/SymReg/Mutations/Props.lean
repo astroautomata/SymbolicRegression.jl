@@ -102,11 +102,11 @@ def mutate_operator_changes : Prop :=
 /-! ## `mutate_constant`, `mutate_value`, `mutate_factor` -/
 
 /-- The factor of `mutate_factor` from the three draws at cursors `c`, `c + 1`, `c + 2`. -/
-def factorAt (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) (rng : RNG) (c : Nat) : Rat :=
+def factorAt (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (rng : RNG) (c : Nat) : Rat :=
   let fac := pw (pert * temperature + 1 + 1 / 10) (rng.draws c)
   let bigger : Bool := (rng.indexDraws 1 (c + 1)).val = 1
   let fac := if bigger then fac else 1 / fac
-  if rng.draws (c + 2) > pneg then -fac else fac
+  if drawBelowFlipProbability (rng.draws (c + 2)) pflip then -fac else fac
 
 /-- A constant leaf with its value multiplied by `f`. -/
 def scaleConst (mul : T → Rat → T) (f : Rat) : Tree T → Tree T
@@ -120,27 +120,26 @@ give the factor of `mutate_factor`, and the result is the input tree with exactl
 constant multiplied by the factor (`mutate_value`). -/
 def mutate_constant_spec : Prop :=
   ∀ (T : Type) (g : SGraph T) (D fuel tree : Nat) (t : Tree T) (rng : RNG) (mul : T → Rat → T)
-    (pw : Rat → Rat → Rat) (pert temperature pneg : Rat),
+    (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF),
     Graph.unfold g.view fuel tree = some t → Graph.NoAlias g.view tree → DegLe D t →
-    ∃ g' rng', mutateConstant D fuel mul pw pert temperature pneg tree ⟨g, rng⟩ =
+    ∃ g' rng', mutateConstant D fuel mul pw pert temperature pflip tree ⟨g, rng⟩ =
         .ok (tree, ⟨g', rng'⟩) ∧
       ((preorder t).any isConstT = false → g' = g ∧ rng' = rng) ∧
       ((preorder t).any isConstT = true →
         Graph.unfold g'.view (fuel + fuel) tree =
           some (modifyAt t (drawAt rng rng.cursor (eligT isConstT t))
-            (scaleConst mul (factorAt pw pert temperature pneg rng (rng.cursor + 1)))) ∧
+            (scaleConst mul (factorAt pw pert temperature pflip rng (rng.cursor + 1)))) ∧
         rng'.cursor = rng.cursor + 4)
 
-/-- `mutate_factor` negates the factor with probability `m.probability_negate`
-("`probability_negate` is the chance of flipping the constant's sign", `src/Mutations.jl:38`):
-for draws in `[0, 1)` and a positive magnitude, the factor is negative exactly when the
-negation draw falls below `probability_negate`. -/
+/-- `mutate_factor` gives a negative factor exactly when the sign draw is below
+`probability_flip_sign` (`src/MutationFunctions.jl:181-183`). -/
 def mutate_factor_negate : Prop :=
-  ∀ (T : Type) (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) (s : St T),
-    (∀ b r, 0 < b → 0 < pw b r) → 0 ≤ pert → 0 ≤ temperature → 0 ≤ pneg → pneg ≤ 1 →
+  ∀ (T : Type) (pw : Rat → Rat → Rat) (pert temperature pflip : Rat) (s : St T),
+    (∀ b r, 0 < b → 0 < pw b r) → 0 ≤ pert → 0 ≤ temperature → 0 ≤ pflip → pflip ≤ 1 →
+    SymReg.Loss.LossPrecision.round .float64 (.fin pflip) = .fin pflip →
     (∀ i, 0 ≤ s.rng.draws i ∧ s.rng.draws i < 1) →
-    ∃ f s', mutateFactor pw pert temperature pneg s = .ok (f, s') ∧
-      (f < 0 ↔ s.rng.draws (s.rng.cursor + 2) < pneg)
+    ∃ f s', mutateFactor pw pert temperature (.fin pflip) s = .ok (f, s') ∧
+      (f < 0 ↔ drawBelowFlipProbability (s.rng.draws (s.rng.cursor + 2)) (.fin pflip) = true)
 
 /-! ## `mutate_feature` -/
 

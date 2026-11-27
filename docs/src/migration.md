@@ -68,8 +68,10 @@ configuration, and need no changes:
 - `annealing` / `alpha` inject a `SimulatedAnnealingPlugin`.
 - `use_frequency` / `use_frequency_in_tournament` configure the
   `AdaptiveParsimonyPlugin`.
-- `perturbation_factor` / `probability_negate_constant` are applied to the
-  default `ConstantMutation`.
+- `perturbation_factor` / `probability_flip_constant_sign` are applied to the
+  default `ConstantMutation`. The deprecated `probability_negate_constant`
+  (and `probability_negate` in `ConstantMutation`) still work and mean
+  `1 - probability_flip_constant_sign`.
 
 ## New APIs
 

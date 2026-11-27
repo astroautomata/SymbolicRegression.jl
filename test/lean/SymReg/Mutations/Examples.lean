@@ -31,6 +31,22 @@ example : Graph.unfold exG.view 2 2 = some exT ∧ Graph.NoAlias exG.view 2 ∧ 
     SlotsLe 2 0 exG ∧ (2 : Nat) ≤ 65535 :=
   ⟨exG_unfold, exG_noAlias, exT_degLe, exG_slotsLe, by decide⟩
 
+/-- `mutate_factor_negate`: a constant power and a stream of zero draws. -/
+example : (∀ b r : Rat, 0 < b → 0 < (fun _ _ : Rat => (1 : Rat)) b r) ∧
+    (0 : Rat) ≤ 0 ∧ (0 : Rat) ≤ 0 ∧ (0 : Rat) ≤ 1 / 2 ∧ (1 / 2 : Rat) ≤ 1 ∧
+    SymReg.Loss.LossPrecision.round .float64 (.fin (1 / 2)) = .fin (1 / 2) ∧
+    (∀ i, 0 ≤ zeroRng.draws i ∧ zeroRng.draws i < 1) :=
+  ⟨fun _ _ _ => by change (0 : Rat) < 1; decide, by decide, by decide,
+    by decide +kernel, by decide +kernel, by decide +kernel,
+    fun _ => by simp only [zeroRng]; decide⟩
+
+-- A draw equal to probability_flip_sign keeps the sign; a smaller draw flips it.
+example : factorAt (fun _ _ => 1) 0 0 (.fin (1 / 2)) { draws := fun _ => 1 / 2 } 0 = 1 := by
+  decide +kernel
+
+example : factorAt (fun _ _ => 1) 0 0 (.fin (1 / 2)) { draws := fun _ => 1 / 4 } 0 = -1 := by
+  decide +kernel
+
 /-- `arity_picker_weights`. -/
 example : (2 : Nat) ≤ ([1, 2] : List Nat).length ∧ 1 ≤ 2 ∧ 2 ≤ 2 := by decide
 

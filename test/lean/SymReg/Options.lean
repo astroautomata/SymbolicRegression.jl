@@ -2,7 +2,9 @@ import SymReg.Options.Edges
 import DynExpr.Registry.Types
 
 /-!
-Options constructor and struct helpers for SymbolicRegression.jl upstream/master daae84e5.
+Options constructor and struct helpers for SymbolicRegression.jl upstream/master daae84e5
+with PR #788 (65dcb19a), which renames `probability_negate_constant` to
+`probability_flip_constant_sign` and keeps the old keyword as a deprecated complement.
 Source: src/Options.jl and src/OptionsStruct.jl. Constraint and nested-constraint
 builders are imported from SymReg.SimpCons; mutation weights and plugin default
 merging reuse their existing slices. Integer complexity mappings reuse
@@ -55,6 +57,17 @@ def entries : List Entry := [
     statement := "Either order of the return-state aliases keeps the last Boolean; no alias retains the declared value.",
     preconditions := "None.",
     status := .proven, prop := ``returnStateAliasOrder, thm := some ``returnStateAliasOrder_holds },
+  { id := "opts-negate-constant-legacy", juliaFile := "src/Options.jl",
+    juliaFns := ["Options"],
+    statement := "The deprecated probability_negate_constant keyword, which the probNegate alias assigns, runs its deprecation warning and then sets probability_flip_constant_sign to 1 - probability_negate_constant; a throwing warning propagates. The stored field and the default ConstantMutation receive the Float64 conversion of that complement. The modern keyword alone is used unchanged without a warning.",
+    preconditions := "probability_negate_constant is Float64 or an exact real, so 1 - p is rounded once; probability_flip_constant_sign omitted. The full constructor is witnessed with stock services and latest defaults; the warning-error case has no earlier return-state or population alias.",
+    status := .proven, prop := ``negateConstantLegacy, thm := some ``negateConstantLegacy_holds,
+    notes := "Options(probNegate=p) and Options(probability_negate_constant=p) still flip the sign of a mutated constant with probability 1 - p, as before the rename." },
+  { id := "opts-flip-constant-conflict", juliaFile := "src/Options.jl",
+    juliaFns := ["Options"],
+    statement := "Supplying both probability_flip_constant_sign and the deprecated probability_negate_constant (directly or through probNegate) raises ArgumentError(\"Pass only one of `probability_flip_constant_sign` and the deprecated `probability_negate_constant`.\") before the deprecation warning, for any values and services.",
+    preconditions := "No return-state alias, npop or npopulations, whose warnings run first and could throw earlier.",
+    status := .proven, prop := ``flipConstantConflict, thm := some ``flipConstantConflict_holds },
   { id := "opts-weight-creation", juliaFile := "src/Options.jl",
     juliaFns := ["create_mutation_weights", "Options"],
     statement := "Existing mutation weights retain object identity and fields. Named fields use the shared builder with fallible Float64 conversions. An object-valued legacy alias replaces the modern input.",
@@ -250,7 +263,7 @@ def entries : List Entry := [
     status := .proven, prop := ``emptyComplexityTypeError, thm := some ``emptyComplexityTypeError_holds },
   { id := "opts-constant-mutation-defaults", juliaFile := "src/Options.jl",
     juliaFns := ["Options"],
-    statement := "Default mutation conversion preserves every weight and installs the resolved perturbation/negation settings on ConstantMutation.",
+    statement := "Default mutation conversion preserves every weight and installs the Float64 conversions of the resolved perturbation_factor and probability_flip_constant_sign on ConstantMutation.",
     preconditions := "Existing MutationWeights model; default_mutations omitted.",
     status := .proven, prop := ``constantMutationDefaults, thm := some ``constantMutationDefaults_holds },
   { id := "opts-documented-literals", juliaFile := "src/Options.jl",

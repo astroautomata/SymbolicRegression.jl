@@ -28,7 +28,7 @@ throws, independent of RNG, value, temperature and mutation field values.
 Numeric mutation lives in MutationFunctions.jl and is reused below.
 src/InterfaceDataTypes.jl:37-39. -/
 def mutateFallback (typeName : String) (_rng : R) (_value : T)
-    (_temperature perturbation negateProbability : Rat) : Jl T :=
+    (_temperature _perturbation : Rat) (_flipProbability : JF) : Jl T :=
   .error (.errorException
     ("No `mutate_value` method defined for type " ++ typeName ++ ". Please define one."))
 
@@ -103,26 +103,26 @@ def numericSample : Prop := ∀ (T R O : Type) (typeName : String) (draw : R →
  theorem numericSample_holds : numericSample := by intro T R O typeName draw rng options; rfl
 
 def genericHooksFail : Prop := ∀ (T R O : Type) (name : String) (zero : String → ExceptT JlError (StateM Unit) T)
-  (draw : R → Jl T) (rng : R) (options : O) (value : T) (temperature pert pneg : Rat),
+  (draw : R → Jl T) (rng : R) (options : O) (value : T) (temperature pert : Rat) (pflip : JF),
   ((initValue false name zero).run ()) = (.error (.errorException
     ("No `init_value` method defined for type " ++ name ++ ". Please define one.")), ()) ∧
   sampleValue false name draw rng options = .error (.errorException
     ("No `sample_value` method defined for type " ++ name ++ ". Please define one.")) ∧
-  mutateFallback name rng value temperature pert pneg = .error (.errorException
+  mutateFallback name rng value temperature pert pflip = .error (.errorException
     ("No `mutate_value` method defined for type " ++ name ++ ". Please define one.")) ∧
   parseScope name = none
  theorem genericHooksFail_holds : genericHooksFail := by
-  intro T R O name zero draw rng options value temperature pert pneg
+  intro T R O name zero draw rng options value temperature pert pflip
   exact ⟨rfl,rfl,rfl,rfl⟩
 
 private def constantMutationForwardingContract : Prop := ∀ (T : Type) (mul : T → Rat → T)
-  (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) (value : T)
+  (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) (value : T)
   (state : SymReg.Mutations.St T),
-  SymReg.Mutations.mutateValue' mul pw pert temperature pneg value state =
-    SymReg.Mutations.mutateValue mul pw pert temperature pneg value state
+  SymReg.Mutations.mutateValue' mul pw pert temperature pflip value state =
+    SymReg.Mutations.mutateValue mul pw pert temperature pflip value state
 
 private theorem constantMutationForwardingContract_holds : constantMutationForwardingContract := by
-  intro T mul pw pert temperature pneg value state; rfl
+  intro T mul pw pert temperature pflip value state; rfl
 
 private def constantMutationForwardingLaw : Prop := SymReg.Mutations.mutate_value_spec
 
@@ -130,7 +130,7 @@ private theorem constantMutationForwardingLaw_holds : constantMutationForwarding
   SymReg.Mutations.mutate_value_spec_holds
 
 private def unsupportedConstantMutation : Prop := ∀ (T R : Type) (name : String)
-  (rng : R) (value : T) (temperature factor probability : Rat),
+  (rng : R) (value : T) (temperature factor : Rat) (probability : JF),
   mutateFallback name rng value temperature factor probability = .error (.errorException
     ("No `mutate_value` method defined for type " ++ name ++ ". Please define one."))
 

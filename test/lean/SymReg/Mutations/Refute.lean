@@ -19,23 +19,7 @@ theorem mutate_operator_changes_refuted : ¬ mutate_operator_changes := by
   rw [hrun] at hcomp
   exact hne _ hcomp rfl
 
-/-- The stream whose real draws are all `1/2` (index draws zero). -/
-def halfRng : RNG := { draws := fun _ => 1 / 2 }
-
 attribute [local semireducible] Rat.add Rat.mul Rat.inv
-
-/-- `mutate_factor` with the default `probability_negate = 0.01` and a negation draw of `1/2`:
-the factor is `-1`, although `1/2 ≥ 0.01`. -/
-theorem mutate_factor_negate_refuted : ¬ mutate_factor_negate := by
-  intro h
-  obtain ⟨f, s', hrun, hiff⟩ := h Nat (fun _ _ => 1) 0 0 (1 / 100) ⟨exG, halfRng⟩
-    (fun _ _ _ => by decide) (by decide) (by decide) (by decide) (by decide)
-    (fun _ => ⟨by simp only [halfRng]; decide, by simp only [halfRng]; decide⟩)
-  rw [mutateFactor_ok] at hrun
-  cases hrun
-  have hf : factorAt (fun _ _ => 1) 0 0 (1 / 100) halfRng 0 < 0 := by decide
-  have hn : ¬ (halfRng.draws 2 < 1 / 100) := by decide
-  exact hn (hiff.mp hf)
 
 /-- Unary operators only (`nops = (1, 0)`, `D = 2`) and `rand(rng) = 0.0`: `scaled_rand = 0`
 fails every `scaled_rand > csum[i]` test, so the last branch, degree `2`, is taken although it

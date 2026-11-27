@@ -114,7 +114,7 @@ end
         return DiscreteValue(value.value + 1)
     end
 
-    mutation = ConstantMutation(; perturbation_factor=0.2, probability_negate=0.3)
+    mutation = ConstantMutation(; perturbation_factor=0.2, probability_flip_sign=0.7)
     options = Options(;
         binary_operators=(combine,),
         unary_operators=(),

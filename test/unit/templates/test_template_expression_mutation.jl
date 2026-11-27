@@ -76,7 +76,7 @@
     @test any(new_p1 .!= original_p1) ⊻ any(new_p2 .!= original_p2)
 
     configured_mutation = ConstantMutation(;
-        perturbation_factor=10.0, probability_negate=1.0
+        perturbation_factor=10.0, probability_flip_sign=0.0
     )
     configured_expr = mutate_constant(
         copy(expr), temperature, options, configured_mutation, MersenneTwister(1)

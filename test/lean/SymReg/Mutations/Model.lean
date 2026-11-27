@@ -13,8 +13,8 @@ A mutation runs in `M T`, a state monad over the heap and the RNG stream, on top
 `Jl` exception monad. Every call into `rand` consumes one position of the abstract stream
 `DynExpr.Expressions.Sampling.RNG`: index draws (`rand(rng, 1:n)`, `rand(rng, xs)`,
 `rand(rng, Bool)`, `rand(rng, NodeSampler(...))`) read `indexDraws`, real draws (`rand(rng)`,
-`rand(rng, T)`, `randn(rng, T)`) read `draws`. Real draws are exact rationals; Float64 rounding
-of `rand(rng) * total` and of the constant factor is not modelled.
+`rand(rng, T)`, `randn(rng, T)`) read `draws`, representing their values as exact rationals.
+Rounding of the factor's magnitude and of `rand(rng) * total` is outside this model.
 
 Nodes are plain `Node{T,D}` objects unless a function takes `isGraph` (`GraphNode`, whose
 `NodeSampler` and `length` see each object once). `D` is the maximum degree of the node type
@@ -192,10 +192,17 @@ def mutateOperator (fuel : Nat) (nops : List Nat) (tree : Addr)
     setOpM node o
     pure tree
 
+/-- Julia's strict `rand(rng) < m.probability_flip_sign` (`src/MutationFunctions.jl:181`). -/
+def drawBelowFlipProbability (draw : Rat) (pflip : JF) : Bool :=
+  match pflip with
+  | .fin p => decide (draw < p)
+  | .posInf => true
+  | .negInf | .nan => false
+
 /-- `mutate_factor(T, temperature, m, rng)` (`src/MutationFunctions.jl:173-185`), with
-`m.perturbation_factor = pert`, `m.probability_negate = pneg`, and `pw b r` the value of
+`m.perturbation_factor = pert`, `m.probability_flip_sign = pflip`, and `pw b r` the value of
 `T(b^r)`. -/
-def mutateFactor (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) : M T Rat := do
+def mutateFactor (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF) : M T Rat := do
   let bottom : Rat := 1 / 10
   let maxChange := pert * temperature + 1 + bottom
   let r ← randU
@@ -203,31 +210,31 @@ def mutateFactor (pw : Rat → Rat → Rat) (pert temperature pneg : Rat) : M T 
   let makeConstBigger ← randBool
   let factor := if makeConstBigger then factor else 1 / factor
   let u ← randU
-  pure (if u > pneg then -factor else factor)
+  pure (if drawBelowFlipProbability u pflip then -factor else factor)
 
 /-- `mutate_value(rng, val::Number, temperature, m)` (`src/MutationFunctions.jl:167-171`);
 `mul v f` is `val * f`. -/
-def mutateValue (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature pneg : Rat)
+def mutateValue (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF)
     (v : T) : M T T := do
-  let f ← mutateFactor pw pert temperature pneg
+  let f ← mutateFactor pw pert temperature pflip
   pure (mul v f)
 
 /-- `_mutate_value(rng, val, temperature, m, options)` (`src/MutationFunctions.jl:151-165`):
 both methods call `mutate_value`. -/
-def mutateValue' (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature pneg : Rat)
+def mutateValue' (mul : T → Rat → T) (pw : Rat → Rat → Rat) (pert temperature : Rat) (pflip : JF)
     (v : T) : M T T :=
-  mutateValue mul pw pert temperature pneg v
+  mutateValue mul pw pert temperature pflip v
 
 /-- `mutate_constant(tree, temperature, options, m, rng)` (`src/MutationFunctions.jl:136-149`). -/
 def mutateConstant (D fuel : Nat) (mul : T → Rat → T) (pw : Rat → Rat → Rat)
-    (pert temperature pneg : Rat) (tree : Addr) : M T Addr := do
+    (pert temperature : Rat) (pflip : JF) (tree : Addr) : M T Addr := do
   let has ← anyM D fuel tree (fun _ c => c.degree == 0 && c.constant)   -- `has_constants`
   if !has then pure tree
   else do
     let node ← sampleM fuel false tree (cellP (fun c => c.degree == 0 && c.constant))
     let c ← rd node
     let v ← liftJ (match c.val with | some v => .ok v | none => .error .undefRefError)
-    let v' ← mutateValue' mul pw pert temperature pneg v
+    let v' ← mutateValue' mul pw pert temperature pflip v
     setValM node v'
     pure tree
 
