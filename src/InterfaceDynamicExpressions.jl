@@ -120,6 +120,7 @@ function expected_array_type(X::AbstractArray, ::Type, ::Val{:eval_grad_tree_arr
     typeof(similar(X))
 end
 expected_array_type(::Matrix{T}, ::Type) where {T} = Vector{T}
+expected_array_type(::DE.FeatureMajorMatrix{T}, ::Type) where {T} = Vector{T}
 expected_array_type(::SubArray{T,2,Matrix{T}}, ::Type) where {T} = Vector{T}
 
 """

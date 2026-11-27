@@ -5,6 +5,7 @@ import SymReg.ConstOpt.Restarts
 import SymReg.ConstOpt.Identity
 import SymReg.ConstOpt.Construction
 import SymReg.ConstOpt.TemplateBridge
+import SymReg.ConstOpt.Hoist
 import DynExpr.Registry.Types
 
 /-!
@@ -19,6 +20,16 @@ namespace SymReg.ConstOpt
 open DynExpr.Registry
 
 def entries : List Entry := [
+  { id := "copt-hoist-eval-equiv", juliaFile := "src/ConstantOptimization.jl",
+    juliaFns := ["_plan_hoist", "_has_any_constant", "_collect_hoist_inputs!", "_build_hoisted_node", "_try_hoist_for_optimization"],
+    statement := "Hoisting and deduplicating maximal constant-free subtrees into X_hoisted preserves DFS constant parameter order (opt_refs) and evaluates identically to the original tree for every parameter vector and every sample environment.",
+    preconditions := "Plain non-shared Expression node tree; valid hoisted subtree evaluations on X_base."
+    status := .proven, prop := ``hoist_eval_equiv, thm := some ``hoist_eval_equiv_holds },
+  { id := "copt-with-eval-x-frame", juliaFile := "src/Dataset.jl",
+    juliaFns := ["with_eval_X"],
+    statement := "with_eval_X(dataset, X_eval) installs the hoisted evaluation matrix and its feature count while preserving raw X, y, weights, n, use_baseline, and baseline_loss.",
+    preconditions := "None."
+    status := .proven, prop := ``with_eval_x_frame, thm := some ``with_eval_x_frame_holds },
   { id := "copt-numeric-support", juliaFile := "src/ConstantOptimization.jl",
     juliaFns := ["can_optimize"],
     statement := "The Number fallback returns true. The expression fallback dispatches on the actual element type and forwards the original options, preserving result, error and effects.",

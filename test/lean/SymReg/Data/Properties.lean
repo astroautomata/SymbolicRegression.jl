@@ -180,6 +180,50 @@ theorem batchMetadata_holds : batchMetadata := by
   intro R rng sample
   constructor <;> intros <;> simp_all [batchDefault, batchWithRNG, Except.map]
 
+/-- `fill!(d, val)` synchronizes `eval_X(d)` when it is a distinct `FeatureMajorMatrix`
+copy without double-filling when `eval_X(d) === d.X`; `eval_tree_dispatch` selects `eval_X`
+iff `turbo = false`; `expected_array_type` on `FeatureMajorMatrix` gives `Vector{T}` for
+expressions and `Any` for `TemplateExpression`. -/
+def evalXLayoutContract : Prop :=
+  (∀ (d x xe : Nat) (v : Int) (s : Nat → List Int), x ≠ xe →
+    let r := fillDatasetWithEvalX (typedProperties x none none [])
+      (fun _ st => (.ok (.array xe), st)) denseFill d v s
+    r.1 = .ok d ∧ r.2 x = List.replicate (s x).length v ∧
+      r.2 xe = List.replicate (s xe).length v ∧
+      (∀ i, i ≠ x → i ≠ xe → r.2 i = s i)) ∧
+  (∀ (d x : Nat) (v : Int),
+    fillDatasetWithEvalX (properties (.array x) .nothing .nothing (.namedTuple []))
+      (fun _ st => (.ok (.array x), st)) recordFill d v [] = (.ok d, [(x, v)])) ∧
+  (∀ (M : Type) (rawX evalX : M),
+    dispatchInputMatrix true rawX evalX = rawX ∧
+    dispatchInputMatrix false rawX evalX = evalX) ∧
+  (∀ (vecTypeId : Nat),
+    expectedArrayTypeFeatureMajor false vecTypeId = some vecTypeId ∧
+    expectedArrayTypeFeatureMajor true vecTypeId = none)
+
+theorem evalXLayoutContract_holds : evalXLayoutContract := by
+  refine ⟨?_, ?_, ?_, ?_⟩
+  · intro d x xe v s hne
+    refine ⟨?_, ?_, ?_, ?_⟩
+    · simp [fillDatasetWithEvalX, fillDataset, fillDataset.go, typedProperties,
+        fillValue, fillValues, denseFill, Except.map, hne]
+    · simp [fillDatasetWithEvalX, fillDataset, fillDataset.go, typedProperties,
+        fillValue, fillValues, denseFill, Except.map, hne]
+    · simp [fillDatasetWithEvalX, fillDataset, fillDataset.go, typedProperties,
+        fillValue, fillValues, denseFill, Except.map, hne, Ne.symm hne]
+    · intro i hix hixe
+      simp [fillDatasetWithEvalX, fillDataset, fillDataset.go, typedProperties,
+        fillValue, fillValues, denseFill, Except.map, hne, Ne.symm hne, hix, hixe]
+  · intro d x v
+    simp [fillDatasetWithEvalX, fillDataset, fillDataset.go, properties,
+      fillValue, fillValues, recordFill, Except.map]
+  · intro M rawX evalX
+    exact ⟨rfl, rfl⟩
+  · intro vecTypeId
+    exact ⟨rfl, rfl⟩
+
+example : (0 : Nat) ≠ 1 := by decide
+
 open DynExpr.Registry
 
 def entries : List Entry := [
@@ -203,7 +247,12 @@ def entries : List Entry := [
     juliaFns := ["batch", "get_full_dataset", "get_indices", "propertynames", "getproperty"],
     statement := "A batch retains its source and signed indices unchanged, counts repeated samples, and forwards property names. Random batch construction forwards the exact sampler error or wraps the drawn indices."
     preconditions := "None; sampler receives the signed size, including negative sizes."
-    status := .proven, prop := ``batchMetadata, thm := some ``batchMetadata_holds }
+    status := .proven, prop := ``batchMetadata, thm := some ``batchMetadata_holds },
+  { id := "dataset-eval-x-layout", juliaFile := "src/Dataset.jl",
+    juliaFns := ["eval_X", "fill!", "eval_tree_dispatch", "expected_array_type"],
+    statement := "fill!(d, val) fills eval_X(d) when it is a distinct FeatureMajorMatrix copy and skips double-filling when aliased to d.X; eval_tree_dispatch selects eval_X(d) iff turbo=false; expected_array_type on FeatureMajorMatrix gives Vector{T} for Expression and Any for TemplateExpression."
+    preconditions := "Distinct array references for the FeatureMajorMatrix fill clause (witnessed by 0 != 1)."
+    status := .proven, prop := ``evalXLayoutContract, thm := some ``evalXLayoutContract_holds }
 ]
 
 end SymReg.Data
