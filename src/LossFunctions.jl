@@ -87,9 +87,7 @@ end
         )
             X = options.turbo isa Val{true} ? dataset.X : eval_X(dataset)
             A = expected_array_type(X, typeof(tree))
-            out, complete = eval_tree_array(
-                tree, X, options; eval_context=eval_context
-            )
+            out, complete = eval_tree_array(tree, X, options; eval_context=eval_context)
             if isnothing(out)
                 return out, false
             else
@@ -104,9 +102,7 @@ end
         )
             X = options.turbo isa Val{true} ? dataset.X : eval_X(dataset)
             A = expected_array_type(X, typeof(tree))
-            out, complete = eval_tree_array(
-                tree, X, options; eval_context=eval_context
-            )
+            out, complete = eval_tree_array(tree, X, options; eval_context=eval_context)
             if isnothing(out)
                 return out, false
             else
