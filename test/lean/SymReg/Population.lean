@@ -64,10 +64,9 @@ def entries : List Entry := [
     status := .refuted, prop := ``tournament_member_live, thm := some ``tournament_member_live_refuted,
     notes := "The nested tournament overwrites the task's scratch indices. The outer tournament returns a live population member outside its original sample. Membership holds when hooks leave the sample and member vector unchanged." },
   { id := "pop-tournament-nan", juliaFile := "src/Population.jl", juliaFns := ["_best_of_sample", "best_of_sample"]
-    statement := "With tournament_selection_p == 1 (first place), a sampled member whose adjusted cost is NaN never wins when some sampled member has a non-NaN adjusted cost (the code comment at src/Population.jl:202: 'a NaN cost never does')."
+    statement := "With tournament_selection_p == 1 (first place), a sampled member whose adjusted cost is NaN never wins when some sampled member has a non-NaN adjusted cost."
     preconditions := "Distinct sampled indices in range; at least one non-NaN adjusted cost in the sample."
-    status := .refuted, prop := ``tournament_nan, thm := some ``tournament_nan_refuted
-    notes := "Bug: the first-place loop (src/Population.jl:203-209) starts from best_cost = adjusted_cost(1) and replaces it only when cost < best_cost; if the first sampled member's cost is NaN, every comparison with NaN is false and the NaN member wins. _best_of_sample([m_nan, m_1], [1, 2], Options(; tournament_selection_p=1.0, ...); plugin_states) returns the member with cost NaN, not the member with cost 1.0." },
+    status := .proven, prop := ``tournament_nan, thm := some ``tournament_nan_holds },
   { id := "pop-tournament-first-min", juliaFile := "src/Population.jl", juliaFns := ["_best_of_sample", "best_of_sample"]
     statement := "When first place is taken (p == 1.0 or the drawn place is 1) and no sampled adjusted cost L(member.cost) * prod(multipliers) is NaN, the winner has the minimal adjusted cost of the sample and is the first sampled position with that cost."
     preconditions := "Nonempty sample with indices in range; no NaN adjusted cost (NaN is covered by pop-tournament-nan); infinities allowed."
@@ -75,8 +74,7 @@ def entries : List Entry := [
   { id := "pop-tournament-rank", juliaFile := "src/Population.jl", juliaFns := ["_best_of_sample", "bottomk_fast"]
     statement := "When place k >= 2 is drawn, the winner holds the k-th place of the sample in the isless order of adjusted costs (ties in any order), as documented for tournament_selection_p ('the next fittest with probability p*(1-p), and so forth')."
     preconditions := "Distinct sampled indices in range; 2 <= k <= tournament_selection_n."
-    status := .refuted, prop := ``tournament_rank, thm := some ``tournament_rank_refuted
-    notes := "Bug: bottomk_fast (src/Utils.jl:97-131), used at src/Population.jl:211, initialises its buffer with (typemax(T), index 1) and inserts x[i] only when x[i] < minval[end]; costs equal to Inf (the cost of every invalid expression) or NaN never enter, so when fewer than k sampled costs are finite the k-th slot still holds the placeholder index 1. bottomk_fast([5.0, Inf], 2) returns indices [1, 1]: place 2 of the sample [5.0, Inf] goes to the cost-5.0 member (first place) instead of the Inf member; when place 2 is drawn the true second-best is never chosen." },
+    status := .proven, prop := ``tournament_rank, thm := some ``tournament_rank_holds },
   { id := "pop-finalize-costs", juliaFile := "src/Population.jl", juliaFns := ["finalize_costs"]
     statement := "With batching, finalize_costs sets every member's loss to its full-data loss and cost to loss_to_cost(loss, ...), leaves every other object unchanged and returns num_evals = pop.n; without batching nothing changes and num_evals = 0."
     preconditions := "Loss evaluation and loss_to_cost arbitrary functions of the member's tree."
